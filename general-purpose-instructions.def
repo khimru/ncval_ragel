@@ -1,0 +1,49 @@
+# File format: three rows separated by commas.
+################################################################################
+# First column: instruction description.
+#   Includes name of the instruction and arguments.
+#
+#   Arguments consist of two parts: argument type and argument size.
+#
+#      Possible argument types:
+#	a: Accumulator (%al/%ax/%eax/%rax depending on size)
+#	d: Accumulator pair (%dx:%ax/%edx:%eax/%rdx:%rax depending on size)
+#	E: General purpose register or memory operand specified by the r/m
+#	   field of the ModRM byte.  For memory operands, the ModRM byte may
+#	   be followed by a SIB byte to specify one of the indexed
+#	   register-indirect addressing forms.
+#	G: General purpose register specified by the reg field of ModRM.
+#	I: Immediate value encoded in the instruction.
+#      Possible sizes:
+#	␀: A byte, word, doubleword, or quadword (in 64-bit mode),
+#	   depending on the effective operand size.
+#	b: A byte, irrespective of the effective operand size.
+#	v: A word, doubleword, or quadword (in 64-bit mode), depending on
+#	   the effective operand size.
+#	z: A word if the effective operand size is 16 bits, or a doubleword
+#	   if the effective operand size is 32 or 64 bits.
+#################################################################################
+# Second column: instruction opcodes.
+#   Includes all opcode bytes.  If first opcode bytes is 0x66, 0xf2, or 0xf3
+#   then they can be moved before other prefixes (and will be moved before REX
+#   prefix if it's allowed).  Should include opcode "bytes" /0, /1, ..., /7 if
+#   part of the opcode is stored in ModRM byte.
+#################################################################################
+# Third column: additional instruction notes.
+#   Different kind of notes for the instruction: untypical prefixes (for example
+#   "lock" prefix or "rep" prefix), CPUID checks, etc.
+#
+#     Possible prefixes:
+#	condrep: prefixes "repe" and "repne" are allowed for the instruction
+#	lock: prefix "lock" is allowed for the instruction
+#	rep: prefix "rep" is allowed for the instruction
+#
+#     Possible CPUID values:
+#	x87: x87 instruction
+#################################################################################
+add G E, 0x00, lock
+add E G, 0x02, lock
+add I a, 0x04, lock
+adc G E, 0x10, lock
+adc E G, 0x12, lock
+adc I a, 0x14, lock
