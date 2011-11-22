@@ -19,29 +19,31 @@
     define(｢insttype_$1｣,)｣)｢｣｣)
   define(｢insttype｣,｢@insttype｢_｣$1｣)
   define(｢instruction｣, ｢ifelse(｢$1｣, , ,
-    ｢instruction_select(possible_operand_prefixes(
+    ｢instruction_select(possible_command_modes(
     shift(split_argument($1))), $@)｣)｣)
-  define(｢possible_operand_prefixes｣,
-    ｢return_operand_prefixes(_possible_operand_prefixes($@))｣)
-  define(｢_possible_operand_prefixes｣,｢ifelse($#,0,｢unknown｣,
-    $#,1,｢｢possible_operand_prefix_｣substr($1,1)｣(substr($1,0,1)),
-    ｢_check_prefixes_compatibility(｢possible_operand_prefix_｣substr($1,1)(
-    substr($1,0,1)),_possible_operand_prefixes(shift($@)))｣)｣)
+  define(｢possible_command_modes｣,
+    ｢return_operand_modes(_possible_command_modes($@))｣)
+  define(｢_possible_command_modes｣,｢ifelse($#,0,｢unknown｣,
+    $#,1,｢｢possible_command_mode_｣substr($1,1)｣(substr($1,0,1)),
+    ｢_check_prefixes_compatibility(｢possible_command_mode_｣substr($1,1)(
+    substr($1,0,1)),_possible_command_modes(shift($@)))｣)｣)
   # Operand sizes mostly follow AMD manual
-  define(｢possible_operand_prefix_a｣,｢data16｣)
-  define(｢possible_operand_prefix_b｣,｢unknown｣) # Other operands will determine
-  define(｢possible_operand_prefix_v｣,｢data16rexw｣)
-  define(｢possible_operand_prefix_z｣,｢data16rexw｣)
+  define(｢possible_command_mode_a｣,｢data16｣)
+  define(｢possible_command_mode_b｣,｢unknown｣) # Other operands will determine
+  define(｢possible_command_mode_r｣,｢rexbreg｣)
+  define(｢possible_command_mode_v｣,｢data16rexw｣)
+  define(｢possible_command_mode_z｣,｢data16rexw｣)
   # This is special prefix not included in AMD manual: w bit selects between
   # 8bit and 16/32/64 bit versions
-  define(｢possible_operand_prefix_｣,｢size8data16rexw｣)
-  define(｢return_operand_prefixes｣,｢ifelse(
+  define(｢possible_command_mode_｣,｢size8data16rexw｣)
+  define(｢return_operand_modes｣,｢ifelse(
      $1,｢unknown｣,｢none｣,
      $1,｢none｣,｢none｣,
      $1,｢size8data16rexw｣,｢size8data16rexw｣,
      $1,｢data16｣,｢data16｣,
      $1,｢data16rexw｣,｢data16rexw｣,
      $1,｢rexw｣,｢rexw｣,
+     $1,｢rexbreg｣,｢rexbreg｣,
      ｢fatal_error(Incorrect prefix size)｣)｣)
   define(｢_check_prefixes_compatibility｣,｢ifelse(
     ｢unknown｣,$1,$2,
@@ -58,6 +60,9 @@
     ｢$1｣, ｢data16rexw｣,
       ｢instruction_select(｢data16｣, shift($@))｣  ｢instruction_select(
 		   ｢none｣, shift($@))｣  ｢instruction_select(｢rexw｣, shift($@))｣,
+    ｢$1｣, ｢rexbreg｣,
+      ｢instruction_separator｢｣(rex_b? instruction_body(
+      ｢none｣, $2, regopcode($3))｣,
     ｢$1｣, ｢size8｣,
       ｢ifelse(index(｢$4｣, ｢lock｣), -1, 
 	｢instruction_separator｢｣｢(REX_RXB?｣ instruction_body($@)｣,
@@ -90,6 +95,9 @@
   define(｢setwflag｣, ｢_setwflag(split_argument($1))｣)
   define(｢_setwflag｣, ｢format(｢0x%02x｣, eval($1 + 1)) translit(
 							  shift($@), ｢,｣, ｢ ｣)｣)
+  define(｢regopcode｣, ｢_regopcode(split_argument($1))｣)
+  define(｢_regopcode｣, ｢ifelse($#, 1, ｢chartest(｢(c & 0xf8) == $1｣)｣,
+    ｢$1 _regopcode(shift($@))｣)｣)
   define(｢opcode_nomodrm｣, ｢_opcode_nomodrm(
     regexp(｢$@｣, ｢\(.*\)/[0-7]\(.*\)｣, ｢\1\2｣), $@)｣)
   define(｢_opcode_nomodrm｣, ｢ifelse(｢$1｣, , ｢begin_opcode((trim(
@@ -127,11 +135,13 @@
   define(｢instruction_argument_size_locksize8｣, ｢8bit｣)
   define(｢instruction_argument_size_lockrexw｣, ｢64bit｣)
   define(｢instruction_argument_size_lockrexw_I｣, ｢32bit｣)
-  define(｢instruction_argument_size_a｣, ｢16bit｣)
+  define(｢instruction_argument_size_r｣, ｢64bit｣)
   define(｢instruction_implied_arguments｣, ｢ifelse(eval(｢$#>2｣), ｢1｣,
     ｢instruction_implied_arguments(｢$1｣, shift(shift($@)))｣)｢｣ifelse(
       substr(｢$2｣, ｢0｣, ｢1｣), ｢a｣,
       ｢ ｣｢operand｣decr(decr(｢$#｣))｢_accumulator｣,
+      substr(｢$2｣, ｢0｣, ｢1｣), ｢r｣,
+      ｢ ｣｢operand｣decr(decr(｢$#｣))｢_from_opcode｣,
       substr(｢$2｣, ｢0｣, ｢1｣), ｢I｣,
       ｢ ｣｢operand｣decr(decr(｢$#｣))｢_immediate｣)｣)
   define(｢instruction_modrm_arguments｣, ｢ifelse(index(｢$2｣, ｢ G｣), -1,
@@ -174,14 +184,14 @@
 	    ｢instruction_immediate_arguments_$1｣,
 	    ｢ifelse(instruction_immediate_arguments_lock$1,
 	      ｢instruction_immediate_arguments_lock$1｣,
-	      ｢fatal_error(Can not determine argument size)｣,
+	      ｢fatal_error(Can not determine immediate size)｣,
 	      instruction_immediate_arguments_lock$1)｣,
 	    instruction_immediate_arguments_$1)｣,
 	  instruction_immediate_arguments_lock$1_$2)｣,
 	instruction_immediate_arguments_$1_$2)｣,
       ｢ifelse(trim(｢instruction_immediate_arguments_｣substr($2, ｢1｣)),
 	｢instruction_immediate_arguments_｣substr($2, ｢1｣),
-	｢fatal_error(Can not determine argument size)｣,
+	｢fatal_error(Can not determine immediate size)｣,
 	｢instruction_immediate_arguments_｣substr($2, ｢1｣))｣))｣)
   define(｢instruction_immediate_arguments_lockdata16｣, )
   define(｢instruction_immediate_arguments_locknone｣, )
@@ -191,7 +201,7 @@
   define(｢instruction_immediate_arguments_locknone_I｣, ｢imm32｣)
   define(｢instruction_immediate_arguments_locksize8_I｣, ｢imm8｣)
   define(｢instruction_immediate_arguments_lockrexw_I｣, ｢imm32｣)
-  define(｢instruction_immediate_arguments_a｣, ｢16bit｣)
+  define(｢instruction_immediate_arguments_r｣, )
 
   instructions_defines(include(｢general-purpose-instructions.def｣))
 

@@ -22,6 +22,7 @@
   define(｢operand0_accumulator｣, )
   define(｢operand0_from_modrm_reg｣, )
   define(｢operand0_from_modrm_rm｣, )
+  define(｢operand0_from_opcode｣, )
   define(｢operand0_rm｣, )
   define(｢operand1_8bit｣, )
   define(｢operand1_16bit｣, )
