@@ -62,6 +62,7 @@ or E G, 0x0a, lock
 or I a, 0x0c, lock
 pop rr, 0x58
 push rr, 0x50
+push Iz, 0x68
 sbb G E, 0x18, lock
 sbb E G, 0x1a, lock
 sbb I a, 0x1c, lock

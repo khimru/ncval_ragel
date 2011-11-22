@@ -61,7 +61,9 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
   int print_rip = FALSE;
   int rex_bits = 0;
   int maybe_rex_bits = 0;
-  int prefix = FALSE;
+  int show_name_suffix = FALSE;
+#define print_name(x) (printf((x)), shown_name += strlen((x)))
+  int shown_name = 0;
   int i;
 
   printf("%8x:\t", begin - (uint8_t *)userdata);
@@ -73,27 +75,52 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
     }
   }
   printf("\t");
-  for (i=instruction->operands_count-1;i>=0;i--) {
-    if ((instruction->operands[i].name >= REG_R8) &&
-	(instruction->operands[i].name <= REG_R15)) {
-      rex_bits++;
-    } else if (instruction->operands[i].name == REG_RM) {
-      if ((instruction->rm.base >= REG_R8) &&
-	  (instruction->rm.base <= REG_R15)) {
-	rex_bits++;
-      } else if ((instruction->rm.base == REG_NONE) ||
-		 (instruction->rm.base == REG_RIP)) {
-        maybe_rex_bits++;
+  if (instruction->operands_count > 0) {
+    show_name_suffix = TRUE;
+    for (i=instruction->operands_count-1;i>=0;i--) {
+      if ((instruction->operands[i].name == REG_IMM) ||
+	  (instruction->operands[i].name == REG_RM)) {
+	if (show_name_suffix) {
+	  switch (instruction->operands[i].size) {
+	    case OperandSize8bit: show_name_suffix = 'b'; break;
+	    case OperandSize16bit: show_name_suffix = 'w'; break;
+	    case OperandSize32bit: show_name_suffix = 'l'; break;
+	    case OperandSize64bit: show_name_suffix = 'q'; break;
+	    default: assert(FALSE);
+	  }
+	  if (!strcmp(instruction->name, "push")) {
+	    /* Temporary hack till we'll add implicit arguments */
+	    if (show_name_suffix == 'l') {
+	      show_name_suffix = 'q';
+	    }
+	    if (instruction->prefix.rex == 0x48) {
+	      print_name("rex.W ");
+	    }
+	  }
+	}
+      } else {
+	show_name_suffix = FALSE;
       }
-      if ((instruction->rm.index >= REG_R8) &&
-	  (instruction->rm.index <= REG_R15)) {
+      if ((instruction->operands[i].name >= REG_R8) &&
+	  (instruction->operands[i].name <= REG_R15)) {
 	rex_bits++;
+      } else if (instruction->operands[i].name == REG_RM) {
+	if ((instruction->rm.base >= REG_R8) &&
+	    (instruction->rm.base <= REG_R15)) {
+	  rex_bits++;
+	} else if ((instruction->rm.base == REG_NONE) ||
+		   (instruction->rm.base == REG_RIP)) {
+	  maybe_rex_bits++;
+	}
+	if ((instruction->rm.index >= REG_R8) &&
+	    (instruction->rm.index <= REG_R15)) {
+	  rex_bits++;
+	}
       }
     }
   }
   if (instruction->prefix.lock) {
-    printf("lock ");
-    prefix = TRUE;
+    print_name("lock ");
   }
   i = (instruction->prefix.rex & 0x01) +
       ((instruction->prefix.rex & 0x02) >> 1) +
@@ -101,26 +128,31 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
   if (!((i == rex_bits) ||
 	(maybe_rex_bits &&
 	 (instruction->prefix.rex & 0x01) && (i == rex_bits + 1)))) {
-    printf("rex.");
+    print_name("rex.");
     if (instruction->prefix.rex & 0x08) {
-      printf("W");
+      print_name("W");
     }
     if (instruction->prefix.rex & 0x04) {
-      printf("R");
+      print_name("R");
     }
     if (instruction->prefix.rex & 0x02) {
-      printf("X");
+      print_name("X");
     }
     if (instruction->prefix.rex & 0x01) {
-      printf("B");
+      print_name("B");
     }
-    printf(" ");
-    prefix = TRUE;
+    print_name(" ");
   }
-  if (prefix) {
-    printf("%s", instruction->name);
-  } else {
-    printf("%-6s", instruction->name);
+#undef print_name
+  printf("%s", instruction->name);
+  shown_name += strlen(instruction->name);
+  if (show_name_suffix) {
+    printf("%c", show_name_suffix);
+    shown_name++;
+  }
+  while (shown_name < 6) {
+    printf(" ");
+    shown_name++;
   }
   for (i=instruction->operands_count-1;i>=0;i--) {
     printf("%c", delimeter);
@@ -374,10 +406,10 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
     printf("%8x:\t", begin - (uint8_t *)userdata);
     for (p = begin; p < begin + 7; p++) {
       if (p >= end) {
-        printf("\n");
-        return;
+	printf("\n");
+	return;
       } else {
-        printf("%02x ", *p);
+	printf("%02x ", *p);
       }
     }
     begin += 6;

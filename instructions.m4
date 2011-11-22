@@ -145,6 +145,9 @@
   define(｢instruction_argument_size_data16_v｣, ｢16bit｣)
   define(｢instruction_argument_size_none_v｣, ｢32bit｣)
   define(｢instruction_argument_size_rexw_v｣, ｢64bit｣)
+  define(｢instruction_argument_size_data16_z｣, ｢16bit｣)
+  define(｢instruction_argument_size_none_z｣, ｢32bit｣)
+  define(｢instruction_argument_size_rexw_z｣, ｢32bit｣)
   define(｢instruction_argument_size_d｣, ｢32bit｣)
   define(｢instruction_argument_size_q｣, ｢64bit｣)
   define(｢instruction_argument_size_r｣, ｢64bit｣)
@@ -203,7 +206,10 @@
 	instruction_immediate_arguments_$1_$2)｣,
       ｢ifelse(trim(｢instruction_immediate_arguments_｣substr($2, ｢1｣)),
 	｢instruction_immediate_arguments_｣substr($2, ｢1｣),
-	｢fatal_error(Can not determine immediate size)｣,
+	｢ifelse(trim(｢instruction_immediate_arguments_$1_｣substr($2, ｢1｣)),
+	  ｢instruction_immediate_arguments_$1_｣substr($2, ｢1｣),
+	  ｢fatal_error(Can not determine immediate size)｣,
+	  ｢instruction_immediate_arguments_$1_｣substr($2, ｢1｣))｣,
 	｢instruction_immediate_arguments_｣substr($2, ｢1｣))｣))｣)
   define(｢instruction_immediate_arguments_lockdata16｣, )
   define(｢instruction_immediate_arguments_locknone｣, )
@@ -217,6 +223,9 @@
   define(｢instruction_immediate_arguments_q｣, )
   define(｢instruction_immediate_arguments_r｣, )
   define(｢instruction_immediate_arguments_v｣, )
+  define(｢instruction_immediate_arguments_data16_z｣, ｢imm16｣)
+  define(｢instruction_immediate_arguments_none_z｣, ｢imm32｣)
+  define(｢instruction_immediate_arguments_rexw_z｣, ｢imm32｣)
 
   instructions_defines(include(｢general-purpose-instructions.def｣))
   instructions_defines(include(｢x86-64-instructions.def｣))
