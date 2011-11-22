@@ -30,6 +30,8 @@
   # Operand sizes mostly follow AMD manual
   define(｢possible_command_mode_a｣,｢data16｣)
   define(｢possible_command_mode_b｣,｢unknown｣) # Other operands will determine
+  define(｢possible_command_mode_d｣,｢unknown｣) # Other operands will determine
+  define(｢possible_command_mode_q｣,｢unknown｣) # Other operands will determine
   define(｢possible_command_mode_r｣,｢rexbreg｣)
   define(｢possible_command_mode_v｣,｢data16rexw｣)
   define(｢possible_command_mode_z｣,｢data16rexw｣)
@@ -37,8 +39,9 @@
   # 8bit and 16/32/64 bit versions
   define(｢possible_command_mode_｣,｢size8data16rexw｣)
   define(｢return_operand_modes｣,｢ifelse(
-     $1,｢unknown｣,｢none｣,
-     $1,｢none｣,｢none｣,
+     $1｢｣$2,｢unknownunknown｣,｢none｣,
+     $1,｢unknown｣,｢$2｣,
+     $2,｢unknown｣,｢$1｣,
      $1,｢size8data16rexw｣,｢size8data16rexw｣,
      $1,｢data16｣,｢data16｣,
      $1,｢data16rexw｣,｢data16rexw｣,
@@ -46,9 +49,10 @@
      $1,｢rexbreg｣,｢rexbreg｣,
      ｢fatal_error(Incorrect prefix size)｣)｣)
   define(｢_check_prefixes_compatibility｣,｢ifelse(
-    ｢unknown｣,$1,$2,
-    $1,$2,$2,
-    ｢fatal_error(Incompatible prefixes $1 and $2)｣)｣)
+    ｢unknown｣,$1,｢$2｣,
+    ｢unknown｣,$2,｢$1｣,
+    $1,$2,｢$2｣,
+    ｢fatal_error(｢Incompatible prefixes $1 and $2｣)｣)｣)
   # Possible registers follow AMD manual with the following additions:
   #  a? - accumulator ("ab" means "%al", "av" means "%ax/%eax/%rax")
   #  r? - register is encoded in command (for example "push %rax..%rdi")
@@ -128,13 +132,21 @@
 	instruction_argument_size_$1_$2)｣,
       ｢ifelse(trim(｢instruction_argument_size_｣substr($2, ｢1｣)),
 	｢instruction_argument_size_｣substr($2, ｢1｣),
-	｢fatal_error(Can not determine argument size)｣,
+	｢ifelse(trim(｢instruction_argument_size_$1_｣substr($2, ｢1｣)),
+	  ｢instruction_argument_size_$1_｣substr($2, ｢1｣),
+	  ｢fatal_error(Can not determine argument size)｣,
+	  ｢instruction_argument_size_$1_｣substr($2, ｢1｣))｣,
 	｢instruction_argument_size_｣substr($2, ｢1｣))｣))｣)
   define(｢instruction_argument_size_lockdata16｣, ｢16bit｣)
   define(｢instruction_argument_size_locknone｣, ｢32bit｣)
   define(｢instruction_argument_size_locksize8｣, ｢8bit｣)
   define(｢instruction_argument_size_lockrexw｣, ｢64bit｣)
   define(｢instruction_argument_size_lockrexw_I｣, ｢32bit｣)
+  define(｢instruction_argument_size_data16_v｣, ｢16bit｣)
+  define(｢instruction_argument_size_none_v｣, ｢32bit｣)
+  define(｢instruction_argument_size_rexw_v｣, ｢64bit｣)
+  define(｢instruction_argument_size_d｣, ｢32bit｣)
+  define(｢instruction_argument_size_q｣, ｢64bit｣)
   define(｢instruction_argument_size_r｣, ｢64bit｣)
   define(｢instruction_implied_arguments｣, ｢ifelse(eval(｢$#>2｣), ｢1｣,
     ｢instruction_implied_arguments(｢$1｣, shift(shift($@)))｣)｢｣ifelse(
@@ -201,9 +213,14 @@
   define(｢instruction_immediate_arguments_locknone_I｣, ｢imm32｣)
   define(｢instruction_immediate_arguments_locksize8_I｣, ｢imm8｣)
   define(｢instruction_immediate_arguments_lockrexw_I｣, ｢imm32｣)
+  define(｢instruction_immediate_arguments_d｣, )
+  define(｢instruction_immediate_arguments_q｣, )
   define(｢instruction_immediate_arguments_r｣, )
+  define(｢instruction_immediate_arguments_v｣, )
 
   instructions_defines(include(｢general-purpose-instructions.def｣))
+  instructions_defines(include(｢x86-64-instructions.def｣))
 
   valid_instruction =
-    instructions(include(｢general-purpose-instructions.def｣));
+    instructions(include(｢general-purpose-instructions.def｣))
+    instructions(include(｢x86-64-instructions.def｣));

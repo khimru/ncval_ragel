@@ -1,0 +1,4 @@
+# File format: see general-purpose-instructions.def
+#################################################################################
+# This file includes instructions valid only in x86-64 mode.
+movslq Ed Gv, 0x63

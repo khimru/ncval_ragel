@@ -1,4 +1,4 @@
-# File format: three rows separated by commas.
+# File format: three rows separated by commas.  Line describes one instruction.
 ################################################################################
 # First column: instruction description.
 #   Includes name of the instruction and arguments.
@@ -19,6 +19,8 @@
 #	␀: A byte, word, doubleword, or quadword (in 64-bit mode),
 #	   depending on the effective operand size.
 #	b: A byte, irrespective of the effective operand size.
+#	d: A doubleword (32bit), irrespective of the effective operand size.
+#	q: A quadword (64bit), irrespective of the effective operand size.
 #	r: Register size (32bit in 32bit mode, 64bit in 64bit mode).
 #	v: A word, doubleword, or quadword (in 64-bit mode), depending on
 #	   the effective operand size.

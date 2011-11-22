@@ -2,7 +2,7 @@ CC = gcc
 M4 = m4
 CFLAGS = -Wall -Werror -O3 -m32 -g
 LDFLAGS = -m32 -g
-INST_DEFS = general-purpose-instructions.def
+INST_DEFS = general-purpose-instructions.def x86-64-instructions.def
 
 all: decoder-test-x86_64 validator-test-x86_64
 decoder-test-x86_64: decoder-x86_64.o decoder-test-x86_64.o
