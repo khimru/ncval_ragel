@@ -89,10 +89,14 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
 	    default: assert(FALSE);
 	  }
 	  if (!strcmp(instruction->name, "push")) {
-	    /* Temporary hack till we'll add implicit arguments */
-	    if (show_name_suffix == 'l') {
+	    /* objdump always shows "6a 01" as "pushq $1", "66 68 01 00" as
+	       "pushw $1" yet "68 01 00" as "pushq $1" again.  This makes no
+	       sense whatsoever so we'll just hack around here to make sure
+	       we produce objdump-compatible output.  */
+	    if ((show_name_suffix == 'b') || (show_name_suffix == 'l')) {
 	      show_name_suffix = 'q';
 	    }
+	    /* rex.W is ignored by push command.  */
 	    if (instruction->prefix.rex == 0x48) {
 	      print_name("rex.W ");
 	    }

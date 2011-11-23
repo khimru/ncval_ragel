@@ -78,8 +78,10 @@
 #define lock_prefix instruction.prefix.lock
 #define operand0_size instruction.operands[0].size
 #define operand1_size instruction.operands[1].size
+#define operand2_size instruction.operands[2].size
 #define operand0 instruction.operands[0].name
 #define operand1 instruction.operands[1].name
+#define operand2 instruction.operands[2].name
 #define operands_count instruction.operands_count
 #define instruction_name instruction.name
 
@@ -117,10 +119,10 @@ int DecodeChunk(uint32_t load_addr, uint8_t *data, size_t size,
   uint8_t *p = data;
   uint8_t *pe = data + size;
   uint8_t *eof = pe;
-  uint8_t *disp, *imm, *begin;
+  uint8_t *disp = NULL, *imm = NULL, *begin;
   uint8_t *begin_opcode, *end_opcode;
-  enum disp_mode disp_type;
-  enum imm_mode imm_operand;
+  enum disp_mode disp_type = DISPNONE;
+  enum imm_mode imm_operand = IMMNONE;
   struct instruction instruction;
   int result = 0;
 

@@ -175,6 +175,10 @@
     operand1 = REG_IMM;
   }
   define(｢operand1_immediate｣, ｢@operand1｢_｣immediate｣)
+  action operand2_immediate {
+    operand2 = REG_IMM;
+  }
+  define(｢operand2_immediate｣, ｢@operand2｢_｣immediate｣)
   action operand0_rm {
     operand0 = REG_RM;
   }

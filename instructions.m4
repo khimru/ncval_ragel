@@ -38,16 +38,24 @@
   # This is special prefix not included in AMD manual: w bit selects between
   # 8bit and 16/32/64 bit versions
   define(｢possible_command_mode_｣,｢size8data16rexw｣)
-  define(｢return_operand_modes｣,｢ifelse(
-     $1｢｣$2,｢unknownunknown｣,｢none｣,
-     $1,｢unknown｣,｢$2｣,
-     $2,｢unknown｣,｢$1｣,
-     $1,｢size8data16rexw｣,｢size8data16rexw｣,
-     $1,｢data16｣,｢data16｣,
-     $1,｢data16rexw｣,｢data16rexw｣,
-     $1,｢rexw｣,｢rexw｣,
-     $1,｢rexbreg｣,｢rexbreg｣,
-     ｢fatal_error(Incorrect prefix size)｣)｣)
+  define(｢return_operand_modes｣, ｢ifelse(
+    ｢$#｣, ｢0｣, ｢none｣,
+    ｢$#｣, ｢1｣,
+    ｢ifelse(
+      $1,｢unknown｣,｢none｣,
+      $1,｢none｣,
+      $1,｢size8data16rexw｣,｢size8data16rexw｣,
+      $1,｢data16｣,｢data16｣,
+      $1,｢data16rexw｣,｢data16rexw｣,
+      $1,｢rexw｣,｢rexw｣,
+      $1,｢rexbreg｣,｢rexbreg｣,
+      ｢fatal_error(Incorrect prefix sizeA)｣)｣,
+    ｢$#｣, ｢2｣, ｢ifelse(
+      $1,｢unknown｣,｢return_operand_modes(｢$2｣)｣,
+      $2,｢unknown｣,｢return_operand_modes(｢$1｣)｣,
+      $1,$2,｢return_operand_modes(｢$1｣)｣,
+      ｢fatal_error(Incorrect prefix sizeB)｣)｣,
+    ｢return_operand_modes(｢$1｣, return_operand_modes(shift($@)))｣)｣)
   define(｢_check_prefixes_compatibility｣,｢ifelse(
     ｢unknown｣,$1,｢$2｣,
     ｢unknown｣,$2,｢$1｣,
@@ -148,6 +156,7 @@
   define(｢instruction_argument_size_data16_z｣, ｢16bit｣)
   define(｢instruction_argument_size_none_z｣, ｢32bit｣)
   define(｢instruction_argument_size_rexw_z｣, ｢32bit｣)
+  define(｢instruction_argument_size_b｣, ｢8bit｣)
   define(｢instruction_argument_size_d｣, ｢32bit｣)
   define(｢instruction_argument_size_q｣, ｢64bit｣)
   define(｢instruction_argument_size_r｣, ｢64bit｣)
@@ -189,40 +198,30 @@
       substr(｢$1｣, ｢0｣, ｢1｣), ｢G｣,
       ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣)｣)
   define(｢instruction_immediate_arguments｣, ｢ifelse(eval(｢$#>2｣), ｢1｣,
-    ｢instruction_immediate_arguments(｢$1｣, shift(shift($@)))｣) trim(
+    ｢instruction_immediate_arguments(｢$1｣, shift(shift($@)))｣) ifelse(
+    substr(｢$2｣, ｢0｣, ｢1｣), ｢I｣, ｢trim(
     ifelse(len(｢$2｣), ｢1｣,
-      ｢ifelse(instruction_immediate_arguments_$1_$2,
-	｢instruction_immediate_arguments_$1_$2｣,
-	｢ifelse(instruction_immediate_arguments_lock$1_$2,
-	  ｢instruction_immediate_arguments_lock$1_$2｣,
-	  ｢ifelse(instruction_immediate_arguments_$1,
-	    ｢instruction_immediate_arguments_$1｣,
-	    ｢ifelse(instruction_immediate_arguments_lock$1,
-	      ｢instruction_immediate_arguments_lock$1｣,
-	      ｢fatal_error(Can not determine immediate size)｣,
-	      instruction_immediate_arguments_lock$1)｣,
-	    instruction_immediate_arguments_$1)｣,
-	  instruction_immediate_arguments_lock$1_$2)｣,
-	instruction_immediate_arguments_$1_$2)｣,
+      ｢ifelse(instruction_immediate_arguments_$1,
+	｢instruction_immediate_arguments_$1｣,
+	｢ifelse(instruction_immediate_arguments_lock$1,
+	  ｢instruction_immediate_arguments_lock$1｣,
+	  ｢fatal_error(Can not determine immediate size)｣,
+	  instruction_immediate_arguments_lock$1)｣,
+	instruction_immediate_arguments_$1)｣,
       ｢ifelse(trim(｢instruction_immediate_arguments_｣substr($2, ｢1｣)),
 	｢instruction_immediate_arguments_｣substr($2, ｢1｣),
 	｢ifelse(trim(｢instruction_immediate_arguments_$1_｣substr($2, ｢1｣)),
 	  ｢instruction_immediate_arguments_$1_｣substr($2, ｢1｣),
 	  ｢fatal_error(Can not determine immediate size)｣,
 	  ｢instruction_immediate_arguments_$1_｣substr($2, ｢1｣))｣,
-	｢instruction_immediate_arguments_｣substr($2, ｢1｣))｣))｣)
-  define(｢instruction_immediate_arguments_lockdata16｣, )
-  define(｢instruction_immediate_arguments_locknone｣, )
-  define(｢instruction_immediate_arguments_locksize8｣, )
-  define(｢instruction_immediate_arguments_lockrexw｣, )
-  define(｢instruction_immediate_arguments_lockdata16_I｣, ｢imm16｣)
-  define(｢instruction_immediate_arguments_locknone_I｣, ｢imm32｣)
-  define(｢instruction_immediate_arguments_locksize8_I｣, ｢imm8｣)
-  define(｢instruction_immediate_arguments_lockrexw_I｣, ｢imm32｣)
-  define(｢instruction_immediate_arguments_d｣, )
-  define(｢instruction_immediate_arguments_q｣, )
-  define(｢instruction_immediate_arguments_r｣, )
-  define(｢instruction_immediate_arguments_v｣, )
+	｢instruction_immediate_arguments_｣substr($2, ｢1｣))｣))｣)｣)
+  define(｢instruction_immediate_arguments_lockdata16｣, ｢imm16｣)
+  define(｢instruction_immediate_arguments_locknone｣, ｢imm32｣)
+  define(｢instruction_immediate_arguments_locksize8｣, ｢imm8｣)
+  define(｢instruction_immediate_arguments_lockrexw｣, ｢imm32｣)
+  define(｢instruction_immediate_arguments_data16_b｣, ｢imm8｣)
+  define(｢instruction_immediate_arguments_none_b｣, ｢imm8｣)
+  define(｢instruction_immediate_arguments_rexw_b｣, ｢imm8｣)
   define(｢instruction_immediate_arguments_data16_z｣, ｢imm16｣)
   define(｢instruction_immediate_arguments_none_z｣, ｢imm32｣)
   define(｢instruction_immediate_arguments_rexw_z｣, ｢imm32｣)

@@ -57,12 +57,15 @@ and I a, 0x24, lock
 cmp G E, 0x38, lock
 cmp E G, 0x3a, lock
 cmp I a, 0x3c, lock
+imul Iz Ev Gv, 0x69
+imul Ib Ev Gv, 0x6b
 or G E, 0x08, lock
 or E G, 0x0a, lock
 or I a, 0x0c, lock
 pop rr, 0x58
 push rr, 0x50
 push Iz, 0x68
+push Ib, 0x6a
 sbb G E, 0x18, lock
 sbb E G, 0x1a, lock
 sbb I a, 0x1c, lock
