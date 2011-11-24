@@ -54,7 +54,7 @@
   define(｢repe_prefix｣, )
   define(｢repne_prefix｣, )
 
-  # But we need to know where DISP and IMM fields can be found
+  # But we need to know where DISP, IMM, and REL fields can be found
   action disp8_operand_begin { }
   action disp8_operand_end { }
   define(｢disp8_operand｣, ｢｢>disp8_operand_begin @disp8_operand_end｣｣)
@@ -73,6 +73,15 @@
   action imm64_operand_begin { }
   action imm64_operand_end { }
   define(｢imm64_operand｣, ｢｢>imm8_operand_begin @imm64_operand_end｣｣)
+  action rel8_operand_begin { }
+  action rel8_operand_end { }
+  define(｢rel8_operand｣, ｢｢>rel8_operand_begin @rel8_operand_end｣｣)
+  action rel16_operand_begin { }
+  action rel16_operand_end { }
+  define(｢rel16_operand｣, ｢｢>rel8_operand_begin @rel16_operand_end｣｣)
+  action rel32_operand_begin { }
+  action rel32_operand_end { }
+  define(｢rel32_operand｣, ｢｢>rel32_operand_begin @rel32_operand_end｣｣)
 
   include(｢instruction_parts.m4｣)
 

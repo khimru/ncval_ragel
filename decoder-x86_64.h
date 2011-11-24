@@ -41,6 +41,7 @@ enum register_name {
   REG_DS_RSI,	/* For string instructions: %ds:(%rdi).			      */
   REG_PORT_DX,	/* 16-bit DX: for in/out instructions.			      */
   REG_NONE,	/* For modrm: both index and base can be absent.	      */
+  JMP_TO	/* Operand is jump target address: usually %rip+offset.	      */
 };
 
 struct instruction {

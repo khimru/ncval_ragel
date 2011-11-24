@@ -417,6 +417,13 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
       case REG_PORT_DX: printf("(%%dx)"); break;
       case REG_ES_RDI: printf("%%es:(%%rdi)"); break;
       case REG_DS_RSI: printf("%%ds:(%%rsi)"); break;
+      case JMP_TO: if (instruction->operands[0].size == OperandSize16bit)
+	  printf("0x%x",
+		 (end + instruction->rm.offset - (uint8_t *)userdata) & 0xffff);
+	else
+	  printf("0x%x",
+			    end + instruction->rm.offset - (uint8_t *)userdata);
+	break;
       default: assert(FALSE);
     }
     delimeter = ',';

@@ -1,27 +1,30 @@
-  action set_jmp_dest8 {
-    int8_t offset = (int8_t) (p[0]);
-    jump_dest = offset + (p - data);
+  action rel8_operand {
+    operand0 = JMP_TO;
+    base = REG_RIP;
+    index = REG_NONE;
+    scale = 0;
+    disp_type = DISP8;
+    disp = p;
   }
-  action set_jmp_dest32 {
-    int32_t offset = 
-      (int32_t) (p[-3] + 256 * (p[-2] + 256 * (p[-1] + 256 * (p[0]))));
-    jump_dest = offset + (p - data);
+  define(｢rel8_operand｣, ｢@rel8｢_｣operand｣)
+  action rel16_operand {
+    operand0 = JMP_TO;
+    base = REG_RIP;
+    index = REG_NONE;
+    scale = 0;
+    disp_type = DISP16;
+    disp = p - 1;
   }
-  action check_jump_dest {
-    if ((jump_dest & bundle_mask) != bundle_mask) {
-      if (jump_dest >= size) {
-	printf("direct jump out of range: %x\n", jump_dest);
-	result = 1;
-	goto error_detected;
-      } else {
-	BitmapSetBit(jump_dests, jump_dest + 1);
-      }
-    }
+  define(｢rel16_operand｣, ｢@rel16｢_｣operand｣)
+  action rel32_operand {
+    operand0 = JMP_TO;
+    base = REG_RIP;
+    index = REG_NONE;
+    scale = 0;
+    disp_type = DISP32;
+    disp = p - 3;
   }
-
-  rel8 = any @set_jmp_dest8 @check_jump_dest;
-  rel32 = any{4} @set_jmp_dest32 @check_jump_dest;
-
+  define(｢rel32_operand｣, ｢@rel32｢_｣operand｣)
   action branch_not_taken {
     branch_taken = TRUE;
   }

@@ -177,20 +177,15 @@
   define(｢instruction_argument_size_rexw_z｣, ｢32bit｣)
   define(｢instruction_implied_arguments｣, ｢ifelse(eval(｢$#>2｣), ｢1｣,
     ｢instruction_implied_arguments(｢$1｣, shift(shift($@)))｣)｢｣ifelse(
-      substr(｢$2｣, ｢0｣, ｢1｣), ｢a｣,
-      ｢ ｣｢operand｣decr(decr(｢$#｣))｢_accumulator｣,
-      substr(｢$2｣, ｢0｣, ｢1｣), ｢o｣,
-      ｢ ｣｢operand｣decr(decr(｢$#｣))｢_port_dx｣,
-      substr(｢$2｣, ｢0｣, ｢1｣), ｢r｣,
-      ｢ ｣｢operand｣decr(decr(｢$#｣))｢_from_opcode｣,
+      substr(｢$2｣, ｢0｣, ｢1｣), ｢a｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_accumulator｣,
+      substr(｢$2｣, ｢0｣, ｢1｣), ｢o｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_port_dx｣,
+      substr(｢$2｣, ｢0｣, ｢1｣), ｢r｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_from_opcode｣,
       substr(｢$2｣, ｢0｣, ｢1｣), ｢E｣, ,
       substr(｢$2｣, ｢0｣, ｢1｣), ｢G｣, ,
-      substr(｢$2｣, ｢0｣, ｢1｣), ｢I｣,
-      ｢ ｣｢operand｣decr(decr(｢$#｣))｢_immediate｣,
-      substr(｢$2｣, ｢0｣, ｢1｣), ｢X｣,
-      ｢ ｣｢operand｣decr(decr(｢$#｣))｢_ds_rsi｣,
-      substr(｢$2｣, ｢0｣, ｢1｣), ｢Y｣,
-      ｢ ｣｢operand｣decr(decr(｢$#｣))｢_es_rdi｣,
+      substr(｢$2｣, ｢0｣, ｢1｣), ｢I｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_immediate｣,
+      substr(｢$2｣, ｢0｣, ｢1｣), ｢J｣, ,
+      substr(｢$2｣, ｢0｣, ｢1｣), ｢X｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_ds_rsi｣,
+      substr(｢$2｣, ｢0｣, ｢1｣), ｢Y｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_es_rdi｣,
       ｢fatal_error(Can not determine argument type)｣)｣)
   define(｢instruction_modrm_arguments｣, ｢ifelse(index(｢$2｣, ｢ G｣), -1,
     ｢ifelse(index(｢$2｣, ｢ E｣), -1, , ｢ _instruction_modrm_arguments($@)｣)｣,
@@ -225,8 +220,7 @@
     ｢instruction_immediate_arguments(｢$1｣, shift(shift($@)))｣) ifelse(
       substr(｢$1｣, ｢0｣, ｢4｣), ｢lock｣,
 	｢instruction_immediate_arguments(substr(｢$1｣, ｢4｣), shift($@))｣,
-      ｢ifelse(substr(｢$2｣, ｢0｣, ｢1｣), ｢I｣, ｢trim(
-	ifelse(len(｢$2｣), ｢1｣,
+      ｢ifelse(substr(｢$2｣, ｢0｣, ｢1｣), ｢I｣, ｢trim(ifelse(len(｢$2｣), ｢1｣,
 	  ｢ifelse(instruction_immediate_arguments_$1,
 	    ｢instruction_immediate_arguments_$1｣,
 	    ｢fatal_error(Can not determine immediate size)｣,
@@ -237,7 +231,19 @@
 	      ｢instruction_immediate_arguments_｣substr($2, ｢1｣),
 	      ｢fatal_error(Can not determine immediate size)｣,
 	      ｢instruction_immediate_arguments_｣substr($2, ｢1｣))｣,
-	    ｢instruction_immediate_arguments_$1_｣substr($2, ｢1｣))｣))｣)｣)｣)
+	    ｢instruction_immediate_arguments_$1_｣substr($2, ｢1｣))｣))｣,
+	substr(｢$2｣, ｢0｣, ｢1｣), ｢J｣, ｢trim(ifelse(len(｢$2｣), ｢1｣,
+	  ｢ifelse(instruction_jump_arguments_$1,
+	    ｢instruction_jump_arguments_$1｣,
+	    ｢fatal_error(Can not determine jump size)｣,
+	    instruction_jump_arguments_$1)｣,
+	  ｢ifelse(trim(｢instruction_jump_arguments_$1_｣substr($2, ｢1｣)),
+	    ｢instruction_jump_arguments_$1_｣substr($2, ｢1｣),
+	    ｢ifelse(trim(｢instruction_jump_arguments_｣substr($2, ｢1｣)),
+	      ｢instruction_jump_arguments_｣substr($2, ｢1｣),
+	      ｢fatal_error(Can not determine jump size)｣,
+	      ｢instruction_jump_arguments_｣substr($2, ｢1｣))｣,
+	    ｢instruction_jump_arguments_$1_｣substr($2, ｢1｣))｣))｣)｣)｣)
   define(｢instruction_immediate_arguments_data16｣, ｢imm16｣)
   define(｢instruction_immediate_arguments_none｣, ｢imm32｣)
   define(｢instruction_immediate_arguments_size8｣, ｢imm8｣)
@@ -248,6 +254,10 @@
   define(｢instruction_immediate_arguments_data16_z｣, ｢imm16｣)
   define(｢instruction_immediate_arguments_none_z｣, ｢imm32｣)
   define(｢instruction_immediate_arguments_rexw_z｣, ｢imm32｣)
+  define(｢instruction_jump_arguments_none_b｣, ｢rel8｣)
+  define(｢instruction_jump_arguments_data16_z｣, ｢rel16｣)
+  define(｢instruction_jump_arguments_none_z｣, ｢rel32｣)
+  define(｢instruction_jump_arguments_rexw_z｣, ｢rel32｣)
 
   instructions_defines(include(｢general-purpose-instructions.def｣))
   instructions_defines(include(｢x86-64-instructions.def｣))

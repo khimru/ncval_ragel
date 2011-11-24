@@ -1,3 +1,8 @@
+  # Relative jumps and calls.
+  rel8 = any rel8_operand;
+  rel16 = any{2} rel16_operand;
+  rel32 = any{4} rel32_operand;
+
   # Displacements.
   disp8		= any disp8_operand;
   disp32	= any{4} disp32_operand;

@@ -45,7 +45,10 @@
     @{｢
 	switch (disp_type) {
 	  case DISPNONE: instruction.rm.offset = 0; break;
-	  case DISP8: instruction.rm.offset = *disp; break;
+	  case DISP8: instruction.rm.offset = (int8_t) *disp; break;
+	  case DISP16: instruction.rm.offset =
+	    (int16_t) (disp[0] + 256 * disp[1]);
+	    break;
 	  case DISP32: instruction.rm.offset = (int32_t)
 	    (disp[0] + 256 * (disp[1] + 256 * (disp[2] + 256 * (disp[3]))));
 	    break;
@@ -105,6 +108,7 @@ enum {
 enum disp_mode {
   DISPNONE,
   DISP8,
+  DISP16,
   DISP32,
 };
 
