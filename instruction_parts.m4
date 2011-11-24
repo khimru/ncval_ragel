@@ -44,10 +44,10 @@
 
   # Prefixes.
   data16 = 0x66 data16_prefix;
-  branch = 0x2e | 0x3e;
-  condrep = 0xf2 | 0xf3;
+  branch = 0x2e branch_not_taken | 0x3e branch_taken;
+  condrep = 0xf2 repe_prefix | 0xf3 repne_prefix;
   lock = 0xf0 lock_prefix;
-  rep = 0xf3;
+  rep = 0xf3 rep_prefix;
 
   # REX prefixes.
   action rex_pfx {

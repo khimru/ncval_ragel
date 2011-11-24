@@ -9,12 +9,17 @@
 #	a: Accumulator (%al/%ax/%eax/%rax depending on size)
 #	r: Register in opcode (low 3 bits plus rex.B)
 #	d: Accumulator pair (%dx:%ax/%edx:%eax/%rdx:%rax depending on size)
+#	o: I/O port in %dx (in/out instructions)
 #	E: General purpose register or memory operand specified by the r/m
 #	   field of the ModRM byte.  For memory operands, the ModRM byte may
 #	   be followed by a SIB byte to specify one of the indexed
 #	   register-indirect addressing forms.
 #	G: General purpose register specified by the reg field of ModRM.
 #	I: Immediate value encoded in the instruction.
+#	X: A memory operand addressed by the DS:rSI registers. Used in string
+#	   instructions.
+#	Y: A memory operand addressed by the ES:rDI registers. Used in string
+#	   instructions.
 #      Possible sizes:
 #	␀: A byte, word, doubleword, or quadword (in 64-bit mode),
 #	   depending on the effective operand size.
@@ -24,6 +29,7 @@
 #	r: Register size (32bit in 32bit mode, 64bit in 64bit mode).
 #	v: A word, doubleword, or quadword (in 64-bit mode), depending on
 #	   the effective operand size.
+#	w: A word, irrespective of the effective operand size.
 #	z: A word if the effective operand size is 16 bits, or a doubleword
 #	   if the effective operand size is 32 or 64 bits.
 #################################################################################
@@ -59,9 +65,13 @@ cmp E G, 0x3a, lock
 cmp I a, 0x3c, lock
 imul Iz Ev Gv, 0x69
 imul Ib Ev Gv, 0x6b
+ins ob Yb, 0x6c, rep
+ins oz Yz, 0x6d, rep
 or G E, 0x08, lock
 or E G, 0x0a, lock
 or I a, 0x0c, lock
+outs Xb ob, 0x6e, rep
+outs Xz oz, 0x6f, rep
 pop rr, 0x58
 push rr, 0x50
 push Iz, 0x68

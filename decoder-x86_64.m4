@@ -36,6 +36,11 @@
 	rex_prefix = FALSE;
 	data16_prefix = FALSE;
 	lock_prefix = FALSE;
+	rep_prefix = FALSE;
+	repe_prefix = FALSE;
+	repne_prefix = FALSE;
+	branch_not_taken = FALSE;
+	branch_taken = FALSE;
     ｣}
     @{｢
 	switch (disp_type) {
@@ -76,6 +81,11 @@
 #define rex_prefix instruction.prefix.rex
 #define data16_prefix instruction.prefix.data16
 #define lock_prefix instruction.prefix.lock
+#define rep_prefix instruction.prefix.rep
+#define repe_prefix instruction.prefix.repe
+#define repne_prefix instruction.prefix.repne
+#define branch_not_taken instruction.prefix.branch_not_taken
+#define branch_taken instruction.prefix.branch_taken
 #define operand0_size instruction.operands[0].size
 #define operand1_size instruction.operands[1].size
 #define operand2_size instruction.operands[2].size

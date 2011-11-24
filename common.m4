@@ -21,7 +21,7 @@ define(｢append｣, ｢ifdef(｢append-$1: $2｣, ,
 # ｢split_argument｣ is used to turn arguments separated by spaces to arguments
 # spearated by commas.
 # For example: ｢split_argument( mov  G E )｣ becomes ｢mov,G,E｣.
-define(｢split_argument｣, ｢ifelse(len(｢$1｣), 0, ｢｣,
+define(｢split_argument｣, ｢ifelse(len(｢$1｣), ｢0｣, ,
   substr(｢$1｣, decr(len(｢$1｣))), ｢ ｣,
   ｢split_argument(substr(｢$1｣, 0, decr(len(｢$1｣))))｣, ｢_split_argument(｢$1｣)｣)｣)
 define(｢_split_argument｣,｢ifelse(eval(len(｢$1｣)<2), 1, ｢$1｣,
@@ -34,7 +34,7 @@ define(｢_split_argument｣,｢ifelse(eval(len(｢$1｣)<2), 1, ｢$1｣,
 # For example: ｢chartest(｢c >= 40 && c < 44｣)｣ becomes ｢(40|41|42|43)｣.
 define(｢chartest｣, ｢(pushdef(｢delim｣, ｢｣)_chartest(0,$1)｢｣popdef(｢delim｣))｣)
 define(｢_chartest｣, ｢ifelse(
-	 $1, ｢256｣, ｢｣,
+	 $1, ｢256｣, ,
 	 ｢pushdef(｢c｣, $1)｢｣ifelse(
 	   eval($2), 1, delim｢format(｢0x%02x｣,
 	     $1)｢｣popdef(｢delim｣)｢｣pushdef(｢delim｣,
@@ -44,9 +44,10 @@ define(｢_chartest｣, ｢ifelse(
 # You can use ｢okprefix｣ to filter our bad prefix combinations.
 # For example: ｢possible_prefixes(addr32,lock)｣ becomes
 #              ｢( lock ) | ( addr32 ) | ( addr32 lock ) | ( lock addr32 )｣
-define(｢possible_prefixes｣, ｢substr(_possible_prefixes(｢｣, $@), 3)｣)
+define(｢possible_prefixes｣, ｢ifelse(｢$#｣, ｢0｣, , ｢$1｣, , ,
+  ｢(substr(_possible_prefixes(, $@), 3))｣)｣)
 define(｢_possible_prefixes｣, ｢ifelse(
-  $2, , ｢__possible_prefixes(｢｣, $1)｣,
+  $2, , ｢__possible_prefixes(, $1)｣,
   ｢_possible_prefixes(｢$1｣, shift(shift($@)))｣｢_possible_prefixes(
     ｢$1, $2｣, shift(shift($@)))｣)｣)
 define(｢__possible_prefixes｣, ｢ifelse(

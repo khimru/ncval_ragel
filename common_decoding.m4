@@ -22,6 +22,14 @@
   rel8 = any @set_jmp_dest8 @check_jump_dest;
   rel32 = any{4} @set_jmp_dest32 @check_jump_dest;
 
+  action branch_not_taken {
+    branch_taken = TRUE;
+  }
+  define(｢branch_not_taken｣, ｢@branch｢_｣not｢_｣taken｣)
+  action branch_taken {
+    branch_taken = TRUE;
+  }
+  define(｢branch_taken｣, ｢@branch｢_｣taken｣)
   action data16_prefix {
     data16_prefix = TRUE;
   }
@@ -30,6 +38,18 @@
     lock_prefix = TRUE;
   }
   define(｢lock_prefix｣, ｢@lock｢_｣prefix｣)
+  action rep_prefix {
+    rep_prefix = TRUE;
+  }
+  define(｢rep_prefix｣, ｢@rep｢_｣prefix｣)
+  action repe_prefix {
+    lock_prefix = TRUE;
+  }
+  define(｢repe_prefix｣, ｢@repe｢_｣prefix｣)
+  action repne_prefix {
+    repne_prefix = TRUE;
+  }
+  define(｢repne_prefix｣, ｢@repne｢_｣prefix｣)
   action disp8_operand {
     disp_type = DISP8;
     disp = p;
@@ -167,26 +187,10 @@
     operand0 = REG_RAX;
   }
   define(｢operand0_accumulator｣, ｢@operand0｢_｣accumulator｣)
-  action operand0_immediate {
-    operand0 = REG_IMM;
+  action operand0_es_rdi {
+    operand0 = REG_ES_RDI;
   }
-  define(｢operand0_immediate｣, ｢@operand0｢_｣immediate｣)
-  action operand1_immediate {
-    operand1 = REG_IMM;
-  }
-  define(｢operand1_immediate｣, ｢@operand1｢_｣immediate｣)
-  action operand2_immediate {
-    operand2 = REG_IMM;
-  }
-  define(｢operand2_immediate｣, ｢@operand2｢_｣immediate｣)
-  action operand0_rm {
-    operand0 = REG_RM;
-  }
-  define(｢operand0_rm｣, ｢@operand0｢_｣rm｣)
-  action operand1_rm {
-    operand1 = REG_RM;
-  }
-  define(｢operand1_rm｣, ｢@operand1｢_｣rm｣)
+  define(｢operand0_es_rdi｣, ｢@operand0｢_｣es｢_｣rdi｣)
   action operand0_from_opcode {
     operand0 = ((*p) & 0x7) | ((rex_prefix & REX_B) << 3);
   }
@@ -195,6 +199,22 @@
     operand0 = (((*p) & 0x38) >> 3) | ((rex_prefix & REX_R) << 1);
   }
   define(｢operand0_from_modrm_reg｣, ｢@operand0｢_｣from｢_｣modrm｢_｣reg｣)
+  action operand0_immediate {
+    operand0 = REG_IMM;
+  }
+  define(｢operand0_immediate｣, ｢@operand0｢_｣immediate｣)
+  action operand0_port_dx {
+    operand0 = REG_PORT_DX;
+  }
+  define(｢operand0_port_dx｣, ｢@operand0｢_｣port｢_｣dx｣)
+  action operand0_rm {
+    operand0 = REG_RM;
+  }
+  define(｢operand0_rm｣, ｢@operand0｢_｣rm｣)
+  action operand1_ds_rsi {
+    operand1 = REG_DS_RSI;
+  }
+  define(｢operand1_ds_rsi｣, ｢@operand1｢_｣ds｢_｣rsi｣)
   action operand1_from_modrm_reg {
     operand1 = (((*p) & 0x38) >> 3) | ((rex_prefix & REX_R) << 1);
   }
@@ -207,3 +227,19 @@
     operand1 = ((*p) & 0x07) | ((rex_prefix & REX_B) << 3);
   }
   define(｢operand1_from_modrm_rm｣, ｢@operand1｢_｣from｢_｣modrm｢_｣rm｣)
+  action operand1_immediate {
+    operand1 = REG_IMM;
+  }
+  define(｢operand1_immediate｣, ｢@operand1｢_｣immediate｣)
+  action operand1_port_dx {
+    operand1 = REG_PORT_DX;
+  }
+  define(｢operand1_port_dx｣, ｢@operand1｢_｣port｢_｣dx｣)
+  action operand1_rm {
+    operand1 = REG_RM;
+  }
+  define(｢operand1_rm｣, ｢@operand1｢_｣rm｣)
+  action operand2_immediate {
+    operand2 = REG_IMM;
+  }
+  define(｢operand2_immediate｣, ｢@operand2｢_｣immediate｣)

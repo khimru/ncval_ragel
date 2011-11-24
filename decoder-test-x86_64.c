@@ -79,7 +79,10 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
     show_name_suffix = TRUE;
     for (i=instruction->operands_count-1;i>=0;i--) {
       if ((instruction->operands[i].name == REG_IMM) ||
-	  (instruction->operands[i].name == REG_RM)) {
+	  (instruction->operands[i].name == REG_RM) ||
+	  (instruction->operands[i].name == REG_PORT_DX) ||
+	  (instruction->operands[i].name == REG_ES_RDI) ||
+	  (instruction->operands[i].name == REG_DS_RSI)) {
 	if (show_name_suffix) {
 	  switch (instruction->operands[i].size) {
 	    case OperandSize8bit: show_name_suffix = 'b'; break;
@@ -87,19 +90,6 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
 	    case OperandSize32bit: show_name_suffix = 'l'; break;
 	    case OperandSize64bit: show_name_suffix = 'q'; break;
 	    default: assert(FALSE);
-	  }
-	  if (!strcmp(instruction->name, "push")) {
-	    /* objdump always shows "6a 01" as "pushq $1", "66 68 01 00" as
-	       "pushw $1" yet "68 01 00" as "pushq $1" again.  This makes no
-	       sense whatsoever so we'll just hack around here to make sure
-	       we produce objdump-compatible output.  */
-	    if ((show_name_suffix == 'b') || (show_name_suffix == 'l')) {
-	      show_name_suffix = 'q';
-	    }
-	    /* rex.W is ignored by push command.  */
-	    if (instruction->prefix.rex == 0x48) {
-	      print_name("rex.W ");
-	    }
 	  }
 	}
       } else {
@@ -125,6 +115,34 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
   }
   if (instruction->prefix.lock) {
     print_name("lock ");
+  }
+  if (instruction->prefix.rep) {
+    print_name("rep ");
+  }
+  if (instruction->prefix.repe) {
+    print_name("repe ");
+  }
+  if (instruction->prefix.repne) {
+    print_name("repne ");
+  }
+  if ((!strcmp(instruction->name, "ins")) ||
+      (!strcmp(instruction->name, "outs"))) {
+    /* rex.W is ignored by in/out commands.  */
+    if (instruction->prefix.rex == 0x48) {
+      print_name("rex.W ");
+    }
+  } else if (!strcmp(instruction->name, "push")) {
+    /* objdump always shows "6a 01" as "pushq $1", "66 68 01 00" as
+       "pushw $1" yet "68 01 00" as "pushq $1" again.  This makes no
+       sense whatsoever so we'll just hack around here to make sure
+       we produce objdump-compatible output.  */
+    if ((show_name_suffix == 'b') || (show_name_suffix == 'l')) {
+      show_name_suffix = 'q';
+    }
+    /* rex.W is ignored by push command.  */
+    if (instruction->prefix.rex == 0x48) {
+      print_name("rex.W ");
+    }
   }
   i = (instruction->prefix.rex & 0x01) +
       ((instruction->prefix.rex & 0x02) >> 1) +
@@ -396,6 +414,9 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
 	printf("$0x%llx",instruction->imm);
 	break;
       }
+      case REG_PORT_DX: printf("(%%dx)"); break;
+      case REG_ES_RDI: printf("%%es:(%%rdi)"); break;
+      case REG_DS_RSI: printf("%%ds:(%%rsi)"); break;
       default: assert(FALSE);
     }
     delimeter = ',';

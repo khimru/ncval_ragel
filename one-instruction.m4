@@ -6,6 +6,8 @@
 
   # We don't need to fully parse instructions here
   define(｢begin_opcode｣, ｢$1｣)
+  define(｢branch_not_taken｣, )
+  define(｢branch_taken｣, )
   define(｢check_access｣, )
   define(｢end_opcode｣, )
   define(｢modrm_base_disp｣, )
@@ -20,18 +22,22 @@
   define(｢operand0_32bit｣, )
   define(｢operand0_64bit｣, )
   define(｢operand0_accumulator｣, )
+  define(｢operand0_es_rdi｣, )
   define(｢operand0_from_modrm_reg｣, )
   define(｢operand0_from_modrm_rm｣, )
   define(｢operand0_from_opcode｣, )
   define(｢operand0_immediate｣, )
+  define(｢operand0_port_dx｣, )
   define(｢operand0_rm｣, )
   define(｢operand1_8bit｣, )
   define(｢operand1_16bit｣, )
   define(｢operand1_32bit｣, )
   define(｢operand1_64bit｣, )
+  define(｢operand1_ds_rsi｣, )
   define(｢operand1_from_modrm_reg｣, )
   define(｢operand1_from_modrm_rm｣, )
   define(｢operand1_immediate｣, )
+  define(｢operand1_port_dx｣, )
   define(｢operand1_rm｣, )
   define(｢operand2_8bit｣, )
   define(｢operand2_16bit｣, )
@@ -44,6 +50,9 @@
   define(｢operands_count_is_3｣, )
   define(｢operands_count_is_4｣, )
   define(｢operands_count_is_5｣, )
+  define(｢rep_prefix｣, )
+  define(｢repe_prefix｣, )
+  define(｢repne_prefix｣, )
 
   # But we need to know where DISP and IMM fields can be found
   action disp8_operand_begin { }
