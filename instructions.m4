@@ -89,8 +89,8 @@
       ｢instruction_select(｢data16｣, shift($@))｣  ｢instruction_select(
 		   ｢none｣, shift($@))｣  ｢instruction_select(｢rexw｣, shift($@))｣,
     ｢$1｣, ｢rexbreg｣,
-      ｢instruction_separator｢｣(rex_b? instruction_body(
-      ｢none｣, $2, regopcode($3))｣,
+      ｢instruction_separator｢｣｢(rex_b?｣ instruction_body(
+	｢none｣, $2, shift(shift($@)))｣,
     ｢$1｣, ｢size8｣,
       ｢ifelse(index(｢$4｣, ｢lock｣), -1, 
 	｢instruction_separator｢｣｢(｣possible_prefixes(optional_prefixes(
@@ -161,14 +161,19 @@
   define(｢setwflag｣, ｢_setwflag(split_argument($1))｣)
   define(｢_setwflag｣, ｢format(｢0x%02x｣, eval($1 + 1)) translit(
 							  shift($@), ｢,｣, ｢ ｣)｣)
-  define(｢regopcode｣, ｢_regopcode(split_argument($1))｣)
-  define(｢_regopcode｣, ｢ifelse($#, 1, ｢chartest(｢(c & 0xf8) == $1｣)｣,
-    ｢$1 _regopcode(shift($@))｣)｣)
   define(｢opcode_nomodrm｣, ｢_opcode_nomodrm(
     regexp(｢$@｣, ｢\(.*\)/[0-7]\(.*\)｣, ｢\1\2｣), $@)｣)
-  define(｢_opcode_nomodrm｣, ｢ifelse(｢$1｣, , ｢begin_opcode((trim(
+  define(｢_opcode_nomodrm｣, ｢ifelse(｢$4｣, , ｢__opcode_nomodrm($@)｣,
+    ｢ifelse(substr(｢$4｣, ｢0｣, ｢1｣), ｢r｣,
+      ｢__opcode_nomodrm(｢$1｣, regopcode(｢$2｣), ｢$3｣)｣,
+      ｢_opcode_nomodrm(｢$1｣, ｢$2｣, ｢$3｣, shift(shift(shift(shift($@)))))｣)｣)｣)
+  define(｢__opcode_nomodrm｣, ｢ifelse(｢$1｣, , ｢begin_opcode((trim(
     ｢$2｣))) end_opcode(｢$3｣) instruction_name(｢$3｣)｣,
     ｢begin_opcode((trim(｢$1｣)))｣)｣)
+  define(｢regopcode｣, ｢_regopcode(split_argument($1))｣)
+  define(｢_regopcode｣, ｢ifelse($#, 1,
+    ｢chartest(｢(｢c｣ != 0x90) && ((｢c｣ & 0xf8) == $1)｣)｣,
+    ｢$1 _regopcode(shift($@))｣)｣)
   define(｢instruction_body｣, ｢opcode_nomodrm(｢$3｣,
     split_argument(｢$2｣))｢｣instruction_arguments_number(
     shift(split_argument($2)))｢｣instruction_arguments_sizes($1,

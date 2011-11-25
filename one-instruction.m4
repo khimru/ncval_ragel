@@ -34,6 +34,7 @@
   define(｢operand1_32bit｣, )
   define(｢operand1_64bit｣, )
   define(｢operand1_ds_rsi｣, )
+  define(｢operand1_accumulator｣, )
   define(｢operand1_from_modrm_reg｣, )
   define(｢operand1_from_modrm_rm｣, )
   define(｢operand1_immediate｣, )

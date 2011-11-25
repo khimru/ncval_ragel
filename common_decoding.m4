@@ -217,6 +217,10 @@
   action operand1_ds_rsi {
     operand1 = REG_DS_RSI;
   }
+  action operand1_accumulator {
+    operand1 = REG_RAX;
+  }
+  define(｢operand1_accumulator｣, ｢@operand1｢_｣accumulator｣)
   define(｢operand1_ds_rsi｣, ｢@operand1｢_｣ds｢_｣rsi｣)
   action operand1_from_modrm_reg {
     operand1 = (((*p) & 0x38) >> 3) | ((rex_prefix & REX_R) << 1);
