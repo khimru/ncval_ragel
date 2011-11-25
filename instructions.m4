@@ -37,36 +37,50 @@
   define(｢possible_command_mode_v｣,｢data16rexw｣)
   define(｢possible_command_mode_w｣,｢unknown｣)
   define(｢possible_command_mode_z｣,｢data16rexw｣)
-  # This is special prefix not included in AMD manual: w bit selects between
-  # 8bit and 16/32/64 bit versions
-  define(｢possible_command_mode_｣,｢size8data16rexw｣)
+  # This is special prefix not included in AMD manual:  w bit selects between
+  # 8bit and 16/32/64 bit versions.  M is just an address in memory: it means
+  # register-only encodings are invalid, but other operands decide everything
+  # else.
+  define(｢possible_command_mode_｣,
+    ｢ifelse(｢$1｣, ｢M｣, ｢memonly｣, ｢size8data16rexw｣)｣)
   define(｢return_operand_modes｣, ｢ifelse(
     ｢$#｣, ｢0｣, ｢none｣,
     ｢$#｣, ｢1｣,
     ｢ifelse(
-      $1,｢unknown｣,｢none｣,
-      $1,｢none｣,
-      $1,｢size8data16rexw｣,｢size8data16rexw｣,
-      $1,｢data16｣,｢data16｣,
-      $1,｢data16rexw｣,｢data16rexw｣,
-      $1,｢rexw｣,｢rexw｣,
-      $1,｢rexbreg｣,｢rexbreg｣,
-      ｢fatal_error(Incorrect prefix sizeA)｣)｣,
+      $1, ｢unknown｣, ｢none｣,
+      $1, ｢none｣,
+      $1, ｢size8data16rexw｣, ｢size8data16rexw｣,
+      $1, ｢data16｣, ｢data16｣,
+      $1, ｢data16rexw｣, ｢data16rexw｣,
+      $1, ｢rexw｣, ｢rexw｣,
+      $1, ｢rexbreg｣, ｢rexbreg｣,
+      $1, ｢memonlysize8data16rexw｣, ｢memonlysize8data16rexw｣,
+      $1, ｢memonlydata16｣, ｢memonlydata16｣,
+      $1, ｢memonlydata16rexw｣, ｢memonlydata16rexw｣,
+      $1, ｢memonlyrexw｣, ｢memonlyrexw｣,
+      $1, ｢memonlyrexbreg｣, ｢memonlyrexbreg｣,
+      ｢fatal_error(｢Incorrect operand mode:｣ $1)｣)｣,
     ｢$#｣, ｢2｣, ｢ifelse(
-      $1,｢unknown｣,｢return_operand_modes(｢$2｣)｣,
-      $2,｢unknown｣,｢return_operand_modes(｢$1｣)｣,
-      $1,$2,｢return_operand_modes(｢$1｣)｣,
-      ｢fatal_error(Incorrect prefix sizeB)｣)｣,
+      $1, ｢unknown｣, ｢return_operand_modes(｢$2｣)｣,
+      $2, ｢unknown｣, ｢return_operand_modes(｢$1｣)｣,
+      $1, $2, ｢return_operand_modes(｢$1｣)｣,
+      $1, ｢memonly｣, ｢return_operand_modes(｢memonly｣$2)｣,
+      $2, ｢memonly｣, ｢return_operand_modes(｢memonly｣$1)｣,
+      ｢fatal_error(｢Incorrect operand modes｣ $1 ｢and｣ $2)｣)｣,
     ｢return_operand_modes(｢$1｣, return_operand_modes(shift($@)))｣)｣)
   define(｢_check_prefixes_compatibility｣,｢ifelse(
-    ｢unknown｣,$1,｢$2｣,
-    ｢unknown｣,$2,｢$1｣,
-    $1,$2,｢$2｣,
-    ｢fatal_error(｢Incompatible prefixes $1 and $2｣)｣)｣)
-  # Possible registers follow AMD manual with the following additions:
-  #  a? - accumulator ("ab" means "%al", "av" means "%ax/%eax/%rax")
-  #  r? - register is encoded in command (for example "push %rax..%rdi")
-  #  c? - condition is encoded in command (for example Jcc)
+    ｢unknown｣, $1, ｢$2｣,
+    ｢unknown｣, $2, ｢$1｣,
+    $1, $2, ｢$2｣,
+    $1, ｢memonly｣, ｢memonly｣$2,
+    $2, ｢memonly｣, ｢memonly｣$1,
+    ｢fatal_error(｢Incompatible prefixes｣ $1 ｢and｣ $2)｣)｣)
+  # Note: we don't support "memonly" and "lock" simultaneously.  IA32 and x86-64
+  # never use them together.  "memonly" without lock are "lea", x87, etc while
+  # "lock" can only be ever used with the follwing instructions: adc, add, and,
+  # btc, btr, bts, cmpxchg, cmpxchg8b, chmpxchg16b, dec, inc, not, or, sbb, sub
+  # xadd, xchg, and xor.  ALL these instructions are NOT "memonly" initially but
+  # become "memonly" when combined with "lock" prefix.
   define(｢instruction_select｣, ｢ifelse(
     ｢$1｣, ｢size8data16rexw｣,
       ｢instruction_select(｢size8｣, shift($@))｣  ｢instruction_select(
@@ -85,7 +99,7 @@
 	  ｢$4｣)) ｢REX_RXB?｣ instruction_body(
 	  $@)instruction_separator｢｣｢(｣one_required_prefix(｢lock｣,
 	  optional_prefixes(｢$4｣)) ｢REX_RXB?｣ instruction_body(
-	  lock$@)｣)｣,
+	  ｢memonly｣$@)｣)｣,
     ｢$1｣, ｢data16｣,
       ｢ifelse(index(｢$4｣, ｢lock｣), -1,
 	｢instruction_separator｢｣｢(｣one_required_prefix(｢data16｣,
@@ -93,7 +107,7 @@
 	｢instruction_separator｢｣｢(｣one_required_prefix(｢data16｣,
 	  optional_prefixes(｢$4｣)) ｢rex_rxb?｣ instruction_body(
 	  $@)instruction_separator｢｣｢(｣two_required_prefixes(｢data16｣, ｢lock｣,
-	  optional_prefixes(｢$4｣)) ｢rex_rxb?｣ instruction_body(lock$@)｣)｣,
+	  optional_prefixes(｢$4｣)) ｢rex_rxb?｣ instruction_body(｢memonly｣$@)｣)｣,
     ｢$1｣, ｢rexw｣, 
       ｢ifelse(index(｢$4｣, ｢lock｣), -1,
 	｢instruction_separator｢｣｢(｣possible_prefixes(optional_prefixes(
@@ -102,7 +116,7 @@
 	  ｢$4｣)) ｢REXW_RXB｣ instruction_body(
 	  $@)instruction_separator｢｣｢(｣one_required_prefix(｢lock｣,
 	  optional_prefixes(｢$4｣)) ｢REXW_RXB｣ instruction_body(
-	  lock$@)｣)｣,
+	  ｢memonly｣$@)｣)｣,
     ｢$1｣, ｢none｣,
       ｢ifelse(index(｢$4｣, ｢lock｣), -1,
 	｢instruction_separator｢｣｢(｣possible_prefixes(optional_prefixes(
@@ -111,8 +125,30 @@
 	  ｢$4｣)) ｢rex_rxb?｣ instruction_body(
 	  $@)instruction_separator｢｣｢(｣one_required_prefix(｢lock｣,
 	  optional_prefixes(｢$4｣)) ｢rex_rxb?｣ instruction_body(
-	  lock$@)｣)｣,
-    ｢fatal_error(Incorrect prefix size)｣)｣)
+	  ｢memonly｣$@)｣)｣,
+    ｢$1｣, ｢memonlysize8data16rexw｣,
+      ｢instruction_select(｢memonlysize8｣, shift($@))｣  ｢instruction_select(
+	       ｢memonlydata16rexw｣, $2, setwflag($3), shift(shift(shift($@))))｣,
+    ｢$1｣, ｢memonlydata16rexw｣,
+      ｢instruction_select(｢memonlydata16｣, shift($@))｣  ｢instruction_select(
+	｢memonlynone｣, shift($@))｣  ｢instruction_select(｢memonlyrexw｣,
+								    shift($@))｣,
+    ｢$1｣, ｢memonlyrexbreg｣,
+      ｢instruction_separator｢｣(rex_b? instruction_body(
+      ｢memonlynone｣, $2, regopcode($3))｣,
+    ｢$1｣, ｢memonlysize8｣,
+      ｢instruction_separator｢｣｢(｣possible_prefixes(optional_prefixes(
+	｢$4｣)) ｢REX_RXB?｣ instruction_body($@)｣,
+    ｢$1｣, ｢memonlydata16｣,
+      ｢instruction_separator｢｣｢(｣one_required_prefix(｢data16｣,
+	optional_prefixes(｢$4｣)) ｢rex_rxb?｣ instruction_body($@)｣,
+    ｢$1｣, ｢memonlyrexw｣, 
+      ｢instruction_separator｢｣｢(｣possible_prefixes(optional_prefixes(
+	｢$4｣)) ｢REXW_RXB｣ instruction_body($@)｣,
+    ｢$1｣, ｢memonlynone｣,
+      ｢instruction_separator｢｣｢(｣possible_prefixes(optional_prefixes(
+	｢$4｣)) ｢rex_rxb?｣ instruction_body($@)｣,
+    ｢fatal_error(｢Incorrect operand mode:｣ $1)｣)｣)
   define(｢optional_prefixes｣, ｢_optional_prefixes(split_argument($1))｣)
   define(｢_optional_prefixes｣, ｢ifelse(｢$#｣, ｢0｣, , ｢$#｣｢$1｣, ｢1｣, ,
     ｢$1｣, ｢condrep｣, ｢condrep, ｣,
@@ -142,8 +178,8 @@
   define(｢instruction_arguments_number｣, ｢ operands_count_is_$#｣)
   define(｢instruction_arguments_sizes｣, ｢ifelse(eval(｢$#>2｣), ｢1｣,
     ｢instruction_arguments_sizes(｢$1｣, shift(shift($@)))｣) ifelse(
-      substr(｢$1｣, ｢0｣, ｢4｣), ｢lock｣,
-	｢instruction_arguments_sizes(substr(｢$1｣, ｢4｣), shift($@))｣,
+      substr(｢$1｣, ｢0｣, ｢7｣), ｢memonly｣,
+	｢instruction_arguments_sizes(substr(｢$1｣, ｢7｣), shift($@))｣,
 	｢trim(｢operand｣decr(decr(｢$#｣))｢_｣ifelse(len(｢$2｣), ｢1｣,
 	  ｢ifelse(instruction_argument_size_$1_$2,
 	    ｢instruction_argument_size_$1_$2｣,
@@ -184,11 +220,15 @@
       substr(｢$2｣, ｢0｣, ｢1｣), ｢G｣, ,
       substr(｢$2｣, ｢0｣, ｢1｣), ｢I｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_immediate｣,
       substr(｢$2｣, ｢0｣, ｢1｣), ｢J｣, ,
+      substr(｢$2｣, ｢0｣, ｢1｣), ｢M｣, ,
       substr(｢$2｣, ｢0｣, ｢1｣), ｢X｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_ds_rsi｣,
       substr(｢$2｣, ｢0｣, ｢1｣), ｢Y｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_es_rdi｣,
       ｢fatal_error(Can not determine argument type)｣)｣)
-  define(｢instruction_modrm_arguments｣, ｢ifelse(index(｢$2｣, ｢ G｣), -1,
-    ｢ifelse(index(｢$2｣, ｢ E｣), -1, , ｢ _instruction_modrm_arguments($@)｣)｣,
+  define(｢instruction_modrm_arguments｣, ｢ifelse(index(｢$2｣, ｢ E｣), -1,
+    ｢ifelse(index(｢$2｣, ｢ G｣), -1,
+      ｢ifelse(index(｢$2｣, ｢ M｣), -1, ,
+	｢ _instruction_modrm_arguments($@)｣)｣,
+      ｢ _instruction_modrm_arguments($@)｣)｣,
     ｢ _instruction_modrm_arguments($@)｣)｣)
   define(｢_instruction_modrm_arguments｣, ｢ifelse(index(｢$3｣, ｢/｣), -1, ,
     ｢regexp(｢$3｣, ｢/\([0-7]\)｣,
@@ -196,10 +236,10 @@
       $2))) instruction_name(split_argument(
       $2)) & ｣)｣)｢( ｣__instruction_modrm_arguments($@)｢｣ifelse(
     index(｢$3｣, ｢/｣), -1, , ｢ )｣)｢)｣｣)
-  define(｢__instruction_modrm_arguments｣, ｢ifelse(index(｢$1｣, ｢lock｣), -1,
+  define(｢__instruction_modrm_arguments｣, ｢ifelse(substr(｢$1｣, ｢0｣, ｢7｣),
+    ｢memonly｣, ｢memory_instruction_modrm_arguments(shift(split_argument($2)))｣,
     ｢register_instruction_modrm_arguments(shift(split_argument(
-      $2))) | memory_instruction_modrm_arguments(shift(split_argument($2)))｣,
-    ｢memory_instruction_modrm_arguments(shift(split_argument($2)))｣)｣)
+      $2))) | memory_instruction_modrm_arguments(shift(split_argument($2)))｣)｣)
   define(｢register_instruction_modrm_arguments｣,
     ｢modrm_registers _register_instruction_modrm_arguments($@)｣)
   define(｢_register_instruction_modrm_arguments｣, ｢ifelse(eval(｢$#>1｣), ｢1｣,
@@ -207,7 +247,9 @@
       substr(｢$1｣, ｢0｣, ｢1｣), ｢E｣,
       ｢operand｣decr(｢$#｣)｢_from_modrm_rm｣,
       substr(｢$1｣, ｢0｣, ｢1｣), ｢G｣,
-      ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣)｣)
+      ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
+      substr(｢$1｣, ｢0｣, ｢1｣), ｢M｣,
+      ｢operand｣decr(｢$#｣)｢_from_modrm_rm｣)｣)
   define(｢memory_instruction_modrm_arguments｣,
     ｢(modrm_memory & (any _memory_instruction_modrm_arguments($@) any*))｣)
   define(｢_memory_instruction_modrm_arguments｣, ｢ifelse(eval(｢$#>1｣), ｢1｣,
@@ -215,11 +257,13 @@
       substr(｢$1｣, ｢0｣, ｢1｣), ｢E｣,
       ｢operand｣decr(｢$#｣)｢_rm｣,
       substr(｢$1｣, ｢0｣, ｢1｣), ｢G｣,
-      ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣)｣)
+      ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
+      substr(｢$1｣, ｢0｣, ｢1｣), ｢M｣,
+      ｢operand｣decr(｢$#｣)｢_rm｣)｣)
   define(｢instruction_immediate_arguments｣, ｢ifelse(eval(｢$#>2｣), ｢1｣,
     ｢instruction_immediate_arguments(｢$1｣, shift(shift($@)))｣) ifelse(
-      substr(｢$1｣, ｢0｣, ｢4｣), ｢lock｣,
-	｢instruction_immediate_arguments(substr(｢$1｣, ｢4｣), shift($@))｣,
+      substr(｢$1｣, ｢0｣, ｢7｣), ｢memonly｣,
+	｢instruction_immediate_arguments(substr(｢$1｣, ｢7｣), shift($@))｣,
       ｢ifelse(substr(｢$2｣, ｢0｣, ｢1｣), ｢I｣, ｢trim(ifelse(len(｢$2｣), ｢1｣,
 	  ｢ifelse(instruction_immediate_arguments_$1,
 	    ｢instruction_immediate_arguments_$1｣,
