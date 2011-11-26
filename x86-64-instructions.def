@@ -1,4 +1,19 @@
 # File format: see general-purpose-instructions.def
 #################################################################################
 # This file includes instructions valid only in x86-64 mode.
+cltq, REXW_NONE 0x98
+cqto, REXW_NONE 0x99
+jrcxz Jb, 0xe3
+# LAHF is always awailable in 16bit/32bit mode, but not in 64bit mode
+lahf, 0x9f, Fn8000_0001_ECX_LahfSahf
+leaveq, 0xc9
+movabs Ob ab, 0xa0
+movabs Ov av, 0xa1
+movabs ab Ob, 0xa2
+movabs av Ov, 0xa3
 movslq Ed Gv, 0x63
+popfq, 0x9d
+pushfq, 0x9c
+retq, 0xc3
+# LAHF is always awailable in 16bit/32bit mode, but not in 64bit mode
+sahf, 0x9e, Fn8000_0001_ECX_LahfSahf

@@ -37,6 +37,8 @@ enum register_name {
   REG_RIP,	/* RIP - used as base in x86-64 mode.			      */
   REG_RIZ,	/* EIZ/RIZ - used as "always zero index" register.	      */
   REG_IMM,	/* Fixed value in imm field.				      */
+  REG_IMM2,	/* Fixed value in second imm field.			      */
+  REG_DS_RBX,	/* Fox xlat: %ds(%rbx).					      */
   REG_ES_RDI,	/* For string instructions: %es:(%rsi).			      */
   REG_DS_RSI,	/* For string instructions: %ds:(%rdi).			      */
   REG_PORT_DX,	/* 16-bit DX: for in/out instructions.			      */
@@ -51,9 +53,8 @@ struct instruction {
     unsigned char rex;	      /* Mostly to distingush cases like %ah vs %spl. */
     int data16:1;	      /* "Normal", non-rex prefixes. */
     int lock:1;
-    int rep:1;		      /* rep and repe are used in different commands */
-    int repe:1;
-    int repne:1;
+    int repnz:1;
+    int repz:1;
     int branch_not_taken:1;
     int branch_taken:1;
   } prefix;
@@ -65,9 +66,9 @@ struct instruction {
     enum register_name base;
     enum register_name index;
     int scale;
-    int32_t offset;
+    int64_t offset;
   } rm;
-  int64_t imm;
+  int64_t imm[2];
 };
 
 typedef void (*process_instruction_func) (uint8_t *begin, uint8_t *end,

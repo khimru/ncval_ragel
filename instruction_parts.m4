@@ -6,12 +6,17 @@
   # Displacements.
   disp8		= any disp8_operand;
   disp32	= any{4} disp32_operand;
+  disp64	= any{8} disp64_operand;
 
   # Immediates.
   imm8 = any imm8_operand;
   imm16 = any{2} imm16_operand;
   imm32 = any{4} imm32_operand;
   imm64 = any{8} imm64_operand;
+  imm8n2 = any imm8_second_operand;
+  imm16n2 = any{2} imm16_second_operand;
+  imm32n2 = any{4} imm32_second_operand;
+  imm64n2 = any{8} imm64_second_operand;
 
   # Different types of operands.
   operand_sib_nodisp = chartest(｢(c & 0xC0) == 0    && (c & 0x07) == 0x04｣) .
@@ -50,7 +55,7 @@
   # Prefixes.
   data16 = 0x66 data16_prefix;
   branch = 0x2e branch_not_taken | 0x3e branch_taken;
-  condrep = 0xf2 repe_prefix | 0xf3 repne_prefix;
+  condrep = 0xf2 repnz_prefix | 0xf3 repz_prefix;
   lock = 0xf0 lock_prefix;
   rep = 0xf3 rep_prefix;
 

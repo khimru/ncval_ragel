@@ -42,17 +42,17 @@
   }
   define(｢lock_prefix｣, ｢@lock｢_｣prefix｣)
   action rep_prefix {
-    rep_prefix = TRUE;
+    repz_prefix = TRUE;
   }
   define(｢rep_prefix｣, ｢@rep｢_｣prefix｣)
-  action repe_prefix {
-    lock_prefix = TRUE;
+  action repz_prefix {
+    repz_prefix = TRUE;
   }
-  define(｢repe_prefix｣, ｢@repe｢_｣prefix｣)
-  action repne_prefix {
-    repne_prefix = TRUE;
+  define(｢repz_prefix｣, ｢@repz｢_｣prefix｣)
+  action repnz_prefix {
+    repnz_prefix = TRUE;
   }
-  define(｢repne_prefix｣, ｢@repne｢_｣prefix｣)
+  define(｢repnz_prefix｣, ｢@repnz｢_｣prefix｣)
   action disp8_operand {
     disp_type = DISP8;
     disp = p;
@@ -63,26 +63,51 @@
     disp = p - 3;
   }
   define(｢disp32_operand｣, ｢@disp32｢_｣operand｣)
+  action disp64_operand {
+    disp_type = DISP64;
+    disp = p - 7;
+  }
+  define(｢disp64_operand｣, ｢@disp64｢_｣operand｣)
   action imm8_operand {
     imm_operand = IMM8;
     imm = p;
   }
   define(｢imm8_operand｣, ｢@imm8｢_｣operand｣)
+  action imm8_second_operand {
+    imm2_operand = IMM8;
+    imm2 = p;
+  }
+  define(｢imm8_second_operand｣, ｢@imm8｢_｣second｢_｣operand｣)
   action imm16_operand {
     imm_operand = IMM16;
     imm = p - 1;
   }
   define(｢imm16_operand｣, ｢@imm16｢_｣operand｣)
+  action imm16_second_operand {
+    imm2_operand = IMM16;
+    imm2 = p - 1;
+  }
+  define(｢imm16_second_operand｣, ｢@imm16｢_｣second｢_｣operand｣)
   action imm32_operand {
     imm_operand = IMM32;
     imm = p - 3;
   }
   define(｢imm32_operand｣, ｢@imm32｢_｣operand｣)
+  action imm32_second_operand {
+    imm2_operand = IMM32;
+    imm2 = p - 3;
+  }
+  define(｢imm32_second_operand｣, ｢@imm32｢_｣second｢_｣operand｣)
   action imm64_operand {
     imm_operand = IMM64;
     imm = p - 7;
   }
   define(｢imm64_operand｣, ｢@imm64｢_｣operand｣)
+  action imm64_second_operand {
+    imm2_operand = IMM64;
+    imm2 = p - 7;
+  }
+  define(｢imm64_second_operand｣, ｢@imm64｢_｣second｢_｣operand｣)
   action modrm_only_base {
     disp_type = DISPNONE;
     index = REG_NONE;
@@ -186,10 +211,25 @@
     operands_count = 5;
   }
   define(｢operands_count_is_5｣, ｢@operands｢_｣count｢_｣is｢_｣5｣)
+  action operand0_absolute_disp {
+    operand0 = REG_RM;
+    base = REG_NONE;
+    index = REG_RIZ;
+    scale = 0;
+  }
+  define(｢operand0_absolute_disp｣, ｢@operand0｢_｣absolute｢_｣disp｣)
   action operand0_accumulator {
     operand0 = REG_RAX;
   }
   define(｢operand0_accumulator｣, ｢@operand0｢_｣accumulator｣)
+  action operand0_ds_rbx {
+    operand0 = REG_DS_RBX;
+  }
+  define(｢operand0_ds_rbx｣, ｢@operand0｢_｣ds｢_｣rbx｣)
+  action operand0_ds_rsi {
+    operand0 = REG_DS_RSI;
+  }
+  define(｢operand0_ds_rsi｣, ｢@operand0｢_｣ds｢_｣rsi｣)
   action operand0_es_rdi {
     operand0 = REG_ES_RDI;
   }
@@ -214,14 +254,25 @@
     operand0 = REG_RM;
   }
   define(｢operand0_rm｣, ｢@operand0｢_｣rm｣)
-  action operand1_ds_rsi {
-    operand1 = REG_DS_RSI;
+  action operand1_absolute_disp {
+    operand1 = REG_RM;
+    base = REG_NONE;
+    index = REG_RIZ;
+    scale = 0;
   }
+  define(｢operand1_absolute_disp｣, ｢@operand1｢_｣absolute｢_｣disp｣)
   action operand1_accumulator {
     operand1 = REG_RAX;
   }
   define(｢operand1_accumulator｣, ｢@operand1｢_｣accumulator｣)
+  action operand1_ds_rsi {
+    operand1 = REG_DS_RSI;
+  }
   define(｢operand1_ds_rsi｣, ｢@operand1｢_｣ds｢_｣rsi｣)
+  action operand1_es_rdi {
+    operand1 = REG_ES_RDI;
+  }
+  define(｢operand1_es_rdi｣, ｢@operand1｢_｣es｢_｣rdi｣)
   action operand1_from_modrm_reg {
     operand1 = (((*p) & 0x38) >> 3) | ((rex_prefix & REX_R) << 1);
   }
@@ -246,6 +297,10 @@
     operand1 = REG_RM;
   }
   define(｢operand1_rm｣, ｢@operand1｢_｣rm｣)
+  action operand1_second_immediate {
+    operand1 = REG_IMM2;
+  }
+  define(｢operand1_second_immediate｣, ｢@operand1｢_｣second｢_｣immediate｣)
   action operand2_immediate {
     operand2 = REG_IMM;
   }

@@ -2,6 +2,10 @@ divert(`-1')
 # Quotes and backquotes can be used in ragel and C, use ｢...｣ as quotes.
 changequote(`｢',`｣')
 ################################################################################
+# ｢unquote｣ just returns arguments without quoting them.  Since m4 expands all
+# arguments it's useful when you want to call define with a constructed name.
+define(｢unquote｣, ｢$*｣)
+################################################################################
 # ｢trim｣ removes spurious spaces from the beginning and the end of string
 # For example: ｢trim(｢ 0x10 /3 ｣) becomes ｢0x10 /3｣
 define(｢trim｣, ｢ifelse(｢$1｣, , , substr(｢$1｣, 0, 1), ｢ ｣,
@@ -21,7 +25,7 @@ define(｢append｣, ｢ifdef(｢append-$1: $2｣, ,
 # ｢split_argument｣ is used to turn arguments separated by spaces to arguments
 # spearated by commas.
 # For example: ｢split_argument( mov  G E )｣ becomes ｢mov,G,E｣.
-define(｢split_argument｣, ｢ifelse(len(｢$1｣), ｢0｣, ,
+define(｢split_argument｣, ｢ifelse(len(｢$1｣), 0, ,
   substr(｢$1｣, decr(len(｢$1｣))), ｢ ｣,
   ｢split_argument(substr(｢$1｣, 0, decr(len(｢$1｣))))｣, ｢_split_argument(｢$1｣)｣)｣)
 define(｢_split_argument｣,｢ifelse(eval(len(｢$1｣)<2), 1, ｢$1｣,
@@ -44,7 +48,7 @@ define(｢_chartest｣, ｢ifelse(
 # You can use ｢okprefix｣ to filter our bad prefix combinations.
 # For example: ｢possible_prefixes(addr32,lock)｣ becomes
 #              ｢( lock ) | ( addr32 ) | ( addr32 lock ) | ( lock addr32 )｣
-define(｢possible_prefixes｣, ｢ifelse(｢$#｣, ｢0｣, , ｢$1｣, , ,
+define(｢possible_prefixes｣, ｢ifelse(｢$#｣, 0, , ｢$1｣, , ,
   ｢(substr(_possible_prefixes(, $@), 3))｣)｣)
 define(｢_possible_prefixes｣, ｢ifelse(
   $2, , ｢__possible_prefixes(, $1)｣,
@@ -56,7 +60,7 @@ define(｢__possible_prefixes｣, ｢ifelse(
   ｢__possible_prefixes(｢$1 $3｣, $2,
     shift(shift(shift($@))))｣｢__possible_prefixes(
     ｢$1｣, ｢$2,$3｣, shift(shift(shift($@))))｣)｣)
-define(｢ok_prefix｣, ｢1｣)
+define(｢ok_prefix｣, 1)
 ################################################################################
 # ｢one_required_prefix｣ creates all permutations of supplied prefixes but
 # first prefix is always included regardless.

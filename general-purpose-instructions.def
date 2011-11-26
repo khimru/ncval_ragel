@@ -7,9 +7,11 @@
 #
 #      Possible argument types:
 #	a: Accumulator (%al/%ax/%eax/%rax depending on size).
-#	r: Register in opcode (low 3 bits plus rex.B).
+#	b: A memory operand addressed by the %ds:(%[er]bx). See "xlat".
 #	d: Accumulator pair (%dx:%ax/%edx:%eax/%rdx:%rax depending on size).
-#	o: I/O port in %dx (in/out instructions).
+#	i: Second immediate value encoded in the instruction.
+#	o: I/O port in %dx (used in "in"/"out" instructions).
+#	r: Register in opcode (low 3 bits plus rex.B).
 #	E: General purpose register or memory operand specified by the r/m
 #	   field of the ModRM byte.  For memory operands, the ModRM byte may
 #	   be followed by a SIB byte to specify one of the indexed
@@ -18,10 +20,13 @@
 #	I: Immediate value encoded in the instruction.
 #	M: A memory operand specified by the {mod, r/m}field of the ModRM byte.
 #	   ModRM.mod ≠ 11b.
-#	X: A memory operand addressed by the DS:rSI registers. Used in string
-#	   instructions.
-#	Y: A memory operand addressed by the ES:rDI registers. Used in string
-#	   instructions.
+#	O: The offset of an operand is encoded in the instruction. There is no
+#	   ModRM byte in the instruction encoding. Indexed register-indirect
+#	   addressing using the SIB byte is not supported
+#	X: A memory operand addressed by the %ds:%[er]si registers. Used in
+#	   string instructions.
+#	Y: A memory operand addressed by the %es:%[er]di registers. Used in
+#	   string instructions.
 #      Possible sizes:
 #	␀: A byte, word, doubleword, or quadword (in 64-bit mode),
 #	   depending on the effective operand size.
@@ -62,13 +67,34 @@ add I a, 0x04, lock
 and G E, 0x20, lock
 and E G, 0x22, lock
 and I a, 0x24, lock
+call Jz, 0xe8
+cbtw, data16 0x98
+cltd, 0x99
+cwtd, data16 0x99
+cwtl, 0x98
+clc, 0xf8
+cld, 0xfc
+cli, 0xfa
+cmc, 0xf5
 cmp G E, 0x38
 cmp E G, 0x3a
 cmp I a, 0x3c
+cmps Y X, 0xa6, condrep
+enter iw Ib, 0xc8
+fwait, 0x9b
+hlt, 0xf4
 imul Iz Ev Gv, 0x69
 imul Ib Ev Gv, 0x6b
+icebp, 0xf1
+in ob ab, 0xec
+in oz az, 0xed
+in Ib ab, 0xe4
+in Ib az, 0xe5
 ins ob Yb, 0x6c, rep
 ins oz Yz, 0x6d, rep
+int3, 0xcc
+int Ib, 0xcd
+iret, 0xcf
 ja Jb, 0x77
 ja Jz, 0x0f 0x87
 jae Jb, 0x73
@@ -87,6 +113,8 @@ jle Jb, 0x7e
 jle Jz, 0x0f 0x8e
 jl Jb, 0x7c
 jl Jz, 0x0f 0x8c
+jmp Jz, 0xe9
+jmp Jb, 0xeb
 jne Jb, 0x75
 jne Jz, 0x0f 0x85
 jno Jb, 0x71
@@ -102,26 +130,50 @@ jp Jz, 0x0f 0x8a
 js Jb, 0x78
 js Jz, 0x0f 0x88
 lea M Gv, 0x8d
+lods X a, 0xac
+loop Jb, 0xe2
+loope Jb, 0xe1
+loopne Jb, 0xe0
+lret Iw, 0xca
+lret, 0xcb
 mov G E, 0x88
 mov E G, 0x8a
+mov Ib rb, 0xb0
+mov Iv rv, 0xb8
+movs X Y, 0xa4, rep
+nop, 0x90
 or G E, 0x08, lock
 or E G, 0x0a, lock
 or I a, 0x0c, lock
+out ab ob, 0xee
+out az oz, 0xef
+out ab Ib, 0xe6
+out az Ib, 0xe7
 outs Xb ob, 0x6e, rep
 outs Xz oz, 0x6f, rep
 pop rr, 0x58
+popfw, data16 0x9d
 push rr, 0x50
 push Iz, 0x68
 push Ib, 0x6a
+pushfw, data16 0x9c
+ret Iw, 0xc2
 sbb G E, 0x18, lock
 sbb E G, 0x1a, lock
 sbb I a, 0x1c, lock
+scas Y a, 0xae
+stc, 0xf9
+std, 0xfd
+sti, 0xfb
+stos a Y, 0xaa
 sub G E, 0x28, lock
 sub E G, 0x2a, lock
 sub I a, 0x2c, lock
 test G E, 0x84
+test I a, 0xa8
 xchg G E, 0x86, lock
 xchg av rv, 0x90
+xlat bb, 0xd7
 xor G E, 0x30, lock
 xor E G, 0x32, lock
 xor I a, 0x34, lock

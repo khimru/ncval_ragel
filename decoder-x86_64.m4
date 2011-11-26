@@ -33,12 +33,12 @@
 	begin = p;
 	disp_type = DISPNONE;
 	imm_operand = IMMNONE;
+	imm2_operand = IMMNONE;
 	rex_prefix = FALSE;
 	data16_prefix = FALSE;
 	lock_prefix = FALSE;
-	rep_prefix = FALSE;
-	repe_prefix = FALSE;
-	repne_prefix = FALSE;
+	repnz_prefix = FALSE;
+	repz_prefix = FALSE;
 	branch_not_taken = FALSE;
 	branch_taken = FALSE;
     ｣}
@@ -52,18 +52,39 @@
 	  case DISP32: instruction.rm.offset = (int32_t)
 	    (disp[0] + 256 * (disp[1] + 256 * (disp[2] + 256 * (disp[3]))));
 	    break;
+	  case DISP64: instruction.rm.offset = (int64_t)
+	    (disp[0] + 256LL * (disp[1] + 256LL * (disp[2] + 256LL * (disp[3] +
+	    256LL * (disp[4] + 256LL * (disp[5] + 256LL * (disp[6] + 256LL *
+								 disp[7])))))));
+	    break;
 	}
 	switch (imm_operand) {
-	  case IMMNONE: instruction.imm = 0; break;
-	  case IMM8: instruction.imm = *imm; break;
-	  case IMM16: instruction.imm = (int64_t) (imm[0] + 256 * (imm[1]));
+	  case IMMNONE: instruction.imm[0] = 0; break;
+	  case IMM8: instruction.imm[0] = *imm; break;
+	  case IMM16: instruction.imm[0] = (int64_t) (imm[0] + 256 * (imm[1]));
 	    break;
-	  case IMM32: instruction.imm = (int64_t)
+	  case IMM32: instruction.imm[0] = (int64_t)
 	    (imm[0] + 256 * (imm[1] + 256 * (imm[2] + 256 * (imm[3]))));
 	    break;
-	  case IMM64: instruction.imm = (int64_t)
+	  case IMM64: instruction.imm[0] = (int64_t)
 	    (imm[0] + 256LL * (imm[1] + 256LL * (imm[2] + 256LL * (imm[3] +
-	    256 * (imm[4] + 256 * (imm[5] + 256 * (imm[6] + 256 * imm[7])))))));
+	    256LL * (imm[4] + 256LL * (imm[5] + 256LL * (imm[6] + 256LL *
+								  imm[7])))))));
+	    break;
+	}
+	switch (imm2_operand) {
+	  case IMMNONE: instruction.imm[1] = 0; break;
+	  case IMM8: instruction.imm[1] = *imm2; break;
+	  case IMM16: instruction.imm[1] = (int64_t)
+	    (imm2[0] + 256 * (imm2[1]));
+	    break;
+	  case IMM32: instruction.imm[1] = (int64_t)
+	    (imm2[0] + 256 * (imm2[1] + 256 * (imm2[2] + 256 * (imm2[3]))));
+	    break;
+	  case IMM64: instruction.imm[1] = (int64_t)
+	    (imm2[0] + 256LL * (imm2[1] + 256LL * (imm2[2] + 256LL * (imm2[3] +
+	    256LL * (imm2[4] + 256LL * (imm2[5] + 256LL * (imm2[6] + 256LL *
+								 imm2[7])))))));
 	    break;
 	}
 	process_instruction(begin, p+1, &instruction, userdata);
@@ -84,9 +105,8 @@
 #define rex_prefix instruction.prefix.rex
 #define data16_prefix instruction.prefix.data16
 #define lock_prefix instruction.prefix.lock
-#define rep_prefix instruction.prefix.rep
-#define repe_prefix instruction.prefix.repe
-#define repne_prefix instruction.prefix.repne
+#define repz_prefix instruction.prefix.repz
+#define repnz_prefix instruction.prefix.repnz
 #define branch_not_taken instruction.prefix.branch_not_taken
 #define branch_taken instruction.prefix.branch_taken
 #define operand0_size instruction.operands[0].size
@@ -110,6 +130,7 @@ enum disp_mode {
   DISP8,
   DISP16,
   DISP32,
+  DISP64,
 };
 
 enum imm_mode {
@@ -133,10 +154,11 @@ int DecodeChunk(uint32_t load_addr, uint8_t *data, size_t size,
   uint8_t *p = data;
   uint8_t *pe = data + size;
   uint8_t *eof = pe;
-  uint8_t *disp = NULL, *imm = NULL, *begin;
+  uint8_t *disp = NULL, *imm = NULL, *imm2 = NULL, *begin;
   uint8_t *begin_opcode, *end_opcode;
-  enum disp_mode disp_type = DISPNONE;
-  enum imm_mode imm_operand = IMMNONE;
+  enum disp_mode disp_type;
+  enum imm_mode imm_operand;
+  enum imm_mode imm2_operand;
   struct instruction instruction;
   int result = 0;
 

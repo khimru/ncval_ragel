@@ -22,17 +22,17 @@ _ = gettext.gettext
 
 version = "0.0"
 
-anyfield_begin_actions = ['disp8_operand_begin', 'disp32_operand_begin',
-			  'imm8_operand_begin', 'imm16_operand_begin',
+anyfield_begin_actions = ['imm8_operand_begin', 'imm16_operand_begin',
 			  'imm32_operand_begin', 'imm64_operand_begin',
-			  'rel8_operand_begin', 'rel16_operand_begin',
-			  'rel32_operand_begin']
+			  'disp8_operand_begin', 'disp32_operand_begin',
+			  'disp64_operand_begin', 'rel8_operand_begin',
+			  'rel16_operand_begin', 'rel32_operand_begin']
 
-anyfield_end_actions = ['disp8_operand_end', 'disp32_operand_end',
-			'imm8_operand_end', 'imm16_operand_end',
+anyfield_end_actions = ['imm8_operand_end', 'imm16_operand_end',
 			'imm32_operand_end', 'imm64_operand_end',
-			'rel8_operand_end', 'rel16_operand_end',
-			'rel32_operand_end']
+			'disp8_operand_end', 'disp32_operand_end',
+			'disp64_operand_end', 'rel8_operand_end',
+			'rel16_operand_end', 'rel32_operand_end']
 
 def anyfield_action(xmlfile, dfa_tree, action_table_id, anyfield_list):
   """ Returns true if action_table_id includes action from anyfield_list"""

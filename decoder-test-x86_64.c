@@ -78,11 +78,26 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
   if (instruction->operands_count > 0) {
     show_name_suffix = TRUE;
     for (i=instruction->operands_count-1;i>=0;i--) {
-      if ((instruction->operands[i].name == REG_IMM) ||
-	  (instruction->operands[i].name == REG_RM) ||
-	  (instruction->operands[i].name == REG_PORT_DX) ||
-	  (instruction->operands[i].name == REG_ES_RDI) ||
-	  (instruction->operands[i].name == REG_DS_RSI)) {
+      if (instruction->operands[i].name == JMP_TO) {
+        /* Most control flow instructions never use suffixes, but "call" and
+           "jmp" do... unless byte offset is used.  */
+	if ((!strcmp(instruction->name, "call")) ||
+	    (!strcmp(instruction->name, "jmp"))) {
+	  switch (instruction->operands[i].size) {
+	    case OperandSize8bit: show_name_suffix = FALSE; break;
+	    case OperandSize16bit: show_name_suffix = 'w'; break;
+	    case OperandSize32bit: show_name_suffix = 'q'; break;
+	    default: assert(FALSE);
+	  }
+	} else {
+	  show_name_suffix = FALSE;
+	}
+      } else if ((instruction->operands[i].name == REG_IMM) ||
+		 (instruction->operands[i].name == REG_IMM2) ||
+		 (instruction->operands[i].name == REG_RM) ||
+		 (instruction->operands[i].name == REG_PORT_DX) ||
+		 (instruction->operands[i].name == REG_ES_RDI) ||
+		 (instruction->operands[i].name == REG_DS_RSI)) {
 	if (show_name_suffix) {
 	  switch (instruction->operands[i].size) {
 	    case OperandSize8bit: show_name_suffix = 'b'; break;
@@ -116,32 +131,52 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
   if (instruction->prefix.lock) {
     print_name("lock ");
   }
-  if (instruction->prefix.rep) {
-    print_name("rep ");
+  if (instruction->prefix.repnz) {
+    print_name("repnz ");
   }
-  if (instruction->prefix.repe) {
-    print_name("repe ");
+  if (instruction->prefix.repz) {
+    /* This prefix is "rep" for "ins", "movs", and "outs", "repz" otherwise.  */
+    if ((!strcmp(instruction->name, "ins")) ||
+	(!strcmp(instruction->name, "movs")) ||
+	(!strcmp(instruction->name, "outs"))) {
+      print_name("rep ");
+    } else {
+      print_name("repz ");
+    }
   }
-  if (instruction->prefix.repne) {
-    print_name("repne ");
-  }
-  if ((!strcmp(instruction->name, "ins")) ||
-      (!strcmp(instruction->name, "outs"))) {
-    /* rex.W is ignored by in/out commands.  */
-    if (instruction->prefix.rex == 0x48) {
+  if (instruction->prefix.rex == 0x48) {
+    /* rex.W is ignored by in/out, and push commands.  */
+    if ((!strcmp(instruction->name, "in")) ||
+	(!strcmp(instruction->name, "ins")) ||
+	(!strcmp(instruction->name, "out")) ||
+	(!strcmp(instruction->name, "outs")) ||
+	(!strcmp(instruction->name, "push"))) {
       print_name("rex.W ");
     }
-  } else if (!strcmp(instruction->name, "push")) {
+  }
+  if ((show_name_suffix == 'b') || (show_name_suffix == 'l')) {
+    /* "int" never uses suffix. */
+    if (!strcmp(instruction->name, "int")) {
+      show_name_suffix = FALSE;
     /* objdump always shows "6a 01" as "pushq $1", "66 68 01 00" as
        "pushw $1" yet "68 01 00" as "pushq $1" again.  This makes no
        sense whatsoever so we'll just hack around here to make sure
        we produce objdump-compatible output.  */
-    if ((show_name_suffix == 'b') || (show_name_suffix == 'l')) {
+    /* Instruction enter accepts two immediates: word and byte. But
+       objdump always uses suffix "q". This is supremely strange, but
+       we want to match objdump exactly, so... here goes.  */
+    } else if ((!strcmp(instruction->name, "enter")) ||
+	       (!strcmp(instruction->name, "push"))) {
       show_name_suffix = 'q';
     }
-    /* rex.W is ignored by push command.  */
-    if (instruction->prefix.rex == 0x48) {
-      print_name("rex.W ");
+  }
+  if (show_name_suffix == 'w') {
+    /* "lret" newer uses suffix at all.  */
+    if (!strcmp(instruction->name, "lret")) {
+       show_name_suffix = FALSE;
+    /* "ret" always uses "q" suffix no matter what.  */
+    } else if (!strcmp(instruction->name, "ret")) {
+      show_name_suffix = 'q';
     }
   }
   i = (instruction->prefix.rex & 0x01) +
@@ -165,16 +200,28 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
     }
     print_name(" ");
   }
-#undef print_name
   printf("%s", instruction->name);
   shown_name += strlen(instruction->name);
   if (show_name_suffix) {
     printf("%c", show_name_suffix);
     shown_name++;
   }
-  while (shown_name < 6) {
-    printf(" ");
-    shown_name++;
+  if (!strcmp(instruction->name, "mov")) {
+    if ((instruction->operands[1].name == REG_IMM) &&
+       (instruction->operands[1].size == OperandSize64bit)) {
+      print_name("abs");
+    }
+  }
+#undef print_name
+  if (strcmp(instruction->name, "nop") &&
+      strcmp(instruction->name, "fwait")) {
+    while (shown_name < 6) {
+      printf(" ");
+      shown_name++;
+    }
+    if (instruction->operands_count == 0) {
+      printf(" ");
+    }
   }
   for (i=instruction->operands_count-1;i>=0;i--) {
     printf("%c", delimeter);
@@ -349,7 +396,7 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
       break;
       case REG_RM: {
 	if (instruction->rm.offset) {
-	  printf("0x%x",instruction->rm.offset);
+	  printf("0x%llx",instruction->rm.offset);
 	}
 	if ((instruction->rm.base != REG_NONE) ||
 	    (instruction->rm.index != REG_RIZ) ||
@@ -411,10 +458,15 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
       }
       break;
       case REG_IMM: {
-	printf("$0x%llx",instruction->imm);
+	printf("$0x%llx",instruction->imm[0]);
+	break;
+      }
+      case REG_IMM2: {
+	printf("$0x%llx",instruction->imm[1]);
 	break;
       }
       case REG_PORT_DX: printf("(%%dx)"); break;
+      case REG_DS_RBX: printf("%%ds:(%%rbx)"); break;
       case REG_ES_RDI: printf("%%es:(%%rdi)"); break;
       case REG_DS_RSI: printf("%%ds:(%%rsi)"); break;
       case JMP_TO: if (instruction->operands[0].size == OperandSize16bit)
