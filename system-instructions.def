@@ -1,0 +1,55 @@
+# This file describes instructions from AMD64 Architecture Programmer’s Manual
+#				 Volume 3: General-Purpose and System Instruction
+#					  Chapter 4: System Instruction Reference
+#################################################################################
+# Note: all 32bit exclusive instructions are in x86-32-instructions.def
+#       all 64bit exclusive instructions are in x86-64-instructions.def
+#################################################################################
+# File format: see general-purpose-instructions.def
+#################################################################################
+clgi, 0x0f 0x01 0xdd, Fn8000_0001_ECX_SVM
+cli, 0xfa
+clts, 0x0f 0x06
+femms, 0xf 0x0e, Fn8000_0001_EDX_3DNow
+fwait, 0x9b
+hlt, 0xf4
+icebp, 0xf1
+int3, 0xcc
+invd, 0x0f 0x08
+invlpg Mb, 0x0f 0x01 /7
+invlpga, 0x0f 0x01 0xdf, Fn8000_0001_ECX_SVM
+iret, 0xcf
+lar Ew Gv, 0x0f 0x02
+lgdt Ms, 0x0f 0x00 /2
+lidt Ms, 0x0f 0x00 /3
+lldt Ew, 0x0f 0x00 /2
+lmsw Ew, 0x0f 0x01 /6
+lsl Ew Gv, 0x0f 0x03
+ltr Ew, 0x0f 0x00 /3
+monitor ar cr dr, 0x0f 0x01 0xc8, Fn0000_0001_ECX_Monitor
+mwait ar cr, 0x0f 0x01 0xc9, Fn0000_0001_ECX_Monitor
+rdtscp, 0x0f 0x01 0xf9, Fn8000_0001_EDX_RDTSCP
+sgdt Ms, 0x0f 0x01 /0
+sidt Ms, 0x0f 0x01 /1
+skinit, 0x0f 0x01 0xde, Fn8000_0001_ECX_SKINIT
+sldt Mw, 0x0f 0x00 /0
+sldt Rv, 0x0f 0x00 /0
+smsw Mw, 0x0f 0x01 /4
+smsw Rv, 0x0f 0x01 /4
+stgi, 0x0f 0x01 0xdc, Fn8000_0001_ECX_SKINIT
+sti, 0xfb
+str Mw, 0x0f 0x00 /1
+str Rv, 0x0f 0x00 /1
+syscall, 0x0f 0x05
+sysret, 0x0f 0x07
+ud2, 0x0f 0x0b
+verr Ew, 0x0f 0x00 /4
+verw Ew, 0x0f 0x00 /5
+vmload, 0x0f 0x01 0xda, Fn8000_0001_ECX_SVM
+vmmcall, 0x0f 0x01 0xd9, Fn8000_0001_ECX_SVM
+vmrun, 0x0f 0x01 0xd8, Fn8000_0001_ECX_SVM
+vmsave, 0x0f 0x01 0xdb, Fn8000_0001_ECX_SVM
+wbinvd, 0x0f 0x09
+xgetbv, 0x0f 0x01 0xd0, Fn0000_00001_ECX_XSAVE
+xsetbv, 0x0f 0x01 0xd1, Fn0000_00001_ECX_XSAVE
+#################################################################################

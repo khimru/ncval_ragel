@@ -479,7 +479,9 @@
 
   instructions_defines(include(｢general-purpose-instructions.def｣))
   instructions_defines(include(｢x86-64-instructions.def｣))
+  instructions_defines(include(｢system-instructions.def｣))
 
   valid_instruction =
     instructions(include(｢general-purpose-instructions.def｣))
+    instructions(include(｢system-instructions.def｣))
     instructions(include(｢x86-64-instructions.def｣));

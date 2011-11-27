@@ -1,24 +1,53 @@
+# This file includes instructions valid only in x86-64 mode.
+#################################################################################
 # File format: see general-purpose-instructions.def
 #################################################################################
-# This file includes instructions valid only in x86-64 mode.
+# This part describes instructions from AMD64 Architecture Programmer’s Manual
+#				 Volume 3: General-Purpose and System Instruction
+#				 Chapter 3: General-Purpose Instruction Reference
+######## CALL (Near) ############################################################
 callq Eq, 0xff /2
-cltq, REXW_NONE 0x98
-cqto, REXW_NONE 0x99
-jrcxz Jb, 0xe3
-# LAHF is always awailable in 16bit/32bit mode, but not in 64bit mode
-lahf, 0x9f, Fn8000_0001_ECX_LahfSahf
+######## CALL (Far) #############################################################
 lcallq Mp, 0xff /3
+######## CBW/CWDE/CDQE ##########################################################
+cltq, REXW_NONE 0x98
+######## CWD/CDQ/CQO ############################################################
+cqto, REXW_NONE 0x99
+######## CMPXCHG8B/CMPXCHG16B ###################################################
+#:cmpxchg16b Mo, REXW_XB 0x0f 0xc7 /1, lock Fn0000_0001_ECX_CMPXCHG16B
+######## JCXZ/JECXZ/JRCXZ #######################################################
+jrcxz Jb, 0xe3
+######## JMP (Near) #############################################################
+#:jmp Eq, 0xff /4
+######## LAHF ###################################################################
+# LAHF is always awailable in 16bit/32bit mode, but not always in 64bit mode
+lahf, 0x9f, Fn8000_0001_ECX_LahfSahf
+######## LEAVE ##################################################################
 leaveq, 0xc9
+######## MOV ####################################################################
 movabs Ob ab, 0xa0
 movabs Ov av, 0xa1
 movabs ab Ob, 0xa2
 movabs av Ov, 0xa3
+######## MOVSXD #################################################################
 movslq Ed Gv, 0x63
+######## POP ####################################################################
 pop Eq, 0x8f /0
+######## POPF/POPFD/POPFQ #######################################################
 popfq, 0x9d
+######## PUSH ###################################################################
 push Eq, 0xff /6
+######## PUSHF/PUSHFD/PUSHFQ ####################################################
 pushfq, 0x9c
+######## RET (Near) #############################################################
 retq, 0xc3
-# LAHF is always awailable in 16bit/32bit mode, but not in 64bit mode
+######## SAHF ###################################################################
+# SAHF is always awailable in 16bit/32bit mode, but not always in 64bit mode
 sahf, 0x9e, Fn8000_0001_ECX_LahfSahf
+#################################################################################
+# This part describes instructions from AMD64 Architecture Programmer’s Manual
+#				 Volume 3: General-Purpose and System Instruction
+#					  Chapter 4: System Instruction Reference
+######## SWAPGS #################################################################
 swapgs, 0x0f 0x01 0xf8
+#################################################################################
