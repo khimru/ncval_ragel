@@ -109,9 +109,9 @@
 #define repnz_prefix instruction.prefix.repnz
 #define branch_not_taken instruction.prefix.branch_not_taken
 #define branch_taken instruction.prefix.branch_taken
-#define operand0_size instruction.operands[0].size
-#define operand1_size instruction.operands[1].size
-#define operand2_size instruction.operands[2].size
+#define operand0_type instruction.operands[0].type
+#define operand1_type instruction.operands[1].type
+#define operand2_type instruction.operands[2].type
 #define operand0 instruction.operands[0].name
 #define operand1 instruction.operands[1].name
 #define operand2 instruction.operands[2].name
@@ -148,14 +148,20 @@ static const uint8_t index_registers[] = {
   REG_R12, REG_R13, REG_R14, REG_R15
 };
 
+static const uint8_t one = 1;
+
 int DecodeChunk(uint32_t load_addr, uint8_t *data, size_t size,
 		process_instruction_func process_instruction,
 		process_error_func process_error, void *userdata) {
-  uint8_t *p = data;
-  uint8_t *pe = data + size;
-  uint8_t *eof = pe;
-  uint8_t *disp = NULL, *imm = NULL, *imm2 = NULL, *begin;
-  uint8_t *begin_opcode, *end_opcode;
+  const uint8_t *p = data;
+  const uint8_t *pe = data + size;
+  const uint8_t *eof = pe;
+  const uint8_t *disp = NULL;
+  const uint8_t *imm = NULL;
+  const uint8_t *imm2 = NULL;
+  const uint8_t *begin;
+  const uint8_t *begin_opcode;
+  const uint8_t *end_opcode;
   enum disp_mode disp_type;
   enum imm_mode imm_operand;
   enum imm_mode imm2_operand;

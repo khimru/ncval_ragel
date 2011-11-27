@@ -54,9 +54,9 @@ void ReadFile(const char *filename, uint8_t **result, size_t *result_size) {
   *result_size = file_size;
 }
 
-void ProcessInstruction(uint8_t *begin, uint8_t *end,
+void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 			struct instruction *instruction, void *userdata) {
-  uint8_t *p;
+  const uint8_t *p;
   char delimeter = ' ';
   int print_rip = FALSE;
   int rex_bits = 0;
@@ -64,7 +64,7 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
   int show_name_suffix = FALSE;
 #define print_name(x) (printf((x)), shown_name += strlen((x)))
   int shown_name = 0;
-  int i;
+  int i, operand_type;
 
   printf("%8x:\t", begin - (uint8_t *)userdata);
   for (p = begin; p < begin + 7; p++) {
@@ -83,7 +83,7 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
            "jmp" do... unless byte offset is used.  */
 	if ((!strcmp(instruction->name, "call")) ||
 	    (!strcmp(instruction->name, "jmp"))) {
-	  switch (instruction->operands[i].size) {
+	  switch (instruction->operands[i].type) {
 	    case OperandSize8bit: show_name_suffix = FALSE; break;
 	    case OperandSize16bit: show_name_suffix = 'w'; break;
 	    case OperandSize32bit: show_name_suffix = 'q'; break;
@@ -99,16 +99,29 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
 		 (instruction->operands[i].name == REG_ES_RDI) ||
 		 (instruction->operands[i].name == REG_DS_RSI)) {
 	if (show_name_suffix) {
-	  switch (instruction->operands[i].size) {
+	  switch (instruction->operands[i].type) {
 	    case OperandSize8bit: show_name_suffix = 'b'; break;
 	    case OperandSize16bit: show_name_suffix = 'w'; break;
 	    case OperandSize32bit: show_name_suffix = 'l'; break;
 	    case OperandSize64bit: show_name_suffix = 'q'; break;
+	    case OperandFarPtr: 
+	    case OperandSelector: show_name_suffix = FALSE; break;
 	    default: assert(FALSE);
 	  }
 	}
       } else {
-	show_name_suffix = FALSE;
+	/* First argument of "rcl"/"rcr"/"rol"/"ror"/"shl"/"shr"/"sar"
+	   can not  be used to determine size of command.  */
+	if ((i != 1) || (strcmp(instruction->name, "rcl") &&
+			 strcmp(instruction->name, "rcr") &&
+			 strcmp(instruction->name, "rol") &&
+			 strcmp(instruction->name, "ror") &&
+			 strcmp(instruction->name, "sal") &&
+			 strcmp(instruction->name, "sar") &&
+			 strcmp(instruction->name, "shl") &&
+			 strcmp(instruction->name, "shr"))) {
+	  show_name_suffix = FALSE;
+	}
       }
       if ((instruction->operands[i].name >= REG_R8) &&
 	  (instruction->operands[i].name <= REG_R15)) {
@@ -144,39 +157,92 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
       print_name("repz ");
     }
   }
-  if (instruction->prefix.rex == 0x48) {
-    /* rex.W is ignored by in/out, and push commands.  */
+  if (instruction->prefix.rex == 0x40) {
+    /* First "%cl" argument of "rcl"/"rcr"/"rol"/"ror"/"sar"/"shl"/"shr" confuses
+       objdump: it does not show it in this case.  */
+    if (show_name_suffix &&
+	((strcmp(instruction->name, "rcl") &&
+	  strcmp(instruction->name, "rcr") &&
+	  strcmp(instruction->name, "rol") &&
+	  strcmp(instruction->name, "ror") &&
+	  strcmp(instruction->name, "sal") &&
+	  strcmp(instruction->name, "sar") &&
+	  strcmp(instruction->name, "shl") &&
+	  strcmp(instruction->name, "shr")) ||
+	 instruction->operands[1].name != REG_RCX)) {
+      print_name("rex ");
+    }
+  }
+  if ((instruction->prefix.rex & 0x08) == 0x08) {
+    /* rex.W is ignored by "in"/"out", and "pop"/"push" commands.  */
     if ((!strcmp(instruction->name, "in")) ||
 	(!strcmp(instruction->name, "ins")) ||
 	(!strcmp(instruction->name, "out")) ||
 	(!strcmp(instruction->name, "outs")) ||
+	(!strcmp(instruction->name, "pop")) ||
 	(!strcmp(instruction->name, "push"))) {
-      print_name("rex.W ");
+      rex_bits = -1;
+    }
+  }
+  if (show_name_suffix == 'b') {
+    /* "int", "invlpg", "prefetch" never use suffix. */
+    if ((!strcmp(instruction->name, "int")) ||
+	(!strcmp(instruction->name, "invlpg")) ||
+	(!strcmp(instruction->name, "prefetch")) ||
+	(!strcmp(instruction->name, "prefetchw"))) {
+      show_name_suffix = FALSE;
+    /* Instruction enter accepts two immediates: word and byte. But
+       objdump always uses suffix "q". This is supremely strange, but
+       we want to match objdump exactly, so... here goes.  */
+    } else if (!strcmp(instruction->name, "enter")) {
+      show_name_suffix = 'q';
     }
   }
   if ((show_name_suffix == 'b') || (show_name_suffix == 'l')) {
-    /* "int" never uses suffix. */
-    if (!strcmp(instruction->name, "int")) {
-      show_name_suffix = FALSE;
     /* objdump always shows "6a 01" as "pushq $1", "66 68 01 00" as
        "pushw $1" yet "68 01 00" as "pushq $1" again.  This makes no
        sense whatsoever so we'll just hack around here to make sure
        we produce objdump-compatible output.  */
-    /* Instruction enter accepts two immediates: word and byte. But
-       objdump always uses suffix "q". This is supremely strange, but
-       we want to match objdump exactly, so... here goes.  */
-    } else if ((!strcmp(instruction->name, "enter")) ||
-	       (!strcmp(instruction->name, "push"))) {
+    if (!strcmp(instruction->name, "push")) {
       show_name_suffix = 'q';
     }
   }
   if (show_name_suffix == 'w') {
-    /* "lret" newer uses suffix at all.  */
-    if (!strcmp(instruction->name, "lret")) {
+    /* "lldt", "lret", "ltr","[ls]msw", "ver[rw]" newer use suffixes at all.  */
+    if ((!strcmp(instruction->name, "lldt")) ||
+	(!strcmp(instruction->name, "lmsw")) ||
+	(!strcmp(instruction->name, "lret")) ||
+	(!strcmp(instruction->name, "ltr")) ||
+	(!strcmp(instruction->name, "smsw")) ||
+	(!strcmp(instruction->name, "verr")) ||
+	(!strcmp(instruction->name, "verw"))) {
        show_name_suffix = FALSE;
+    /* "callw"/"jmpw" already includes suffix in the nanme.  */
+    } else if ((!strcmp(instruction->name, "callw")) ||
+	       (!strcmp(instruction->name, "jmpw"))) {
+      show_name_suffix = FALSE;
     /* "ret" always uses "q" suffix no matter what.  */
     } else if (!strcmp(instruction->name, "ret")) {
       show_name_suffix = 'q';
+    }
+  }
+  if ((show_name_suffix == 'w') || (show_name_suffix == 'l')) {
+    /* "sldt" and "str: newer uses suffixes at all.  */
+    if ((!strcmp(instruction->name, "sldt")) ||
+	(!strcmp(instruction->name, "str"))) {
+       show_name_suffix = FALSE;
+    }
+  }
+  if (show_name_suffix == 'l') {
+    /* "popl" does not exist, only "popq" do.  */
+    if (!strcmp(instruction->name, "pop")) {
+       show_name_suffix = 'q';
+    }
+  }
+  if (show_name_suffix == 'q') {
+    /* "callq" already includes suffix in the nanme.  */
+    if (!strcmp(instruction->name, "callq")) {
+       show_name_suffix = FALSE;
     }
   }
   i = (instruction->prefix.rex & 0x01) +
@@ -208,7 +274,7 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
   }
   if (!strcmp(instruction->name, "mov")) {
     if ((instruction->operands[1].name == REG_IMM) &&
-       (instruction->operands[1].size == OperandSize64bit)) {
+       (instruction->operands[1].type == OperandSize64bit)) {
       print_name("abs");
     }
   }
@@ -225,48 +291,73 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
   }
   for (i=instruction->operands_count-1;i>=0;i--) {
     printf("%c", delimeter);
+    if ((!strcmp(instruction->name, "callw")) ||
+	(!strcmp(instruction->name, "callq")) ||
+	(!strcmp(instruction->name, "jmpw")) ||
+	(!strcmp(instruction->name, "jmpq")) ||
+	(!strcmp(instruction->name, "ljmpw")) ||
+	(!strcmp(instruction->name, "ljmpq")) ||
+	(!strcmp(instruction->name, "lcallw")) ||
+	(!strcmp(instruction->name, "lcallq"))) {
+      printf("*");
+    }
+    /* Dirty hack: both AMD manual and Intel manual agree that mov from general
+       purpose register to segment register has signature "mov Ew Sw", but
+       objdump insist on 32bit.  This is clearly error in objdump so we fix it
+       here and not in decoder.  */
+    if (((begin[0] == 0x8e) || 
+	 ((begin[0] >= 0x40) && (begin[0] <= 0x4f) && (begin[1] == 0x8e))) &&
+	(instruction->operands[i].type == OperandSize16bit)) {
+      operand_type = OperandSize32bit;
+    } else {
+      operand_type = instruction->operands[i].type;
+    }
     switch (instruction->operands[i].name) {
-      case REG_RAX: switch (instruction->operands[i].size) {
+      case REG_RAX: switch (operand_type) {
 	case OperandSize8bit: printf("%%al"); break;
 	case OperandSize16bit: printf("%%ax"); break;
 	case OperandSize32bit: printf("%%eax"); break;
 	case OperandSize64bit: printf("%%rax"); break;
-	case OperandSizeST: printf("%%st(0)"); break;
-	case OperandSizeXMM: printf("%%xmm0"); break;
+	case OperandST: printf("%%st(0)"); break;
+	case OperandXMM: printf("%%xmm0"); break;
+	case OperandSegmentRegister: printf("%%es"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_RCX: switch (instruction->operands[i].size) {
+      case REG_RCX: switch (operand_type) {
 	case OperandSize8bit: printf("%%cl"); break;
 	case OperandSize16bit: printf("%%cx"); break;
 	case OperandSize32bit: printf("%%ecx"); break;
 	case OperandSize64bit: printf("%%rcx"); break;
-	case OperandSizeST: printf("%%st(1)"); break;
-	case OperandSizeXMM: printf("%%xmm1"); break;
+	case OperandST: printf("%%st(1)"); break;
+	case OperandXMM: printf("%%xmm1"); break;
+	case OperandSegmentRegister: printf("%%cs"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_RDX: switch (instruction->operands[i].size) {
+      case REG_RDX: switch (operand_type) {
 	case OperandSize8bit: printf("%%dl"); break;
 	case OperandSize16bit: printf("%%dx"); break;
 	case OperandSize32bit: printf("%%edx"); break;
 	case OperandSize64bit: printf("%%rdx"); break;
-	case OperandSizeST: printf("%%st(2)"); break;
-	case OperandSizeXMM: printf("%%xmm2"); break;
+	case OperandST: printf("%%st(2)"); break;
+	case OperandXMM: printf("%%xmm2"); break;
+	case OperandSegmentRegister: printf("%%ss"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_RBX: switch (instruction->operands[i].size) {
+      case REG_RBX: switch (operand_type) {
 	case OperandSize8bit: printf("%%bl"); break;
 	case OperandSize16bit: printf("%%bx"); break;
 	case OperandSize32bit: printf("%%ebx"); break;
 	case OperandSize64bit: printf("%%rbx"); break;
-	case OperandSizeST: printf("%%st(3)"); break;
-	case OperandSizeXMM: printf("%%xmm3"); break;
+	case OperandST: printf("%%st(3)"); break;
+	case OperandXMM: printf("%%xmm3"); break;
+	case OperandSegmentRegister: printf("%%ds"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_RSP: switch (instruction->operands[i].size) {
+      case REG_RSP: switch (operand_type) {
 	case OperandSize8bit: if (instruction->prefix.rex)
 	    printf("%%spl");
 	  else
@@ -275,12 +366,13 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
 	case OperandSize16bit: printf("%%sp"); break;
 	case OperandSize32bit: printf("%%esp"); break;
 	case OperandSize64bit: printf("%%rsp"); break;
-	case OperandSizeST: printf("%%st(4)"); break;
-	case OperandSizeXMM: printf("%%xmm4"); break;
+	case OperandST: printf("%%st(4)"); break;
+	case OperandXMM: printf("%%xmm4"); break;
+	case OperandSegmentRegister: printf("%%fs"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_RBP: switch (instruction->operands[i].size) {
+      case REG_RBP: switch (operand_type) {
 	case OperandSize8bit: if (instruction->prefix.rex)
 	    printf("%%bpl");
 	  else
@@ -289,12 +381,13 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
 	case OperandSize16bit: printf("%%bp"); break;
 	case OperandSize32bit: printf("%%ebp"); break;
 	case OperandSize64bit: printf("%%rbp"); break;
-	case OperandSizeST: printf("%%st(5)"); break;
-	case OperandSizeXMM: printf("%%xmm5"); break;
+	case OperandST: printf("%%st(5)"); break;
+	case OperandXMM: printf("%%xmm5"); break;
+	case OperandSegmentRegister: printf("%%gs"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_RSI: switch (instruction->operands[i].size) {
+      case REG_RSI: switch (operand_type) {
 	case OperandSize8bit: if (instruction->prefix.rex)
 	    printf("%%sil");
 	  else
@@ -303,12 +396,12 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
 	case OperandSize16bit: printf("%%si"); break;
 	case OperandSize32bit: printf("%%esi"); break;
 	case OperandSize64bit: printf("%%rsi"); break;
-	case OperandSizeST: printf("%%st(6)"); break;
-	case OperandSizeXMM: printf("%%xmm6"); break;
+	case OperandST: printf("%%st(6)"); break;
+	case OperandXMM: printf("%%xmm6"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_RDI: switch (instruction->operands[i].size) {
+      case REG_RDI: switch (operand_type) {
 	case OperandSize8bit: if (instruction->prefix.rex)
 	    printf("%%dil");
 	  else
@@ -317,80 +410,80 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
 	case OperandSize16bit: printf("%%di"); break;
 	case OperandSize32bit: printf("%%edi"); break;
 	case OperandSize64bit: printf("%%rdi"); break;
-	case OperandSizeST: printf("%%st(7)"); break;
-	case OperandSizeXMM: printf("%%xmm7"); break;
+	case OperandST: printf("%%st(7)"); break;
+	case OperandXMM: printf("%%xmm7"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_R8: switch (instruction->operands[i].size) {
+      case REG_R8: switch (operand_type) {
 	case OperandSize8bit: printf("%%r8b"); break;
 	case OperandSize16bit: printf("%%r8w"); break;
 	case OperandSize32bit: printf("%%r8d"); break;
 	case OperandSize64bit: printf("%%r8"); break;
-	case OperandSizeXMM: printf("%%xmm8"); break;
+	case OperandXMM: printf("%%xmm8"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_R9: switch (instruction->operands[i].size) {
+      case REG_R9: switch (operand_type) {
 	case OperandSize8bit: printf("%%r9b"); break;
 	case OperandSize16bit: printf("%%r9w"); break;
 	case OperandSize32bit: printf("%%r9d"); break;
 	case OperandSize64bit: printf("%%r9"); break;
-	case OperandSizeXMM: printf("%%xmm9"); break;
+	case OperandXMM: printf("%%xmm9"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_R10: switch (instruction->operands[i].size) {
+      case REG_R10: switch (operand_type) {
 	case OperandSize8bit: printf("%%r10b"); break;
 	case OperandSize16bit: printf("%%r10w"); break;
 	case OperandSize32bit: printf("%%r10d"); break;
 	case OperandSize64bit: printf("%%r10"); break;
-	case OperandSizeXMM: printf("%%xmm10"); break;
+	case OperandXMM: printf("%%xmm10"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_R11: switch (instruction->operands[i].size) {
+      case REG_R11: switch (operand_type) {
 	case OperandSize8bit: printf("%%r11b"); break;
 	case OperandSize16bit: printf("%%r11w"); break;
 	case OperandSize32bit: printf("%%r11d"); break;
 	case OperandSize64bit: printf("%%r11"); break;
-	case OperandSizeXMM: printf("%%xmm11"); break;
+	case OperandXMM: printf("%%xmm11"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_R12: switch (instruction->operands[i].size) {
+      case REG_R12: switch (operand_type) {
 	case OperandSize8bit: printf("%%r12b"); break;
 	case OperandSize16bit: printf("%%r12w"); break;
 	case OperandSize32bit: printf("%%r12d"); break;
 	case OperandSize64bit: printf("%%r12"); break;
-	case OperandSizeXMM: printf("%%xmm12"); break;
+	case OperandXMM: printf("%%xmm12"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_R13: switch (instruction->operands[i].size) {
+      case REG_R13: switch (operand_type) {
 	case OperandSize8bit: printf("%%r13b"); break;
 	case OperandSize16bit: printf("%%r13w"); break;
 	case OperandSize32bit: printf("%%r13d"); break;
 	case OperandSize64bit: printf("%%r13"); break;
-	case OperandSizeXMM: printf("%%xmm13"); break;
+	case OperandXMM: printf("%%xmm13"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_R14: switch (instruction->operands[i].size) {
+      case REG_R14: switch (operand_type) {
 	case OperandSize8bit: printf("%%r14b"); break;
 	case OperandSize16bit: printf("%%r14w"); break;
 	case OperandSize32bit: printf("%%r14d"); break;
 	case OperandSize64bit: printf("%%r14"); break;
-	case OperandSizeXMM: printf("%%xmm14"); break;
+	case OperandXMM: printf("%%xmm14"); break;
 	default: assert(FALSE);
       }
       break;
-      case REG_R15: switch (instruction->operands[i].size) {
+      case REG_R15: switch (operand_type) {
 	case OperandSize8bit: printf("%%r15b"); break;
 	case OperandSize16bit: printf("%%r15w"); break;
 	case OperandSize32bit: printf("%%r15d"); break;
 	case OperandSize64bit: printf("%%r15"); break;
-	case OperandSizeXMM: printf("%%xmm15"); break;
+	case OperandXMM: printf("%%xmm15"); break;
 	default: assert(FALSE);
       }
       break;
@@ -469,7 +562,7 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
       case REG_DS_RBX: printf("%%ds:(%%rbx)"); break;
       case REG_ES_RDI: printf("%%es:(%%rdi)"); break;
       case REG_DS_RSI: printf("%%ds:(%%rsi)"); break;
-      case JMP_TO: if (instruction->operands[0].size == OperandSize16bit)
+      case JMP_TO: if (instruction->operands[0].type == OperandSize16bit)
 	  printf("0x%x",
 		 (end + instruction->rm.offset - (uint8_t *)userdata) & 0xffff);
 	else
@@ -500,7 +593,7 @@ void ProcessInstruction(uint8_t *begin, uint8_t *end,
   }
 }
 
-void ProcessError (uint8_t *ptr, void *userdata) {
+void ProcessError (const uint8_t *ptr, void *userdata) {
   printf("rejected at %x (byte 0x%02x)\n", ptr - (uint8_t *)userdata, *ptr);
 }
 

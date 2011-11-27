@@ -51,6 +51,8 @@
   opcode_5 = chartest(｢(c & 0x38) == 0x28｣);
   opcode_6 = chartest(｢(c & 0x38) == 0x30｣);
   opcode_7 = chartest(｢(c & 0x38) == 0x38｣);
+  # Used for segment operations: there only 6 segment registers.
+  opcode_s = chartest(｢(c & 0x38) < 0x30｣);
 
   # Prefixes.
   data16 = 0x66 data16_prefix;
@@ -58,6 +60,8 @@
   condrep = 0xf2 repnz_prefix | 0xf3 repz_prefix;
   lock = 0xf0 lock_prefix;
   rep = 0xf3 rep_prefix;
+  repnz = 0xf2 repnz_prefix;
+  repz = 0xf3 repz_prefix;
 
   # REX prefixes.
   action rex_pfx {

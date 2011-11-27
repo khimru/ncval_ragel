@@ -157,36 +157,39 @@
   define(｢end_opcode｣, ｢@end｢_｣opcode｣)
   define(｢operand_size｣,
     ｢action operand0_$1 {
-      operand0_size = OperandSize$2;
+      operand0_type = Operand$2;
      }
      define(｢operand0_$1｣, ｢@operand0｢_｣$1｣)
      action operand1_$1 {
-      operand1_size = OperandSize$2;
+      operand1_type = Operand$2;
      }
      define(｢operand1_$1｣, ｢@operand1｢_｣$1｣)
      action operand2_$1 {
-      operand2_size = OperandSize$2;
+      operand2_type = Operand$2;
      }
      define(｢operand2_$1｣, ｢@operand2｢_｣$1｣)
      action operand3_$1 {
-      operand3_size = OperandSize$2;
+      operand3_type = Operand$2;
      }
      define(｢operand3_$1｣, ｢@operand3｢_｣$1｣)
      action operand4_$1 {
-      operand4_size = OperandSize$2;
+      operand4_type = Operand$2;
      }
      define(｢operand4_$1｣, ｢@operand4｢_｣$1｣)
      ifdef(｢OperandSizeList｣,
        ｢append(｢OperandSizeList｣,｢, OperandSize$2｣)｣,
        ｢define(｢OperandSizeList｣,｢OperandSize$2｣)｣)｣)
-  operand_size(8bit, 8bit)
-  operand_size(16bit, 16bit)
-  operand_size(32bit, 32bit)
-  operand_size(64bit, 64bit)
+  operand_size(8bit, Size8bit)
+  operand_size(16bit, Size16bit)
+  operand_size(32bit, Size32bit)
+  operand_size(64bit, Size64bit)
   operand_size(x87, X87)
   operand_size(mm, MM)
   operand_size(xmm, XMM)
   operand_size(ymm, YMM)
+  operand_size(farptr, FarPtr)
+  operand_size(segreg, SegmentRegister)
+  operand_size(selector, Selector)
   action operands_count_is_0 {
     operands_count = 0;
   }
@@ -218,10 +221,6 @@
     scale = 0;
   }
   define(｢operand0_absolute_disp｣, ｢@operand0｢_｣absolute｢_｣disp｣)
-  action operand0_accumulator {
-    operand0 = REG_RAX;
-  }
-  define(｢operand0_accumulator｣, ｢@operand0｢_｣accumulator｣)
   action operand0_ds_rbx {
     operand0 = REG_DS_RBX;
   }
@@ -250,6 +249,18 @@
     operand0 = REG_PORT_DX;
   }
   define(｢operand0_port_dx｣, ｢@operand0｢_｣port｢_｣dx｣)
+  action operand0_rax {
+    operand0 = REG_RAX;
+  }
+  define(｢operand0_rax｣, ｢@operand0｢_｣rax｣)
+  action operand0_rcx {
+    operand0 = REG_RCX;
+  }
+  define(｢operand0_rcx｣, ｢@operand0｢_｣rcx｣)
+  action operand0_rdx {
+    operand0 = REG_RDX;
+  }
+  define(｢operand0_rdx｣, ｢@operand0｢_｣rdx｣)
   action operand0_rm {
     operand0 = REG_RM;
   }
@@ -261,10 +272,6 @@
     scale = 0;
   }
   define(｢operand1_absolute_disp｣, ｢@operand1｢_｣absolute｢_｣disp｣)
-  action operand1_accumulator {
-    operand1 = REG_RAX;
-  }
-  define(｢operand1_accumulator｣, ｢@operand1｢_｣accumulator｣)
   action operand1_ds_rsi {
     operand1 = REG_DS_RSI;
   }
@@ -289,10 +296,24 @@
     operand1 = REG_IMM;
   }
   define(｢operand1_immediate｣, ｢@operand1｢_｣immediate｣)
+  action operand1_one {
+    operand1 = REG_IMM;
+    imm_operand = IMM8;
+    imm = &one;
+  }
+  define(｢operand1_one｣, ｢@operand1｢_｣one｣)
   action operand1_port_dx {
     operand1 = REG_PORT_DX;
   }
   define(｢operand1_port_dx｣, ｢@operand1｢_｣port｢_｣dx｣)
+  action operand1_rax {
+    operand1 = REG_RAX;
+  }
+  define(｢operand1_rax｣, ｢@operand1｢_｣rax｣)
+  action operand1_rcx {
+    operand1 = REG_RCX;
+  }
+  define(｢operand1_rcx｣, ｢@operand1｢_｣rcx｣)
   action operand1_rm {
     operand1 = REG_RM;
   }
@@ -305,3 +326,7 @@
     operand2 = REG_IMM;
   }
   define(｢operand2_immediate｣, ｢@operand2｢_｣immediate｣)
+  action operand2_rax {
+    operand2 = REG_RAX;
+  }
+  define(｢operand2_rax｣, ｢@operand2｢_｣rax｣)

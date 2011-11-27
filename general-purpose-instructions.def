@@ -6,11 +6,14 @@
 #   Arguments consist of two parts: argument type and argument size.
 #
 #      Possible argument types:
+#	1: One (for instructions like "shr" or "rol")
 #	a: Accumulator (%al/%ax/%eax/%rax depending on size).
 #	b: A memory operand addressed by the %ds:(%[er]bx). See "xlat".
-#	d: Accumulator pair (%dx:%ax/%edx:%eax/%rdx:%rax depending on size).
+#	c: Implicit %ecx/%rcx (depending on size).
+#	d: Implicit %edx/%rdx (depending on size).
 #	i: Second immediate value encoded in the instruction.
 #	o: I/O port in %dx (used in "in"/"out" instructions).
+#	p: Accumulator pair (%dx:%ax/%edx:%eax/%rdx:%rax depending on size).
 #	r: Register in opcode (low 3 bits plus rex.B).
 #	E: General purpose register or memory operand specified by the r/m
 #	   field of the ModRM byte.  For memory operands, the ModRM byte may
@@ -32,8 +35,11 @@
 #	   depending on the effective operand size.
 #	b: A byte, irrespective of the effective operand size.
 #	d: A doubleword (32bit), irrespective of the effective operand size.
+#	p: A 32-bit or 48-bit far pointer, depending on the effective operand
+#	   size.
 #	q: A quadword (64bit), irrespective of the effective operand size.
 #	r: Register size (32bit in 32bit mode, 64bit in 64bit mode).
+#	s: A 6-byte or 10-byte pseudo-descriptor.
 #	v: A word, doubleword, or quadword (in 64-bit mode), depending on
 #	   the effective operand size.
 #	w: A word, irrespective of the effective operand size.
@@ -61,39 +67,63 @@
 adc G E, 0x10, lock
 adc E G, 0x12, lock
 adc I a, 0x14, lock
+adc I E, 0x80 /2, lock
+adc Ib Ev, 0x83 /2, lock
 add G E, 0x00, lock
 add E G, 0x02, lock
 add I a, 0x04, lock
+add I E, 0x80 /0, lock
+add Ib Ev, 0x83 /0, lock
 and G E, 0x20, lock
 and E G, 0x22, lock
 and I a, 0x24, lock
+and I E, 0x80 /4, lock
+and Ib Ev, 0x83 /4, lock
 call Jz, 0xe8
+# "call" does not require rex prefix and always uses 64bit addresses in x86-64
+# mode unless data16 prefix is used.  We use simple solution: 16bit call is
+# declared as common for 32bit/64bit mode and 32bit/64bit versions are described
+# in the appropriate files.
+callw Ew, 0x66 0xff /2
 cbtw, data16 0x98
 cltd, 0x99
 cwtd, data16 0x99
 cwtl, 0x98
 clc, 0xf8
 cld, 0xfc
+clgi, 0x0f 0x01 0xdd, Fn8000_0001_ECX_SVM
 cli, 0xfa
+clts, 0x0f 0x06
 cmc, 0xf5
 cmp G E, 0x38
 cmp E G, 0x3a
 cmp I a, 0x3c
+cmp I E, 0x80 /7
+cmp Ib Ev, 0x83 /7
 cmps Y X, 0xa6, condrep
+dec E, 0xfe /1, lock
+div E, 0xf6 /6
 enter iw Ib, 0xc8
+femms, 0xf 0x0e, Fn8000_0001_EDX_3DNow
 fwait, 0x9b
 hlt, 0xf4
+idiv E, 0xf6 /7
 imul Iz Ev Gv, 0x69
 imul Ib Ev Gv, 0x6b
+imul E, 0xf6 /5
 icebp, 0xf1
 in ob ab, 0xec
 in oz az, 0xed
 in Ib ab, 0xe4
 in Ib az, 0xe5
+inc E, 0xfe /0, lock
 ins ob Yb, 0x6c, rep
 ins oz Yz, 0x6d, rep
 int3, 0xcc
 int Ib, 0xcd
+invd, 0x0f 0x08
+invlpg Mb, 0x0f 0x01 /7
+invlpga, 0x0f 0x01 0xdf, Fn8000_0001_ECX_SVM
 iret, 0xcf
 ja Jb, 0x77
 ja Jz, 0x0f 0x87
@@ -115,6 +145,11 @@ jl Jb, 0x7c
 jl Jz, 0x0f 0x8c
 jmp Jz, 0xe9
 jmp Jb, 0xeb
+# "jmp" does not require rex prefix and always uses 64bit addresses in x86-64
+# mode unless data16 prefix is used.  We use simple solution: 16bit call is
+# declared as common for 32bit/64bit mode and 32bit/64bit versions are described
+# in the appropriate files.
+jmpw Ew, 0x66 0xff /4
 jne Jb, 0x75
 jne Jz, 0x0f 0x85
 jno Jb, 0x71
@@ -129,22 +164,50 @@ jp Jb, 0x7a
 jp Jz, 0x0f 0x8a
 js Jb, 0x78
 js Jz, 0x0f 0x88
-lea M Gv, 0x8d
+lar Ew Gv, 0x0f 0x02
+# "lcall" does not require rex prefix and always uses 64bit addresses in x86-64
+# mode unless data16 prefix is used.  We use simple solution: 16bit call is
+# declared as common for 32bit/64bit mode and 32bit/64bit versions are described
+# in the appropriate files.
+lcallw Mp, 0x66 0xff /3
+lea Mv Gv, 0x8d
+lgdt Ms, 0x0f 0x00 /2
+lidt Ms, 0x0f 0x00 /3
+# "ljmp" does not require rex prefix and always uses 64bit addresses in x86-64
+# mode unless data16 prefix is used.  We use simple solution: 16bit call is
+# declared as common for 32bit/64bit mode and 32bit/64bit versions are described
+# in the appropriate files.
+ljmpw Mp, 0x66 0xff /5
+lldt Ew, 0x0f 0x00 /2
+lmsw Ew, 0x0f 0x01 /6
 lods X a, 0xac
 loop Jb, 0xe2
 loope Jb, 0xe1
 loopne Jb, 0xe0
 lret Iw, 0xca
 lret, 0xcb
+lsl Ew Gv, 0x0f 0x03
+ltr Ew, 0x0f 0x00 /3
+monitor ar cr dr, 0x0f 0x01 0xc8, Fn0000_0001_ECX_Monitor
+mwait ar cr, 0x0f 0x01 0xc9, Fn0000_0001_ECX_Monitor
 mov G E, 0x88
 mov E G, 0x8a
 mov Ib rb, 0xb0
 mov Iv rv, 0xb8
+mov I E, 0xc6 /0
+mov Sw Mw, 0x8c /s
+mov Sw Rv, 0x8c /s
+mov Ew Sw, 0x8e /s
 movs X Y, 0xa4, rep
+mul E, 0xf6 /4
+neg E, 0xf6 /3, lock
 nop, 0x90
+not E, 0xf6 /2, lock
 or G E, 0x08, lock
 or E G, 0x0a, lock
 or I a, 0x0c, lock
+or I E, 0x80 /1, lock
+or Ib Ev, 0x83 /1, lock
 out ab ob, 0xee
 out az oz, 0xef
 out ab Ib, 0xe6
@@ -152,28 +215,99 @@ out az Ib, 0xe7
 outs Xb ob, 0x6e, rep
 outs Xz oz, 0x6f, rep
 pop rr, 0x58
+# "pop" does not require rex prefix and always uses 64bit addresses in x86-64
+# mode unless data16 prefix is used.  We use simple solution: 16bit call is
+# declared as common for 32bit/64bit mode and 32bit/64bit versions are described
+# in the appropriate files.
+pop Ew, 0x66 0x8f /0
 popfw, data16 0x9d
+prefetch Mb, 0x0f 0x0d /0, Fn8000_0001_ECX_3DNowPrefetch
+prefetchw Mb, 0x0f 0x0d /1, Fn8000_0001_ECX_3DNowPrefetch
 push rr, 0x50
 push Iz, 0x68
 push Ib, 0x6a
+# "push" does not require rex prefix and always uses 64bit addresses in x86-64
+# mode unless data16 prefix is used.  We use simple solution: 16bit call is
+# declared as common for 32bit/64bit mode and 32bit/64bit versions are described
+# in the appropriate files.
+push Ew, 0x66 0xff /6
 pushfw, data16 0x9c
+rdtscp, 0x0f 0x01 0xf9, Fn8000_0001_EDX_RDTSCP
+rcl Ib E, 0xc0 /2
+rcl E, 0xd0 /2
+rcl cb E, 0xd2 /2
+rcr Ib E, 0xc0 /3
+rcr E, 0xd0 /3
+rcr cb E, 0xd2 /3
 ret Iw, 0xc2
+rol Ib E, 0xc0 /0
+rol E, 0xd0 /0
+rol cb E, 0xd2 /0
+ror Ib E, 0xc0 /1
+ror E, 0xd0 /1
+ror cb E, 0xd2 /1
+# AMD manual claims this opcode works identically to shl.  Intel manual
+# says it's reserved.  Objdump does not like it.
+# sal Ib E, 0xc0 /6
+# sal E, 0xd0 /6
+# sal cb E, 0xd2 /6
+sar Ib E, 0xc0 /7
+sar E, 0xd0 /7
+sar cb E, 0xd2 /7
 sbb G E, 0x18, lock
 sbb E G, 0x1a, lock
 sbb I a, 0x1c, lock
+sbb I E, 0x80 /3, lock
+sbb Ib Ev, 0x83 /3, lock
 scas Y a, 0xae
+sgdt Ms, 0x0f 0x01 /0
+shl Ib E, 0xc0 /4
+shl E, 0xd0 /4
+shl cb E, 0xd2 /4
+shr Ib E, 0xc0 /5
+shr E, 0xd0 /5
+shr cb E, 0xd2 /5
+sidt Ms, 0x0f 0x01 /1
+skinit, 0x0f 0x01 0xde, Fn8000_0001_ECX_SKINIT
+sldt Mw, 0x0f 0x00 /0
+sldt Rv, 0x0f 0x00 /0
+smsw Mw, 0x0f 0x01 /4
+smsw Rv, 0x0f 0x01 /4
 stc, 0xf9
 std, 0xfd
+stgi, 0x0f 0x01 0xdc, Fn8000_0001_ECX_SKINIT
 sti, 0xfb
+str Mw, 0x0f 0x00 /1
+str Rv, 0x0f 0x00 /1
 stos a Y, 0xaa
 sub G E, 0x28, lock
 sub E G, 0x2a, lock
 sub I a, 0x2c, lock
+sub I E, 0x80 /5, lock
+sub Ib Ev, 0x83 /5, lock
+syscall, 0x0f 0x05
+sysret, 0x0f 0x07
 test G E, 0x84
 test I a, 0xa8
+test I E, 0xf6 /0
+# AMD manual claims this opcode works identically to /0.  Intel manual
+# says it's reserved.  Objdump does not like it.
+# test I E, 0xf6 /1
+ud2, 0x0f 0x0b
+verr Ew, 0x0f 0x00 /4
+verw Ew, 0x0f 0x00 /5
+vmload, 0x0f 0x01 0xda, Fn8000_0001_ECX_SVM
+vmmcall, 0x0f 0x01 0xd9, Fn8000_0001_ECX_SVM
+vmrun, 0x0f 0x01 0xd8, Fn8000_0001_ECX_SVM
+vmsave, 0x0f 0x01 0xdb, Fn8000_0001_ECX_SVM
+wbinvd, 0x0f 0x09
 xchg G E, 0x86, lock
 xchg av rv, 0x90
+xgetbv, 0x0f 0x01 0xd0, Fn0000_00001_ECX_XSAVE
 xlat bb, 0xd7
 xor G E, 0x30, lock
 xor E G, 0x32, lock
 xor I a, 0x34, lock
+xor I E, 0x80 /6, lock
+xor Ib Ev, 0x83 /6, lock
+xsetbv, 0x0f 0x01 0xd1, Fn0000_00001_ECX_XSAVE

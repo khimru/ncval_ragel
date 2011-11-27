@@ -7,13 +7,16 @@
 extern "C" {
 #endif
 
-enum operand_size {
+enum operand_type {
   OperandSize8bit,
   OperandSize16bit,
   OperandSize32bit,
   OperandSize64bit,
-  OperandSizeST,
-  OperandSizeXMM,
+  OperandST,
+  OperandXMM,
+  OperandSegmentRegister, /* Operand is segment register.		       */
+  OperandSelector,	  /* Operand is 6bytes/10bytes selector in memory.     */
+  OperandFarPtr		  /* Operand is 6bytes/10bytes far pointer in memory.  */
 };
 
 enum register_name {
@@ -60,7 +63,7 @@ struct instruction {
   } prefix;
   struct {
     enum register_name name;
-    enum operand_size size;
+    enum operand_type type;
   } operands[5];
   struct {
     enum register_name base;
@@ -71,11 +74,12 @@ struct instruction {
   int64_t imm[2];
 };
 
-typedef void (*process_instruction_func) (uint8_t *begin, uint8_t *end,
+typedef void (*process_instruction_func) (const uint8_t *begin,
+					  const uint8_t *end,
 					  struct instruction *instruction,
 					  void *userdata);
 
-typedef void (*process_error_func) (uint8_t *ptr, void *userdata);
+typedef void (*process_error_func) (const uint8_t *ptr, void *userdata);
 
 int DecodeChunk(uint32_t load_addr, uint8_t *data, size_t size, 
 		process_instruction_func process_instruction,
