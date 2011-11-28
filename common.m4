@@ -85,10 +85,25 @@ define(｢ok_prefix_one_required｣, ｢index(｢$1｣, _required_prefix)｣)
 define(｢two_required_prefixes｣, ｢pushdef(｢ok_prefix｣, defn(
   ｢ok_prefix_two_required｣))pushdef(｢_required_prefix_one｣,
   ｢$1｣)pushdef(｢_required_prefix_two｣, ｢$2｣)｢｣possible_prefixes(
-  $@)｢｣popdef(｢_required_prefix_one｣)｢｣popdef(
-  ｢_required_prefix_two｣)｢｣popdef(｢ok_prefix｣)｣)
+  $@)｢｣popdef(｢_required_prefix_one｣)popdef(
+  ｢_required_prefix_two｣)popdef(｢ok_prefix｣)｣)
 define(｢ok_prefix_two_required｣, ｢ifelse(index(｢$1｣, _required_prefix_one),
   ｢-1｣, ｢-1｣, index(｢$1｣, _required_prefix_two))｣)
+################################################################################
+# ｢three_required_prefixes｣ creates all permutations of supplied prefixes but
+# first, second, and third prefixes are always included regardless.
+# For example: ｢two_required_prefixes(data16,loack,addr32)｣ becomes
+#		( data16 lock addr32 ) | ( data16 addr32 lock ) |
+#		( lock data16 addr32 ) | ( lock addr32 data16 ) |
+#		( addr32 data16 lock ) | ( addr32 lock data16 )
+define(｢three_required_prefixes｣, ｢pushdef(｢ok_prefix｣, defn(
+  ｢ok_prefix_three_required｣))pushdef(｢_required_prefix_one｣,
+  ｢$1｣)pushdef(｢_required_prefix_two｣, ｢$2｣)pushdef(｢_required_prefix_three｣,
+  ｢$3｣)｢｣possible_prefixes($@)｢｣popdef(｢_required_prefix_one｣)popdef(
+  ｢_required_prefix_two｣)popdef(｢_required_prefix_three｣)popdef(｢ok_prefix｣)｣)
+define(｢ok_prefix_three_required｣, ｢ifelse(index(｢$1｣, _required_prefix_one),
+  ｢-1｣, ｢-1｣, index(｢$1｣, _required_prefix_two), ｢-1｣, ｢-1｣,
+  index(｢$1｣, _required_prefix_three))｣)
 ################################################################################
 # ｢fatal_error｣ reports fatal error and stop processing.
 define(｢fatal_error｣, ｢errprint(｢fatal error: $*

@@ -17,6 +17,12 @@
   define(｢modrm_rip｣, )
   define(｢data16_prefix｣, )
   define(｢lock_prefix｣, )
+  define(｢rep_prefix｣, )
+  define(｢repnz_prefix｣, )
+  define(｢repz_prefix｣, )
+  define(｢not_data16｣, )
+  define(｢not_repnz｣, )
+  define(｢not_repz｣, )
   define(｢operand0_8bit｣, )
   define(｢operand0_16bit｣, )
   define(｢operand0_32bit｣, )
@@ -67,9 +73,6 @@
   define(｢operands_count_is_3｣, )
   define(｢operands_count_is_4｣, )
   define(｢operands_count_is_5｣, )
-  define(｢rep_prefix｣, )
-  define(｢repz_prefix｣, )
-  define(｢repnz_prefix｣, )
 
   # But we need to know where DISP, IMM, and REL fields can be found
   action disp8_operand_begin { }

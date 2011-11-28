@@ -53,6 +53,18 @@
     repnz_prefix = TRUE;
   }
   define(｢repnz_prefix｣, ｢@repnz｢_｣prefix｣)
+  action not_data16_prefix {
+    data16｢_｣prefix = FALSE;
+  }
+  define(｢not_data16｣, ｢@not｢_｣data16｢_｣prefix｣)
+  action not_repnz_prefix {
+    repnz｢_｣prefix = FALSE;
+  }
+  define(｢not_repnz｣, ｢@not｢_｣repnz｢_｣prefix｣)
+  action not_repz_prefix {
+    repz｢_｣prefix = FALSE;
+  }
+  define(｢not_repz｣, ｢@not｢_｣repz｢_｣prefix｣)
   action disp8_operand {
     disp_type = DISP8;
     disp = p;

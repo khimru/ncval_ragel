@@ -92,6 +92,8 @@
     $2, ｢memonly｣, ｢memonly｣$1,
     $1, ｢regonly｣, ｢regonly｣$2,
     $2, ｢regonly｣, ｢regonly｣$1,
+    $1 $2, ｢nonerexw size8data16rexw｣, ｢size8data16rexw｣,
+    $2 $1, ｢nonerexw size8data16rexw｣, ｢size8data16rexw｣,
     ｢fatal_error(｢Incompatible prefixes｣ $1 ｢and｣ $2)｣)｣)
   define(｢possible_rex_rxb_bits｣, ｢check_rex_rxb_bits(｢ifelse(｢$1｣, , ,
     ｢ifelse(
@@ -138,19 +140,19 @@
       ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0x66 $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
     substr(｢$4｣, 0, 7), ｢data16 ｣,
-      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 7)), ｢0x66 $5｣,
+      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 7)), ｢data16 $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
     substr(｢$4｣, 0, 5), ｢0xf2 ｣,
       ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0xf2 $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
     substr(｢$4｣, 0, 6), ｢repnz ｣,
-      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 6)), ｢0xf2 $5｣,
+      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 6)), ｢repnz $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
     substr(｢$4｣, 0, 5), ｢0xf3 ｣,
       ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0xf3 $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
     substr(｢$4｣, 0, 5), ｢repz ｣,
-      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0xf3 $5｣,
+      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢repz $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
     substr(｢$4｣, 0, 5)｢$1｣, ｢rexw regonlynone｣,
       ｢instruction_select(｢regonlyrexw｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)),
@@ -176,37 +178,36 @@
 	  ｢$5｣) REX_prefix_q(｢$2｣)instruction_body(｢size8｣, shift(shift($@)))｣,
 	｢instruction_separator｢｣｢(｣possible_optional_prefixes(
 	  ｢$5｣) REX_prefix_q(｢$2｣)instruction_body(｢size8｣, shift(shift(
-	  $@)))instruction_separator｢｣｢(｣one_required_prefix(｢lock｣,
-	  optional_prefixes(｢$5｣)) REX_prefix_q(｢$2｣)instruction_body(
+	  $@)))instruction_separator｢｣｢(｣minimum_one_required_prefix(｢lock｣,
+	  ｢$5｣) REX_prefix_q(｢$2｣)instruction_body(
 	  ｢memonlysize8｣, shift(shift($@)))｣)｣,
     ｢$1｣, ｢data16｣,
       ｢ifelse(index(｢$5｣, ｢lock｣), -1,
-	｢instruction_separator｢｣｢(｣one_required_prefix(｢data16｣,
-	  optional_prefixes(｢$5｣)) rex_prefix_q(｢$2｣)instruction_body(｢data16｣,
-	  shift(shift($@)))｣,
-	｢instruction_separator｢｣｢(｣one_required_prefix(｢data16｣,
-	  optional_prefixes(｢$5｣)) rex_prefix_q(｢$2｣)instruction_body(｢data16｣,
-	  shift(shift($@)))instruction_separator｢｣｢(｣two_required_prefixes(
-	  ｢data16｣, ｢lock｣, optional_prefixes(｢$4｣)) rex_prefix_q(
-	  ｢$2｣)instruction_body(｢memonlydata16｣, shift(shift($@)))｣)｣,
+	｢instruction_separator｢｣｢(｣minimum_one_required_prefix(｢data16｣,
+	  ｢$5｣) rex_prefix_q(｢$2｣)instruction_body(｢data16｣, shift(shift($@)))｣,
+	｢instruction_separator｢｣｢(｣minimum_one_required_prefix(｢data16｣,
+	  ｢$5｣) rex_prefix_q(｢$2｣)instruction_body(｢data16｣, shift(shift(
+	  $@)))instruction_separator｢｣｢(｣minimum_two_required_prefixes(｢data16｣,
+	  ｢lock｣, ｢$5｣) rex_prefix_q(｢$2｣)instruction_body(｢memonlydata16｣,
+	  shift(shift($@)))｣)｣,
     ｢$1｣, ｢rexw｣, 
       ｢ifelse(index(｢$5｣, ｢lock｣), -1,
 	｢instruction_separator｢｣｢(｣possible_optional_prefixes(
 	  ｢$5｣) REXW_prefix(｢$2｣)instruction_body(｢rexw｣, shift(shift($@)))｣,
 	｢instruction_separator｢｣｢(｣possible_optional_prefixes(
 	  ｢$5｣) REXW_prefix(｢$2｣)instruction_body(｢rexw｣, shift(shift(
-	  $@)))instruction_separator｢｣｢(｣one_required_prefix(｢lock｣,
-	  optional_prefixes(｢$5｣)) REXW_prefix(｢$2｣)instruction_body(
-	  ｢memonlyrexw｣, shift(shift($@)))｣)｣,
+	  $@)))instruction_separator｢｣｢(｣minimum_one_required_prefix(｢lock｣,
+	  ｢$5｣) REXW_prefix(｢$2｣)instruction_body(｢memonlyrexw｣,
+	  shift(shift($@)))｣)｣,
     ｢$1｣, ｢none｣,
       ｢ifelse(index(｢$5｣, ｢lock｣), -1,
 	｢instruction_separator｢｣｢(｣possible_optional_prefixes(
 	  ｢$5｣) rex_prefix_q(｢$2｣)instruction_body(｢none｣, shift(shift($@)))｣,
 	｢instruction_separator｢｣｢(｣possible_optional_prefixes(
 	  ｢$5｣) rex_prefix_q(｢$2｣)instruction_body(｢none｣, shift(shift(
-	  $@)))instruction_separator｢｣｢(｣one_required_prefix(｢lock｣,
-	  optional_prefixes(｢$5｣)) rex_prefix_q(｢$2｣)instruction_body(
-	  ｢memonlynone｣, shift(shift($@)))｣)｣,
+	  $@)))instruction_separator｢｣｢(｣minimum_one_required_prefix(｢lock｣,
+	  ｢$5｣) rex_prefix_q(｢$2｣)instruction_body(｢memonlynone｣,
+	  shift(shift($@)))｣)｣,
     ｢$1｣, ｢memonlysize8data16rexw｣,
       ｢instruction_select(｢memonlysize8｣, shift($@))｣  ｢instruction_select(
 	｢memonlydata16rexw｣, $2, $3, setwflag($4),
@@ -220,8 +221,8 @@
 	｢$5｣) REX_prefix_q(｢$2｣)instruction_body(｢memonlysize8｣,
 							     shift(shift($@)))｣,
     ｢$1｣, ｢memonlydata16｣,
-      ｢instruction_separator｢｣｢(｣one_required_prefix(｢data16｣,
-	optional_prefixes(｢$5｣)) rex_prefix_q(｢$2｣)instruction_body(
+      ｢instruction_separator｢｣｢(｣minimum_one_required_prefix(｢data16｣,
+        ｢$5｣) rex_prefix_q(｢$2｣)instruction_body(
 					    ｢memonlydata16｣, shift(shift($@)))｣,
     ｢$1｣, ｢memonlyrexw｣, 
       ｢instruction_separator｢｣｢(｣possible_optional_prefixes(
@@ -244,8 +245,8 @@
 	｢$5｣) REX_prefix_q(｢$2｣)instruction_body(｢regonlysize8｣,
 							     shift(shift($@)))｣,
     ｢$1｣, ｢regonlydata16｣,
-      ｢instruction_separator｢｣｢(｣one_required_prefix(｢data16｣,
-	optional_prefixes(｢$5｣)) rex_prefix_q(｢$2｣)instruction_body(
+      ｢instruction_separator｢｣｢(｣minimum_one_required_prefix(｢data16｣,
+	｢$5｣) rex_prefix_q(｢$2｣)instruction_body(
 					    ｢regonlydata16｣, shift(shift($@)))｣,
     ｢$1｣, ｢regonlyrexw｣, 
       ｢instruction_separator｢｣｢(｣possible_optional_prefixes(
@@ -258,13 +259,47 @@
     ｢fatal_error(｢Incorrect operand mode:｣ $1)｣)｣)
   define(｢possible_optional_prefixes｣, ｢ifelse(
     substr(｢$1｣, 0, 5), ｢0x66 ｣,
+			 ｢one_required_prefix(｢0x66｣, optional_prefixes(｢$1｣))｣,
+    substr(｢$1｣, 0, 7), ｢data16 ｣,
 		       ｢one_required_prefix(｢data16｣, optional_prefixes(｢$1｣))｣,
     substr(｢$1｣, 0, 5), ｢0xf2 ｣,
+			 ｢one_required_prefix(｢0xf2｣, optional_prefixes(｢$1｣))｣,
+    substr(｢$1｣, 0, 6), ｢repnz ｣,
 			｢one_required_prefix(｢repnz｣, optional_prefixes(｢$1｣))｣,
     substr(｢$1｣, 0, 5), ｢0xf3 ｣,
+			 ｢one_required_prefix(｢0xf3｣, optional_prefixes(｢$1｣))｣,
+    substr(｢$1｣, 0, 5), ｢repz ｣,
 			 ｢one_required_prefix(｢repz｣, optional_prefixes(｢$1｣))｣,
     possible_prefixes(optional_prefixes(｢$1｣)), , ,
     ｢possible_prefixes(optional_prefixes(｢$1｣))?｣)｣)
+  define(｢minimum_one_required_prefix｣, ｢ifelse(
+    substr(｢$2｣, 0, 5), ｢0x66 ｣,
+		 ｢two_required_prefixes(｢$1｣, ｢0x66｣, optional_prefixes(｢$2｣))｣,
+    substr(｢$2｣, 0, 7), ｢data16 ｣,
+	       ｢two_required_prefixes(｢$1｣, ｢data16｣, optional_prefixes(｢$2｣))｣,
+    substr(｢$2｣, 0, 5), ｢0xf2 ｣,
+		 ｢two_required_prefixes(｢$1｣, ｢0xf2｣, optional_prefixes(｢$2｣))｣,
+    substr(｢$2｣, 0, 6), ｢repnz ｣,
+		｢two_required_prefixes(｢$1｣, ｢repnz｣, optional_prefixes(｢$2｣))｣,
+    substr(｢$2｣, 0, 5), ｢0xf3 ｣,
+		 ｢two_required_prefixes(｢$1｣, ｢0xf3｣, optional_prefixes(｢$2｣))｣,
+    substr(｢$2｣, 0, 5), ｢repz ｣,
+		 ｢two_required_prefixes(｢$1｣, ｢repz｣, optional_prefixes(｢$2｣))｣,
+    ｢one_required_prefix(｢$1｣, optional_prefixes(｢$2｣))｣)｣)
+  define(｢minimum_two_required_prefixes｣, ｢ifelse(
+    substr(｢$3｣, 0, 5), ｢0x66 ｣,
+         ｢three_required_prefixes(｢$1｣, ｢$2｣, ｢0x66｣, optional_prefixes(｢$3｣))｣,
+    substr(｢$3｣, 0, 7), ｢data16 ｣,
+       ｢three_required_prefixes(｢$1｣, ｢$2｣, ｢data16｣, optional_prefixes(｢$3｣))｣,
+    substr(｢$3｣, 0, 5), ｢0xf2 ｣,
+	 ｢three_required_prefixes(｢$1｣, ｢$2｣, ｢0xf2｣, optional_prefixes(｢$3｣))｣,
+    substr(｢$3｣, 0, 6), ｢repnz ｣,
+	｢three_required_prefixes(｢$1｣, ｢$2｣, ｢repnz｣, optional_prefixes(｢$3｣))｣,
+    substr(｢$3｣, 0, 5), ｢0xf3 ｣,
+	 ｢three_required_prefixes(｢$1｣, ｢$2｣, ｢0xf3｣, optional_prefixes(｢$3｣))｣,
+    substr(｢$3｣, 0, 5), ｢repz ｣,
+	 ｢three_required_prefixes(｢$1｣, ｢$2｣, ｢repz｣, optional_prefixes(｢$3｣))｣,
+    ｢two_required_prefixes(｢$1｣, ｢$2｣, optional_prefixes(｢$3｣))｣)｣)
   define(｢optional_prefixes｣, ｢_optional_prefixes(split_argument($1))｣)
   define(｢_optional_prefixes｣, ｢ifelse(｢$#｣, 0, , ｢$#｣｢$1｣, 1, ,
     ｢$1｣, ｢condrep｣, ｢condrep, ｣,
@@ -283,22 +318,29 @@
     ｢$2｣, , format(｢0x%02x｣, eval(｢$1 + 1｣)),
     index(｢$2｣, ｢/｣), -1, ｢$1 _setwflag(shift($@))｣,
     ｢format(｢0x%02x｣, eval(｢$1 + 1｣)) $2｣)｣)
-  define(｢instruction_body｣, ｢opcode_nomodrm(｢$1｣, ｢$3｣,
+  define(｢instruction_body｣, ｢opcode_nomodrm(｢$1｣, ｢$4｣, ｢$3｣,
     split_argument(｢$2｣))｢｣instruction_modrm_arguments(
     $@)｢｣instruction_immediate_arguments(｢$1｣, shift(split_argument(｢$2｣))))｣)
-  define(｢opcode_nomodrm｣, ｢ifelse(regexp(｢$2｣, ｢\(.*\)/[0-7s]\(.*\)｣, ｢\1\2｣), ,
-    ｢__opcode_nomodrm(｢$1｣, _opcode_nomodrm(shift($@)), shift(shift($@)))｣,
-    ｢___opcode_nomodrm(｢$1｣, regexp($2, ｢\(.*\)/[0-7s]\(.*\)｣, ｢\1\2｣),
-							   shift(shift($@)))｣)｣)
+  define(｢opcode_nomodrm｣,
+    ｢ifelse(regexp(｢$3｣, ｢\(.*\)/[0-7s]\(.*\)｣, ｢\1\2｣), ,
+      ｢__opcode_nomodrm(｢$1｣, ｢$2｣, _opcode_nomodrm(shift(shift($@))),
+						      shift(shift(shift($@))))｣,
+      ｢___opcode_nomodrm(｢$1｣, ｢$4｣, regexp($3, ｢\(.*\)/[0-7s]\(.*\)｣, ｢\1\2｣),
+						    shift(shift(shift($@))))｣)｣)
   define(｢_opcode_nomodrm｣, ｢ifelse(｢$3｣, , ｢$1｣,
     ｢ifelse(substr(｢$3｣, 0, 1), ｢r｣, regopcode(｢$1｣),
     ｢_opcode_nomodrm(｢$1｣, ｢$2｣, shift(shift(shift($@))))｣)｣)｣)
   define(｢__opcode_nomodrm｣,
-    ｢begin_opcode((trim(｢$2｣))) end_opcode(｢$3｣) instruction_name(
-    ｢$3｣)｢｣instruction_arguments_number(shift(shift(shift(
-    $@))))｢｣instruction_arguments_sizes(｢$1｣, shift(shift(shift(
-    $@))))｢｣instruction_implied_arguments(｢$1｣, shift(shift(shift($@))))｣)
-  define(｢___opcode_nomodrm｣, ｢begin_opcode((trim(｢$2｣)))｣)
+    ｢begin_opcode((trim(｢$3｣))) end_opcode(｢$4｣) ifelse(
+      substr(｢$2｣, 0, 5), ｢0x66 ｣, ｢not_data16 ｣,
+      substr(｢$2｣, 0, 5), ｢0xf2 ｣, ｢not_repnz ｣,
+      substr(｢$2｣, 0, 5), ｢0xf3 ｣, ｢not_repz ｣,
+    )instruction_name(
+    ｢$4｣)｢｣instruction_arguments_number(shift(shift(shift(shift(
+    $@)))))｢｣instruction_arguments_sizes(｢$1｣, shift(shift(shift(shift(
+    $@)))))｢｣instruction_implied_arguments(｢$1｣, shift(shift(shift(shift(
+    $@)))))｣)
+  define(｢___opcode_nomodrm｣, ｢begin_opcode((trim(｢$3｣)))｣)
   define(｢regopcode｣, ｢_regopcode(split_argument(｢$1｣))｣)
   define(｢_regopcode｣, ｢ifelse($#, 1,
     ｢chartest(｢(｢c｣ != 0x90) && ((｢c｣ & 0xf8) == ｢$1｣)｣)｣,
@@ -335,9 +377,9 @@
 		｢instruction_argument_size_｣substr($2, 1, 1))｣,
 	      ｢instruction_argument_size_$1_｣substr($2, 1, 1))｣,
 	    instruction_argument_size_$1_$2)｣))｣)｣)
+  define(｢instruction_argument_size_size8｣, ｢8bit｣)
   define(｢instruction_argument_size_data16｣, ｢16bit｣)
   define(｢instruction_argument_size_none｣, ｢32bit｣)
-  define(｢instruction_argument_size_size8｣, ｢8bit｣)
   define(｢instruction_argument_size_rexw｣, ｢64bit｣)
   define(｢instruction_argument_size_rexw_I｣, ｢32bit｣)
   define(｢instruction_argument_size_b｣, ｢8bit｣)
@@ -354,6 +396,8 @@
   define(｢instruction_argument_size_none_Sw｣, ｢segreg｣)
   define(｢instruction_argument_size_rexw_Sw｣, ｢segreg｣)
   define(｢instruction_argument_size_w｣, ｢16bit｣)
+  define(｢instruction_argument_size_size8_y｣, ｢32bit｣)
+  define(｢instruction_argument_size_data16_y｣, ｢32bit｣)
   define(｢instruction_argument_size_none_y｣, ｢32bit｣)
   define(｢instruction_argument_size_rexw_y｣, ｢64bit｣)
   define(｢instruction_argument_size_data16_z｣, ｢16bit｣)
@@ -394,7 +438,11 @@
   define(｢_instruction_modrm_arguments｣, ｢ifelse(index(｢$3｣, ｢/｣), -1, ,
     ｢regexp(｢$3｣, ｢/\([0-7s]\)｣,
     ｢(( opcode_\1 end_opcode(split_argument(
-      ｢$2｣))) instruction_name(split_argument(
+      ｢$2｣))) ifelse(
+      substr(｢$4｣, 0, 5), ｢0x66 ｣, ｢not_data16 ｣,
+      substr(｢$4｣, 0, 5), ｢0xf2 ｣, ｢not_repnz ｣,
+      substr(｢$4｣, 0, 5), ｢0xf3 ｣, ｢not_repz ｣,
+    )instruction_name(split_argument(
       ｢$2｣))｢｣instruction_arguments_number(shift(split_argument(
       ｢$2｣)))｢｣instruction_arguments_sizes(｢$1｣, shift(split_argument(
       ｢$2｣)))｢｣instruction_implied_arguments(｢$1｣, shift(split_argument(

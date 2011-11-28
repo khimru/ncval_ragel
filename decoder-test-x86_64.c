@@ -79,8 +79,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     show_name_suffix = TRUE;
     for (i=instruction->operands_count-1;i>=0;i--) {
       if (instruction->operands[i].name == JMP_TO) {
-        /* Most control flow instructions never use suffixes, but "call" and
-           "jmp" do... unless byte offset is used.  */
+        /* Most control flow instructions never use suffixes, but “call” and
+           “jmp” do... unless byte offset is used.  */
 	if ((!strcmp(instruction->name, "call")) ||
 	    (!strcmp(instruction->name, "jmp"))) {
 	  switch (instruction->operands[i].type) {
@@ -111,17 +111,31 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	  }
 	}
       } else {
-	/* First argument of "rcl"/"rcr"/"rol"/"ror"/"shl"/"shr"/"sar"
-	   can not  be used to determine size of command.  */
-	if ((i != 1) || (strcmp(instruction->name, "rcl") &&
-			 strcmp(instruction->name, "rcr") &&
-			 strcmp(instruction->name, "rol") &&
-			 strcmp(instruction->name, "ror") &&
-			 strcmp(instruction->name, "sal") &&
-			 strcmp(instruction->name, "sar") &&
-			 strcmp(instruction->name, "shl") &&
-			 strcmp(instruction->name, "shr"))) {
+	/* First argument of “rcl”/“rcr”/“rol”/“ror”/“sar/”“shl”/“shr”
+	   can not be used to determine size of command.  */
+	if (((i != 1) || (strcmp(instruction->name, "rcl") &&
+			  strcmp(instruction->name, "rcr") &&
+			  strcmp(instruction->name, "rol") &&
+			  strcmp(instruction->name, "ror") &&
+			  strcmp(instruction->name, "sal") &&
+			  strcmp(instruction->name, "sar") &&
+			  strcmp(instruction->name, "shl") &&
+			  strcmp(instruction->name, "shr"))) &&
+	/* Second argument of “crc32” can not be used to determine size of
+	   command.  */
+	    ((i != 0) || strcmp(instruction->name, "crc32"))) {
 	  show_name_suffix = FALSE;
+	}
+	/* First argument of “crc32” can be used for that but objdump uses
+	   suffix anyway. */
+	if ((i == 1) && (!strcmp(instruction->name, "crc32"))) {
+	  switch (instruction->operands[i].type) {
+	    case OperandSize8bit: show_name_suffix = 'b'; break;
+	    case OperandSize16bit: show_name_suffix = 'w'; break;
+	    case OperandSize32bit: show_name_suffix = 'l'; break;
+	    case OperandSize64bit: show_name_suffix = 'q'; break;
+	    default: assert(FALSE);
+	  }
 	}
       }
       if ((instruction->operands[i].name >= REG_R8) &&
@@ -149,7 +163,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     print_name("repnz ");
   }
   if (instruction->prefix.repz) {
-    /* This prefix is "rep" for "ins", "movs", and "outs", "repz" otherwise.  */
+    /* This prefix is “rep” for “ins”, “movs”, and “outs”, “repz” otherwise.  */
     if ((!strcmp(instruction->name, "ins")) ||
 	(!strcmp(instruction->name, "movs")) ||
 	(!strcmp(instruction->name, "outs"))) {
@@ -159,10 +173,11 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     }
   }
   if (instruction->prefix.rex == 0x40) {
-    /* First "%cl" argument of "rcl"/"rcr"/"rol"/"ror"/"sar"/"shl"/"shr" confuses
-       objdump: it does not show it in this case.  */
+    /* First argument of “crc32”/“rcl”/“rcr”/“rol”/“ror”/“sar”/“shl”/“shr”
+       confuses objdump: it does not show it in this case.  */
     if (show_name_suffix &&
-	((strcmp(instruction->name, "rcl") &&
+	((strcmp(instruction->name, "crc32") &&
+	  strcmp(instruction->name, "rcl") &&
 	  strcmp(instruction->name, "rcr") &&
 	  strcmp(instruction->name, "rol") &&
 	  strcmp(instruction->name, "ror") &&
@@ -170,12 +185,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	  strcmp(instruction->name, "sar") &&
 	  strcmp(instruction->name, "shl") &&
 	  strcmp(instruction->name, "shr")) ||
-	 instruction->operands[1].name != REG_RCX)) {
+	 (instruction->operands[1].name > REG_R15))) {
       print_name("rex ");
     }
   }
   if ((instruction->prefix.rex & 0x08) == 0x08) {
-    /* rex.W is ignored by "in"/"out", and "pop"/"push" commands.  */
+    /* rex.W is ignored by “in”/“out”, and “pop”/“push” commands.  */
     if ((!strcmp(instruction->name, "in")) ||
 	(!strcmp(instruction->name, "ins")) ||
 	(!strcmp(instruction->name, "out")) ||
@@ -186,7 +201,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     }
   }
   if (show_name_suffix == 'b') {
-    /* "int", "invlpg", "prefetch" never use suffix. */
+    /* “cflush", “int”, “invlpg”, “prefetch*”, and “setcc” never use suffix. */
     if ((!strcmp(instruction->name, "clflush")) ||
 	(!strcmp(instruction->name, "int")) ||
 	(!strcmp(instruction->name, "invlpg")) ||
@@ -210,23 +225,24 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	(!strcmp(instruction->name, "sets"))) {
       show_name_suffix = FALSE;
     /* Instruction enter accepts two immediates: word and byte. But
-       objdump always uses suffix "q". This is supremely strange, but
+       objdump always uses suffix “q”. This is supremely strange, but
        we want to match objdump exactly, so... here goes.  */
     } else if (!strcmp(instruction->name, "enter")) {
       show_name_suffix = 'q';
     }
   }
   if ((show_name_suffix == 'b') || (show_name_suffix == 'l')) {
-    /* objdump always shows "6a 01" as "pushq $1", "66 68 01 00" as
-       "pushw $1" yet "68 01 00" as "pushq $1" again.  This makes no
-       sense whatsoever so we'll just hack around here to make sure
-       we produce objdump-compatible output.  */
+    /* objdump always shows “6a 01” as “pushq $1”, “66 68 01 00” as
+       “pushw $1” yet “68 01 00 00 00” as "pushq $1" again.  This makes no
+       sense whatsoever so we'll just hack around here to make sure we
+       produce objdump-compatible output.  */
     if (!strcmp(instruction->name, "push")) {
       show_name_suffix = 'q';
     }
   }
   if (show_name_suffix == 'w') {
-    /* "lldt", "lret", "ltr","[ls]msw", "ver[rw]" newer use suffixes at all.  */
+    /* “lldt”, “[ls]msw”, “lret”, “ltr”, and “ver[rw]” newer use suffixes at
+       all.  */
     if ((!strcmp(instruction->name, "lldt")) ||
 	(!strcmp(instruction->name, "lmsw")) ||
 	(!strcmp(instruction->name, "lret")) ||
@@ -235,30 +251,30 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	(!strcmp(instruction->name, "verr")) ||
 	(!strcmp(instruction->name, "verw"))) {
        show_name_suffix = FALSE;
-    /* "callw"/"jmpw" already includes suffix in the nanme.  */
+    /* “callw”/“jmpw” already includes suffix in the nanme.  */
     } else if ((!strcmp(instruction->name, "callw")) ||
 	       (!strcmp(instruction->name, "jmpw"))) {
       show_name_suffix = FALSE;
-    /* "ret" always uses "q" suffix no matter what.  */
+    /* “ret” always uses suffix “q” no matter what.  */
     } else if (!strcmp(instruction->name, "ret")) {
       show_name_suffix = 'q';
     }
   }
   if ((show_name_suffix == 'w') || (show_name_suffix == 'l')) {
-    /* "sldt" and "str: newer uses suffixes at all.  */
+    /* “sldt” and “str” newer uses suffixes at all.  */
     if ((!strcmp(instruction->name, "sldt")) ||
 	(!strcmp(instruction->name, "str"))) {
        show_name_suffix = FALSE;
     }
   }
   if (show_name_suffix == 'l') {
-    /* "popl" does not exist, only "popq" do.  */
+    /* “popl” does not exist, only “popq” do.  */
     if (!strcmp(instruction->name, "pop")) {
        show_name_suffix = 'q';
     }
   }
   if (show_name_suffix == 'q') {
-    /* "callq"/"cmpxchg8b"/"jmpq" already include suffix in the nanme.  */
+    /* “callq”,“cmpxchg8b”/“jmpq” already include suffix in the nanme.  */
     if ((!strcmp(instruction->name, "callq")) ||
 	(!strcmp(instruction->name, "cmpxchg8b")) ||
 	(!strcmp(instruction->name, "jmpq"))) {
@@ -322,7 +338,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       printf("*");
     }
     /* Dirty hack: both AMD manual and Intel manual agree that mov from general
-       purpose register to segment register has signature "mov Ew Sw", but
+       purpose register to segment register has signature “mov Ew Sw”, but
        objdump insist on 32bit.  This is clearly error in objdump so we fix it
        here and not in decoder.  */
     if (((begin[0] == 0x8e) || 

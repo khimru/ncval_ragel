@@ -13,13 +13,13 @@
 #   Arguments consist of two parts: argument type and argument size.
 #
 #      Possible argument types:
-#	1: One (for instructions like "shr" or "rol")
+#	1: One (for instructions like “shr” or “rol”)
 #	a: Accumulator (%al/%ax/%eax/%rax depending on size).
-#	b: A memory operand addressed by the %ds:(%[er]bx). See "xlat".
+#	b: A memory operand addressed by the %ds:(%[er]bx). See “xlat”.
 #	c: Implicit %ecx/%rcx (depending on size).
 #	d: Implicit %edx/%rdx (depending on size).
 #	i: Second immediate value encoded in the instruction.
-#	o: I/O port in %dx (used in "in"/"out" instructions).
+#	o: I/O port in %dx (used in “in”/“out” instructions).
 #	p: Accumulator pair (%dx:%ax/%edx:%eax/%rdx:%rax depending on size).
 #	r: Register in opcode (low 3 bits plus rex.B).
 #	E: General purpose register or memory operand specified by the r/m
@@ -55,20 +55,23 @@
 #	   if the effective operand size is 32 or 64 bits.
 #################################################################################
 # Second column: instruction opcodes.
-#   Includes all opcode bytes.  If first opcode bytes is 0x66, 0xf2, or 0xf3
-#   then they can be moved before other prefixes (and will be moved before REX
-#   prefix if it's allowed).  Should include opcode "bytes" /0, /1, ..., /7 if
-#   part of the opcode is stored in ModRM byte.  Use "/s" to for segment register
-#   operations.
+#   Includes all opcode bytes.  If first opcode bytes is 0x66/data16, 0xf2/repnz,
+#   or 0xf3/rep/repz then they can be moved before other prefixes (and will be
+#   moved before REX prefix if it's allowed).  Note: data16, repnz, and rep/repz
+#   opcodes will set appropriate flags while 0x66, 0xf2, and 0xf3 will not.
+#   If part of the opcode is stored in ModRM byte then opcode should include the
+#   usual “/0”, “/1”, …, “/0” “bytes”.  Use /s “byte” for segment register
+#   operand: it'll make only registers 0..5 valid (there are only six segment
+#   registers in total).
 #################################################################################
 # Third column: additional instruction notes.
 #   Different kind of notes for the instruction: untypical prefixes (for example
-#   "lock" prefix or "rep" prefix), CPUID checks, etc.
+#   “lock” prefix or “rep” prefix), CPUID checks, etc.
 #
 #     Possible prefixes:
-#	condrep: prefixes "repe" and "repne" are allowed for the instruction
-#	lock: prefix "lock" is allowed for the instruction
-#	rep: prefix "rep" is allowed for the instruction
+#	condrep: prefixes “repnz” and “repz” are allowed for the instruction
+#	lock: prefix “lock” is allowed for the instruction
+#	rep: prefix “rep” is allowed for the instruction (it's aliased to “repz”)
 #
 #     Possible CPUID values:
 #	Fn0000_0001_ECX_CMPXCHG16B: Fn0000_0001_ECX[CMPXCHG16B]
@@ -157,13 +160,13 @@ bts Gv Ev, 0x0f 0xab
 bts Ib Ev, 0x0f 0xba /5
 ######## CALL (Near) ############################################################
 call Jz, 0xe8
-# "call" does not require rex prefix and always uses 64bit addresses in x86-64
+# “call” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
 # in the appropriate files.
 callw Ew, 0x66 0xff /2
 ######## CALL (Far) #############################################################
-# "lcall" does not require rex prefix and always uses 64bit addresses in x86-64
+# “lcall” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
 # in the appropriate files.
@@ -212,9 +215,9 @@ cmpxchg G E, 0x0f 0xb0, lock
 ######## CMPXCHG8B/CMPXCHG16B ###################################################
 cmpxchg8b Mq, 0x0f 0xc7 /1, lock Fn0000_0001_EDX_CMPXCHG8B
 ######## CPUID ##################################################################
-#:cpuid, 0x0f 0xa2
+cpuid, 0x0f 0xa2
 ######## CRC32 ##################################################################
-#:crc32 G E, 0xf2 0x0f 0x32 0xf0, Fn0000_0001_ECX_SSE42
+crc32 E Gy, 0xf2 0x0f 0x38 0xf0, Fn0000_0001_ECX_SSE42
 ######## DEC ####################################################################
 dec E, 0xfe /1, lock
 ######## DIV ####################################################################
@@ -276,13 +279,13 @@ js Jz, 0x0f 0x88
 ######## JMP (Near) #############################################################
 jmp Jz, 0xe9
 jmp Jb, 0xeb
-# "jmp" does not require rex prefix and always uses 64bit addresses in x86-64
+# “jmp” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
 # in the appropriate files.
 jmpw Ew, 0x66 0xff /4
 ######## JMP (Far) ##############################################################
-# "ljmp" does not require rex prefix and always uses 64bit addresses in x86-64
+# “ljmp” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
 # in the appropriate files.
@@ -365,7 +368,7 @@ outs Xz oz, 0x6f, rep
 ######## PAUSE ##################################################################
 #:pause, 0xf3 0x90
 ######## POP ####################################################################
-# "pop" does not require rex prefix and always uses 64bit addresses in x86-64
+# “pop” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
 # in the appropriate files.
@@ -386,7 +389,7 @@ prefetchw Mb, 0x0f 0x0d /1, Fn8000_0001_ECX_3DNowPrefetch
 #:prefetch1 Mb, 0x0f 0x18 /2
 #:prefetch2 Mb, 0x0f 0x18 /3
 ######## PUSH ###################################################################
-# "push" does not require rex prefix and always uses 64bit addresses in x86-64
+# “push” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
 # in the appropriate files.
