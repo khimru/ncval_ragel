@@ -21,6 +21,7 @@
   define(｢operand0_16bit｣, )
   define(｢operand0_32bit｣, )
   define(｢operand0_64bit｣, )
+  define(｢operand0_128bit｣, )
   define(｢operand0_absolute_disp｣, )
   define(｢operand0_ds_rbx｣, )
   define(｢operand0_ds_rsi｣, )

@@ -138,23 +138,23 @@ and E G, 0x22, lock
 ######## BLSSR ##################################################################
 #$:blsr
 ######## BSF ####################################################################
-#:bsf Ev Gv, 0x0f 0xbc
+bsf Ev Gv, 0x0f 0xbc
 ######## BSR ####################################################################
-#:bsr Ev Gv, 0x0f 0xbd
+bsr Ev Gv, 0x0f 0xbd
 ######## BSWAP ##################################################################
-#:bswap rr, 0x0f 0xc8
+bswap ry, 0x0f 0xc8
 ######## BT #####################################################################
-#:bt Gv Ev, 0x0f 0xa3
-#:bt Ib Ev, 0x0f 0xba /4
+bt Gv Ev, 0x0f 0xa3
+bt Ib Ev, 0x0f 0xba /4
 ######## BTC ####################################################################
-#:btc Gv Ev, 0x0f 0xbb
-#:btc Ib Ev, 0x0f 0xba /7
+btc Gv Ev, 0x0f 0xbb
+btc Ib Ev, 0x0f 0xba /7
 ######## BTR ####################################################################
-#:btr Gv Ev, 0x0f 0xb3
-#:btr Ib Ev, 0x0f 0xba /6
+btr Gv Ev, 0x0f 0xb3
+btr Ib Ev, 0x0f 0xba /6
 ######## BTS ####################################################################
-#:bts Gv Ev, 0x0f 0xab
-#:bts Ib Ev, 0x0f 0xba /5
+bts Gv Ev, 0x0f 0xab
+bts Ib Ev, 0x0f 0xba /5
 ######## CALL (Near) ############################################################
 call Jz, 0xe8
 # "call" does not require rex prefix and always uses 64bit addresses in x86-64
@@ -179,26 +179,26 @@ clc, 0xf8
 ######## CLD ####################################################################
 cld, 0xfc
 ######## CLFLUSH ################################################################
-#:clflush Mb, 0x0f 0xae /7, Fn0000_0001_EDX_CLFSH
+clflush Mb, 0x0f 0xae /7, Fn0000_0001_EDX_CLFSH
 ######## CMC ####################################################################
 cmc, 0xf5
 ######## CMOVCC #################################################################
-#:cmova Ev Gv, 0x0f 0x47, Fn0000_0001_EDX_CMOV
-#:cmovae Ev Gv, 0x0f 0x43, Fn0000_0001_EDX_CMOV
-#:cmovbe Ev Gv, 0x0f 0x46, Fn0000_0001_EDX_CMOV
-#:cmovb Ev Gv, 0x0f 0x42, Fn0000_0001_EDX_CMOV
-#:cmove Ev Gv, 0x0f 0x44, Fn0000_0001_EDX_CMOV
-#:cmovg Ev Gv, 0x0f 0x4f, Fn0000_0001_EDX_CMOV
-#:cmovge Ev Gv, 0x0f 0x4d, Fn0000_0001_EDX_CMOV
-#:cmovle Ev Gv, 0x0f 0x4e, Fn0000_0001_EDX_CMOV
-#:cmovl Ev Gv, 0x0f 0x4c, Fn0000_0001_EDX_CMOV
-#:cmovne Ev Gv, 0x0f 0x45, Fn0000_0001_EDX_CMOV
-#:cmovno Ev Gv, 0x0f 0x41, Fn0000_0001_EDX_CMOV
-#:cmovnp Ev Gv, 0x0f 0x4b, Fn0000_0001_EDX_CMOV
-#:cmovns Ev Gv, 0x0f 0x49, Fn0000_0001_EDX_CMOV
-#:cmovo Ev Gv, 0x0f 0x40, Fn0000_0001_EDX_CMOV
-#:cmovp Ev Gv, 0x0f 0x4a, Fn0000_0001_EDX_CMOV
-#:cmovs Ev Gv, 0x0f 0x48, Fn0000_0001_EDX_CMOV
+cmova Ev Gv, 0x0f 0x47, Fn0000_0001_EDX_CMOV
+cmovae Ev Gv, 0x0f 0x43, Fn0000_0001_EDX_CMOV
+cmovbe Ev Gv, 0x0f 0x46, Fn0000_0001_EDX_CMOV
+cmovb Ev Gv, 0x0f 0x42, Fn0000_0001_EDX_CMOV
+cmove Ev Gv, 0x0f 0x44, Fn0000_0001_EDX_CMOV
+cmovg Ev Gv, 0x0f 0x4f, Fn0000_0001_EDX_CMOV
+cmovge Ev Gv, 0x0f 0x4d, Fn0000_0001_EDX_CMOV
+cmovle Ev Gv, 0x0f 0x4e, Fn0000_0001_EDX_CMOV
+cmovl Ev Gv, 0x0f 0x4c, Fn0000_0001_EDX_CMOV
+cmovne Ev Gv, 0x0f 0x45, Fn0000_0001_EDX_CMOV
+cmovno Ev Gv, 0x0f 0x41, Fn0000_0001_EDX_CMOV
+cmovnp Ev Gv, 0x0f 0x4b, Fn0000_0001_EDX_CMOV
+cmovns Ev Gv, 0x0f 0x49, Fn0000_0001_EDX_CMOV
+cmovo Ev Gv, 0x0f 0x40, Fn0000_0001_EDX_CMOV
+cmovp Ev Gv, 0x0f 0x4a, Fn0000_0001_EDX_CMOV
+cmovs Ev Gv, 0x0f 0x48, Fn0000_0001_EDX_CMOV
 ######## CMP ####################################################################
 cmp I a, 0x3c
 cmp I E, 0x80 /7
@@ -208,9 +208,9 @@ cmp E G, 0x3a
 ######## CMPS/CMPSB/CMPSW/CMPSD/CMPSQ ###########################################
 cmps Y X, 0xa6, condrep
 ######## CMPXCHG ################################################################
-#:cmpxchg G E, 0x0f 0xb0, lock
+cmpxchg G E, 0x0f 0xb0, lock
 ######## CMPXCHG8B/CMPXCHG16B ###################################################
-#:cmpxchg8b Mq, 0x0f 0xc7 /1, lock Fn0000_0001_EDX_CMPXCHG8B
+cmpxchg8b Mq, 0x0f 0xc7 /1, lock Fn0000_0001_EDX_CMPXCHG8B
 ######## CPUID ##################################################################
 #:cpuid, 0x0f 0xa2
 ######## CRC32 ##################################################################
@@ -442,22 +442,22 @@ sbb E G, 0x1a, lock
 ######## SCAS/SCASB/SCASW/SCASD/SCASQ ###########################################
 scas Y a, 0xae
 ######## SETcc ##################################################################
-#:cmova Eb, 0x0f 0x97, Fn0000_0001_EDX_CMOV
-#:cmovae Eb, 0x0f 0x93, Fn0000_0001_EDX_CMOV
-#:cmovbe Eb, 0x0f 0x96, Fn0000_0001_EDX_CMOV
-#:cmovb Eb, 0x0f 0x92, Fn0000_0001_EDX_CMOV
-#:cmove Eb, 0x0f 0x94, Fn0000_0001_EDX_CMOV
-#:cmovg Eb, 0x0f 0x9f, Fn0000_0001_EDX_CMOV
-#:cmovge Eb, 0x0f 0x9d, Fn0000_0001_EDX_CMOV
-#:cmovle Eb, 0x0f 0x9e, Fn0000_0001_EDX_CMOV
-#:cmovl Eb, 0x0f 0x9c, Fn0000_0001_EDX_CMOV
-#:cmovne Eb, 0x0f 0x95, Fn0000_0001_EDX_CMOV
-#:cmovno Eb, 0x0f 0x91, Fn0000_0001_EDX_CMOV
-#:cmovnp Eb, 0x0f 0x9b, Fn0000_0001_EDX_CMOV
-#:cmovns Eb, 0x0f 0x99, Fn0000_0001_EDX_CMOV
-#:cmovo Eb, 0x0f 0x90, Fn0000_0001_EDX_CMOV
-#:cmovp Eb, 0x0f 0x9a, Fn0000_0001_EDX_CMOV
-#:cmovs Eb, 0x0f 0x98, Fn0000_0001_EDX_CMOV
+seta Eb, 0x0f 0x97, Fn0000_0001_EDX_CMOV
+setae Eb, 0x0f 0x93, Fn0000_0001_EDX_CMOV
+setbe Eb, 0x0f 0x96, Fn0000_0001_EDX_CMOV
+setb Eb, 0x0f 0x92, Fn0000_0001_EDX_CMOV
+sete Eb, 0x0f 0x94, Fn0000_0001_EDX_CMOV
+setg Eb, 0x0f 0x9f, Fn0000_0001_EDX_CMOV
+setge Eb, 0x0f 0x9d, Fn0000_0001_EDX_CMOV
+setle Eb, 0x0f 0x9e, Fn0000_0001_EDX_CMOV
+setl Eb, 0x0f 0x9c, Fn0000_0001_EDX_CMOV
+setne Eb, 0x0f 0x95, Fn0000_0001_EDX_CMOV
+setno Eb, 0x0f 0x91, Fn0000_0001_EDX_CMOV
+setnp Eb, 0x0f 0x9b, Fn0000_0001_EDX_CMOV
+setns Eb, 0x0f 0x99, Fn0000_0001_EDX_CMOV
+seto Eb, 0x0f 0x90, Fn0000_0001_EDX_CMOV
+setp Eb, 0x0f 0x9a, Fn0000_0001_EDX_CMOV
+sets Eb, 0x0f 0x98, Fn0000_0001_EDX_CMOV
 ######## SFENCE #################################################################
 #:sfence, 0x0f 0ae 0xf8, Fn0000_0001_EDX_SFENCE
 ######## SHLD ###################################################################

@@ -8,9 +8,7 @@ define(｢unquote｣, ｢$*｣)
 ################################################################################
 # ｢trim｣ removes spurious spaces from the beginning and the end of string
 # For example: ｢trim(｢ 0x10 /3 ｣) becomes ｢0x10 /3｣
-define(｢trim｣, ｢ifelse(｢$1｣, , , substr(｢$1｣, 0, 1), ｢ ｣,
-  ｢trim(substr(｢$1｣, 1))｣, substr(｢$1｣, decr(len(｢$1｣))), ｢ ｣,
-  ｢trim(substr(｢$1｣, 0, decr(len(｢$1｣))))｣, ｢$1｣)｣)
+define(｢trim｣, ｢patsubst(｢$1｣, ｢^ *\([^ ]*.*[^ ]+\) *$｣, ｢\1｣)｣)
 ################################################################################
 # ｢append｣ is used to collect variants of $2 in $1 while avoiding duplicates
 # For example:

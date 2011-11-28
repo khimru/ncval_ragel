@@ -104,6 +104,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case OperandSize16bit: show_name_suffix = 'w'; break;
 	    case OperandSize32bit: show_name_suffix = 'l'; break;
 	    case OperandSize64bit: show_name_suffix = 'q'; break;
+	    case OperandSize128bit:
 	    case OperandFarPtr: 
 	    case OperandSelector: show_name_suffix = FALSE; break;
 	    default: assert(FALSE);
@@ -186,10 +187,27 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   }
   if (show_name_suffix == 'b') {
     /* "int", "invlpg", "prefetch" never use suffix. */
-    if ((!strcmp(instruction->name, "int")) ||
+    if ((!strcmp(instruction->name, "clflush")) ||
+	(!strcmp(instruction->name, "int")) ||
 	(!strcmp(instruction->name, "invlpg")) ||
 	(!strcmp(instruction->name, "prefetch")) ||
-	(!strcmp(instruction->name, "prefetchw"))) {
+	(!strcmp(instruction->name, "prefetchw")) ||
+	(!strcmp(instruction->name, "seta")) ||
+	(!strcmp(instruction->name, "setae")) ||
+	(!strcmp(instruction->name, "setbe")) ||
+	(!strcmp(instruction->name, "setb")) ||
+	(!strcmp(instruction->name, "sete")) ||
+	(!strcmp(instruction->name, "setg")) ||
+	(!strcmp(instruction->name, "setge")) ||
+	(!strcmp(instruction->name, "setle")) ||
+	(!strcmp(instruction->name, "setl")) ||
+	(!strcmp(instruction->name, "setne")) ||
+	(!strcmp(instruction->name, "setno")) ||
+	(!strcmp(instruction->name, "setnp")) ||
+	(!strcmp(instruction->name, "setns")) ||
+	(!strcmp(instruction->name, "seto")) ||
+	(!strcmp(instruction->name, "setp")) ||
+	(!strcmp(instruction->name, "sets"))) {
       show_name_suffix = FALSE;
     /* Instruction enter accepts two immediates: word and byte. But
        objdump always uses suffix "q". This is supremely strange, but
@@ -240,8 +258,10 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     }
   }
   if (show_name_suffix == 'q') {
-    /* "callq" already includes suffix in the nanme.  */
-    if (!strcmp(instruction->name, "callq")) {
+    /* "callq"/"cmpxchg8b"/"jmpq" already include suffix in the nanme.  */
+    if ((!strcmp(instruction->name, "callq")) ||
+	(!strcmp(instruction->name, "cmpxchg8b")) ||
+	(!strcmp(instruction->name, "jmpq"))) {
        show_name_suffix = FALSE;
     }
   }

@@ -32,12 +32,14 @@
   define(｢possible_command_mode_1｣,｢unknown｣)
   define(｢possible_command_mode_b｣,｢unknown｣)
   define(｢possible_command_mode_d｣,｢unknown｣)
+  define(｢possible_command_mode_o｣,｢unknown｣)
   define(｢possible_command_mode_p｣,｢unknown｣)
   define(｢possible_command_mode_q｣,｢unknown｣)
   define(｢possible_command_mode_r｣,｢unknown｣)
   define(｢possible_command_mode_s｣,｢unknown｣)
   define(｢possible_command_mode_v｣,｢data16rexw｣)
   define(｢possible_command_mode_w｣,｢unknown｣)
+  define(｢possible_command_mode_y｣,｢nonerexw｣)
   define(｢possible_command_mode_z｣,｢data16rexw｣)
   # ｢size8｣ is special "prefix" not included in AMD manual:  w bit in opcode
   # switches between 8bit and 16/32/64 bit versions.  M is just an address in
@@ -57,6 +59,7 @@
       $1, ｢size8data16rexw｣, ｢size8data16rexw｣,
       $1, ｢data16｣, ｢data16｣,
       $1, ｢data16rexw｣, ｢data16rexw｣,
+      $1, ｢nonerexw｣, ｢nonerexw｣,
       $1, ｢rexw｣, ｢rexw｣,
       $1, ｢memonlysize8data16rexw｣, ｢memonlysize8data16rexw｣,
       $1, ｢memonlydata16｣, ｢memonlydata16｣,
@@ -134,14 +137,14 @@
     substr(｢$4｣, 0, 5), ｢0x66 ｣,
       ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0x66 $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
-    substr(｢$4｣, 0, 5), ｢data16 ｣,
-      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0x66 $5｣,
+    substr(｢$4｣, 0, 7), ｢data16 ｣,
+      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 7)), ｢0x66 $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
     substr(｢$4｣, 0, 5), ｢0xf2 ｣,
       ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0xf2 $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
-    substr(｢$4｣, 0, 5), ｢repnz ｣,
-      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0xf2 $5｣,
+    substr(｢$4｣, 0, 6), ｢repnz ｣,
+      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 6)), ｢0xf2 $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
     substr(｢$4｣, 0, 5), ｢0xf3 ｣,
       ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0xf3 $5｣,
@@ -149,11 +152,23 @@
     substr(｢$4｣, 0, 5), ｢repz ｣,
       ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0xf3 $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
+    substr(｢$4｣, 0, 5)｢$1｣, ｢rexw regonlynone｣,
+      ｢instruction_select(｢regonlyrexw｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)),
+					       shift(shift(shift(shift($@)))))｣,
+    substr(｢$4｣, 0, 5)｢$1｣, ｢rexw memonlynone｣,
+      ｢instruction_select(｢memonlyrexw｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)),
+					       shift(shift(shift(shift($@)))))｣,
+    substr(｢$4｣, 0, 5)｢$1｣, ｢rexw none｣,
+      ｢instruction_select(｢rexw｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)),
+					       shift(shift(shift(shift($@)))))｣,
     ｢$1｣, ｢size8data16rexw｣,
       ｢instruction_select(｢size8｣, shift($@))｣  ｢instruction_select(
 	   ｢data16rexw｣, $2, $3, setwflag($4), shift(shift(shift(shift($@)))))｣,
     ｢$1｣, ｢data16rexw｣,
       ｢instruction_select(｢data16｣, shift($@))｣  ｢instruction_select(
+		   ｢none｣, shift($@))｣  ｢instruction_select(｢rexw｣, shift($@))｣,
+    ｢$1｣, ｢nonerexw｣,
+      ｢instruction_select(
 		   ｢none｣, shift($@))｣  ｢instruction_select(｢rexw｣, shift($@))｣,
     ｢$1｣, ｢size8｣,
       ｢ifelse(index(｢$5｣, ｢lock｣), -1, 
@@ -329,6 +344,7 @@
   define(｢instruction_argument_size_d｣, ｢32bit｣)
   define(｢instruction_argument_size_q｣, ｢64bit｣)
   define(｢instruction_argument_size_p｣, ｢farptr｣)
+  define(｢instruction_argument_size_o｣, ｢128bit｣)
   define(｢instruction_argument_size_r｣, ｢64bit｣)
   define(｢instruction_argument_size_s｣, ｢selector｣)
   define(｢instruction_argument_size_data16_v｣, ｢16bit｣)
@@ -338,6 +354,8 @@
   define(｢instruction_argument_size_none_Sw｣, ｢segreg｣)
   define(｢instruction_argument_size_rexw_Sw｣, ｢segreg｣)
   define(｢instruction_argument_size_w｣, ｢16bit｣)
+  define(｢instruction_argument_size_none_y｣, ｢32bit｣)
+  define(｢instruction_argument_size_rexw_y｣, ｢64bit｣)
   define(｢instruction_argument_size_data16_z｣, ｢16bit｣)
   define(｢instruction_argument_size_none_z｣, ｢32bit｣)
   define(｢instruction_argument_size_rexw_z｣, ｢32bit｣)

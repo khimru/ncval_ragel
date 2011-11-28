@@ -14,11 +14,13 @@ cltq, REXW_NONE 0x98
 ######## CWD/CDQ/CQO ############################################################
 cqto, REXW_NONE 0x99
 ######## CMPXCHG8B/CMPXCHG16B ###################################################
-#:cmpxchg16b Mo, REXW_XB 0x0f 0xc7 /1, lock Fn0000_0001_ECX_CMPXCHG16B
+cmpxchg16b Mo, rexw 0x0f 0xc7 /1, lock Fn0000_0001_ECX_CMPXCHG16B
 ######## JCXZ/JECXZ/JRCXZ #######################################################
 jrcxz Jb, 0xe3
 ######## JMP (Near) #############################################################
-#:jmp Eq, 0xff /4
+jmpq Eq, 0xff /4
+######## JMP (Far) ##############################################################
+ljmpq Mp, 0xff /5
 ######## LAHF ###################################################################
 # LAHF is always awailable in 16bit/32bit mode, but not always in 64bit mode
 lahf, 0x9f, Fn8000_0001_ECX_LahfSahf

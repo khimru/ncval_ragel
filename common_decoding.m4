@@ -183,6 +183,7 @@
   operand_size(16bit, Size16bit)
   operand_size(32bit, Size32bit)
   operand_size(64bit, Size64bit)
+  operand_size(128bit, Size128bit)
   operand_size(x87, X87)
   operand_size(mm, MM)
   operand_size(xmm, XMM)
