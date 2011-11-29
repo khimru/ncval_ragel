@@ -42,6 +42,7 @@
 #	P: 64-bit MMX register specified by the ModRM.reg field.
 #	R: General purpose register specified by the ModRM.r/m field.
 #	   The ModRM.mod field must be 11b.
+#	S: Segment register specified by the ModRM.reg field.
 #	V: YMM/XMM register specified by the ModRM.reg field.
 #	X: A memory operand addressed by the %ds:%[er]si registers. Used in
 #	   string instructions.
@@ -414,8 +415,6 @@ pause, 0xf3 0x90
 # in the appropriate files.
 pop Ew, 0x66 0x8f /0
 pop rr, 0x58
-#:pop %fs, 0x0f 0xa1
-#:pop %gs, 0x0f 0xa9
 ######## POPCNT #################################################################
 popcnt Ev Gv, 0xf3 0x0f 0xb8, Fn0000_0001_ECX_POPCNT
 ######## POPF/POPFD/POPFQ #######################################################
@@ -437,8 +436,6 @@ push Ew, 0x66 0xff /6
 push rr, 0x50
 push Iz, 0x68
 push Ib, 0x6a
-#:push %fs, 0x0f 0xa0
-#:push %gs, 0x0f 0xa8
 ######## PUSHF/PUSHFD/PUSHFQ ####################################################
 pushfw, data16 0x9c
 ######## RCL ####################################################################
@@ -532,7 +529,7 @@ sub E G, 0x2a, lock
 ######## TEST ###################################################################
 test I a, 0xa8
 test I E, 0xf6 /0
-# AMD manual claims this opcode works identically to /0.  Intel manual
+# AMD manual claims this opcode works identically to “/0”.  Intel manual
 # says it's reserved.  Objdump does not like it.
 # test I E, 0xf6 /1
 test G E, 0x84

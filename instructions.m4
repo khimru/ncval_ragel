@@ -349,8 +349,8 @@
       substr(｢$2｣, 0, 5), ｢0x66 ｣, ｢not_data16 ｣,
       substr(｢$2｣, 0, 5), ｢0xf2 ｣, ｢not_repnz ｣,
       substr(｢$2｣, 0, 5), ｢0xf3 ｣, ｢not_repz ｣,
-    )instruction_name(
-    ｢$4｣)｢｣instruction_arguments_number(shift(shift(shift(shift(
+    )instruction_name(clean_name(
+    ｢$4｣))｢｣instruction_arguments_number(shift(shift(shift(shift(
     $@)))))｢｣instruction_arguments_sizes(｢$1｣, shift(shift(shift(shift(
     $@)))))｢｣instruction_implied_arguments(｢$1｣, shift(shift(shift(shift(
     $@)))))｣)
@@ -359,6 +359,7 @@
   define(｢_regopcode｣, ｢ifelse($#, 1,
     ｢chartest(｢(｢c｣ != 0x90) && ((｢c｣ & 0xf8) == ｢$1｣)｣)｣,
     ｢$1 _regopcode(shift($@))｣)｣)
+  define(｢clean_name｣, ｢translit(｢$1｣, ｢ ()[]{}%:｣, ｢_________｣)｣)
   define(｢instruction_arguments_number｣,
     ｢ifelse(｢$1｣, , ｢ operands_count_is_0｣, ｢ operands_count_is_$#｣)｣)
   define(｢instruction_arguments_sizes｣, ｢ifelse(eval(｢$#>2｣), 1,
@@ -466,8 +467,8 @@
       substr(｢$4｣, 0, 5), ｢0x66 ｣, ｢not_data16 ｣,
       substr(｢$4｣, 0, 5), ｢0xf2 ｣, ｢not_repnz ｣,
       substr(｢$4｣, 0, 5), ｢0xf3 ｣, ｢not_repz ｣,
-    )instruction_name(split_argument(
-      ｢$2｣))｢｣instruction_arguments_number(shift(split_argument(
+    )instruction_name(clean_name(split_argument(
+      ｢$2｣)))｢｣instruction_arguments_number(shift(split_argument(
       ｢$2｣)))｢｣instruction_arguments_sizes(｢$1｣, shift(split_argument(
       ｢$2｣)))｢｣instruction_implied_arguments(｢$1｣, shift(split_argument(
       ｢$2｣))) any* & ｣)｣)｢( ｣__instruction_modrm_arguments($@)｢｣ifelse(

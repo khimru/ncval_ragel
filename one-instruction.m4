@@ -128,7 +128,7 @@
 
   include(｢instruction_parts.m4｣)
 
-  define(｢_instruction_name_action｣, ｢action instruction_｢｣$1 { }｣)
+  define(｢_instruction_name_action｣, ｢action instruction_｢｣clean_name($1) { }｣)
 
   include(｢instructions.m4｣)
 

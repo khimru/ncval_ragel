@@ -31,6 +31,8 @@ define(｢split_argument｣, ｢ifelse(len(｢$1｣), 0, ,
   substr(｢$1｣, decr(len(｢$1｣))), ｢ ｣,
   ｢split_argument(substr(｢$1｣, 0, decr(len(｢$1｣))))｣, ｢_split_argument(｢$1｣)｣)｣)
 define(｢_split_argument｣,｢ifelse(eval(len(｢$1｣)<2), 1, ｢$1｣,
+  substr(｢$1｣, 0, 2), ｢\\｣, ｢\_split_argument(substr(｢$1｣, 2))｣,
+  substr(｢$1｣, 0, 2), ｢\ ｣, ｢ _split_argument(substr(｢$1｣, 2))｣,
   substr(｢$1｣, 0, 2), ｢  ｣, ｢_split_argument(substr(｢$1｣, 1))｣,
   substr(｢$1｣, 0, 1), ｢ ｣, ｢,_split_argument(substr(｢$1｣, 1))｣,
   ｢substr(｢$1｣, 0, 1)｢｣_split_argument(substr(｢$1｣, 1))｣)｣)
