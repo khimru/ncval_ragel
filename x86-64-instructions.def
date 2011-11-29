@@ -31,6 +31,17 @@ movabs Ob ab, 0xa0
 movabs Ov av, 0xa1
 movabs ab Ob, 0xa2
 movabs av Ov, 0xa3
+######## MOVD ###################################################################
+movq Eq Vq, 0x66 rexw 0x0f 0x6e, Fn0000_0001_EDX_SSE2
+movq Vq Eq, 0x66 rexw 0x0f 0x7e, Fn0000_0001_EDX_SSE2
+movq Eq Pq, rexw 0x0f 0x6e, Fn0000_0001_EDX_MMX
+movq Pq Eq, rexw 0x0f 0x7e, Fn0000_0001_EDX_MMX
+######## MOVSX ##################################################################
+movsbq Eb Gq, rexw 0x0f 0xbe
+movswq Ew Gq, rexw 0x0f 0xb7
+######## MOVZX ##################################################################
+movzbq Eb Gq, rexw 0x0f 0xb6
+movzwq Ew Gq, rexw 0x0f 0xb7
 ######## MOVSXD #################################################################
 movslq Ed Gv, 0x63
 ######## POP ####################################################################

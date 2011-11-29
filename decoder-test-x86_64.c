@@ -206,6 +206,10 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	(!strcmp(instruction->name, "int")) ||
 	(!strcmp(instruction->name, "invlpg")) ||
 	(!strcmp(instruction->name, "prefetch")) ||
+	(!strcmp(instruction->name, "prefetchnta")) ||
+	(!strcmp(instruction->name, "prefetcht0")) ||
+	(!strcmp(instruction->name, "prefetcht1")) ||
+	(!strcmp(instruction->name, "prefetcht2")) ||
 	(!strcmp(instruction->name, "prefetchw")) ||
 	(!strcmp(instruction->name, "seta")) ||
 	(!strcmp(instruction->name, "setae")) ||
@@ -315,7 +319,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     }
   }
 #undef print_name
-  if (strcmp(instruction->name, "nop") &&
+  if ((strcmp(instruction->name, "nop") || instruction->operands_count != 0) &&
       strcmp(instruction->name, "fwait")) {
     while (shown_name < 6) {
       printf(" ");
@@ -355,6 +359,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%eax"); break;
 	case OperandSize64bit: printf("%%rax"); break;
 	case OperandST: printf("%%st(0)"); break;
+	case OperandMMX: printf("%%mm0"); break;
 	case OperandXMM: printf("%%xmm0"); break;
 	case OperandSegmentRegister: printf("%%es"); break;
 	default: assert(FALSE);
@@ -366,6 +371,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%ecx"); break;
 	case OperandSize64bit: printf("%%rcx"); break;
 	case OperandST: printf("%%st(1)"); break;
+	case OperandMMX: printf("%%mm1"); break;
 	case OperandXMM: printf("%%xmm1"); break;
 	case OperandSegmentRegister: printf("%%cs"); break;
 	default: assert(FALSE);
@@ -377,6 +383,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%edx"); break;
 	case OperandSize64bit: printf("%%rdx"); break;
 	case OperandST: printf("%%st(2)"); break;
+	case OperandMMX: printf("%%mm2"); break;
 	case OperandXMM: printf("%%xmm2"); break;
 	case OperandSegmentRegister: printf("%%ss"); break;
 	default: assert(FALSE);
@@ -388,6 +395,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%ebx"); break;
 	case OperandSize64bit: printf("%%rbx"); break;
 	case OperandST: printf("%%st(3)"); break;
+	case OperandMMX: printf("%%mm3"); break;
 	case OperandXMM: printf("%%xmm3"); break;
 	case OperandSegmentRegister: printf("%%ds"); break;
 	default: assert(FALSE);
@@ -403,6 +411,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%esp"); break;
 	case OperandSize64bit: printf("%%rsp"); break;
 	case OperandST: printf("%%st(4)"); break;
+	case OperandMMX: printf("%%mm4"); break;
 	case OperandXMM: printf("%%xmm4"); break;
 	case OperandSegmentRegister: printf("%%fs"); break;
 	default: assert(FALSE);
@@ -418,6 +427,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%ebp"); break;
 	case OperandSize64bit: printf("%%rbp"); break;
 	case OperandST: printf("%%st(5)"); break;
+	case OperandMMX: printf("%%mm5"); break;
 	case OperandXMM: printf("%%xmm5"); break;
 	case OperandSegmentRegister: printf("%%gs"); break;
 	default: assert(FALSE);
@@ -433,6 +443,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%esi"); break;
 	case OperandSize64bit: printf("%%rsi"); break;
 	case OperandST: printf("%%st(6)"); break;
+	case OperandMMX: printf("%%mm6"); break;
 	case OperandXMM: printf("%%xmm6"); break;
 	default: assert(FALSE);
       }
@@ -447,6 +458,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%edi"); break;
 	case OperandSize64bit: printf("%%rdi"); break;
 	case OperandST: printf("%%st(7)"); break;
+	case OperandMMX: printf("%%mm7"); break;
 	case OperandXMM: printf("%%xmm7"); break;
 	default: assert(FALSE);
       }

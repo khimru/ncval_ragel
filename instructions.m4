@@ -22,11 +22,16 @@
     ｢instruction_select(possible_command_modes(shift(split_argument($1))),
 		       possible_rex_rxb_bits(shift(split_argument($1))), $@)｣)｣)
   define(｢possible_command_modes｣, ｢ifelse($1, , ｢none｣,
-    ｢return_operand_modes(_possible_command_modes($@))｣)｣)
+    ｢return_operand_mode(_possible_command_modes($@))｣)｣)
   define(｢_possible_command_modes｣,｢ifelse($#, 0, ｢unknown｣,
-    $#, 1, ｢｢ifelse(substr($1, 0, 1), ｢M｣, ｢memonly｣, substr($1, 0, 1), ｢R｣, ｢regonly｣)｢｣possible_command_mode_｣substr($1, 1, 1)(substr($1, 0, 1))｣,
-    ｢check_prefixes_compatibility(｢ifelse(substr($1, 0, 1), ｢M｣, ｢memonly｣, substr($1, 0, 1), ｢R｣, ｢regonly｣)｢｣possible_command_mode_｣substr($1, 1, 1)(
-    substr($1, 0, 1)), _possible_command_modes(shift($@)))｣)｣)
+    $#, 1, ｢｢ifelse(
+      substr($1, 0, 1), ｢M｣, ｢memonly｣,
+      substr($1, 0, 1), ｢R｣, ｢regonly｣)｢｣possible_command_mode_｣substr($1, 1,
+	1)(substr($1, 0, 1))｣,
+    ｢check_prefixes_compatibility(｢ifelse(
+      substr($1, 0, 1), ｢M｣, ｢memonly｣,
+      substr($1, 0, 1), ｢R｣, ｢regonly｣)｢｣possible_command_mode_｣substr($1, 1, 1)(
+	substr($1, 0, 1)), _possible_command_modes(shift($@)))｣)｣)
   # Operand sizes mostly follow AMD manual.
   # ｢unknown｣ means ther operands will determine.
   define(｢possible_command_mode_1｣,｢unknown｣)
@@ -46,7 +51,7 @@
   # memory: it means register-only encodings are invalid, but other operands
   # decide everything else.
   define(｢possible_command_mode_｣, ｢size8data16rexw｣)
-  define(｢return_operand_modes｣, ｢ifelse(
+  define(｢return_operand_mode｣, ｢ifelse(
     ｢$#｣, 0, ｢none｣,
     ｢$#｣, 1,
     ｢ifelse(
@@ -64,26 +69,19 @@
       $1, ｢memonlysize8data16rexw｣, ｢memonlysize8data16rexw｣,
       $1, ｢memonlydata16｣, ｢memonlydata16｣,
       $1, ｢memonlydata16rexw｣, ｢memonlydata16rexw｣,
+      $1, ｢memonlynonerexw｣, ｢memonlynonerexw｣,
       $1, ｢memonlyrexw｣, ｢memonlyrexw｣,
       $1, ｢regonlysize8data16rexw｣, ｢regonlysize8data16rexw｣,
       $1, ｢regonlydata16｣, ｢regonlydata16｣,
       $1, ｢regonlydata16rexw｣, ｢regonlydata16rexw｣,
+      $1, ｢regonlynonerexw｣, ｢regonlynonerexw｣,
       $1, ｢regonlyrexw｣, ｢regonlyrexw｣,
       ｢fatal_error(｢Incorrect operand mode:｣ $1)｣)｣,
-    ｢$#｣, 2, ｢ifelse(
-      $1, ｢unknown｣, ｢return_operand_modes(｢$2｣)｣,
-      $2, ｢unknown｣, ｢return_operand_modes(｢$1｣)｣,
-      $1, $2, ｢return_operand_modes(｢$1｣)｣,
-      $1, ｢memonly｣, ｢return_operand_modes(｢memonly｣$2)｣,
-      $2, ｢memonly｣, ｢return_operand_modes(｢memonly｣$1)｣,
-      $1, ｢regonly｣, ｢return_operand_modes(｢regonly｣$2)｣,
-      $2, ｢regonly｣, ｢return_operand_modes(｢regonly｣$1)｣,
-      ｢fatal_error(｢Incorrect operand modes｣ $1 ｢and｣ $2)｣)｣,
-    ｢return_operand_modes(｢$1｣, return_operand_modes(shift($@)))｣)｣)
+    ｢fatal_error(｢More the one mode:｣ $@)｣)｣)
   define(｢check_prefixes_compatibility｣, ｢ifelse(
-    ｢unknown｣, $1, ｢$2｣,
-    ｢unknown｣, $2, ｢$1｣,
-    $1, $2, ｢$2｣,
+    $1, $2, $2,
+    $1, ｢unknown｣, $2,
+    $2, ｢unknown｣, $1,
     $1, ｢memonly｣$2, $1,
     $2, ｢memonly｣$1, $2,
     $1, ｢regonly｣$2, $1,
@@ -92,6 +90,10 @@
     $2, ｢memonly｣, ｢memonly｣$1,
     $1, ｢regonly｣, ｢regonly｣$2,
     $2, ｢regonly｣, ｢regonly｣$1,
+    $1, ｢memonlyunknown｣, ｢memonly｣$2,
+    $2, ｢memonlyunknown｣, ｢memonly｣$1,
+    $1, ｢regonlyunknown｣, ｢regonly｣$2,
+    $2, ｢regonlyunknown｣, ｢regonly｣$1,
     $1 $2, ｢nonerexw size8data16rexw｣, ｢size8data16rexw｣,
     $2 $1, ｢nonerexw size8data16rexw｣, ｢size8data16rexw｣,
     ｢fatal_error(｢Incompatible prefixes｣ $1 ｢and｣ $2)｣)｣)
@@ -111,14 +113,16 @@
   define(｢possible_rex_rxb_bits_o｣, )
   define(｢possible_rex_rxb_bits_p｣, )
   define(｢possible_rex_rxb_bits_r｣, ｢b｣)
-  define(｢possible_rex_rxb_bits_G｣, ｢r｣)
   define(｢possible_rex_rxb_bits_E｣, ｢xb｣)
+  define(｢possible_rex_rxb_bits_G｣, ｢r｣)
   define(｢possible_rex_rxb_bits_I｣, )
   define(｢possible_rex_rxb_bits_J｣, )
   define(｢possible_rex_rxb_bits_M｣, ｢xb｣)
   define(｢possible_rex_rxb_bits_O｣, )
+  define(｢possible_rex_rxb_bits_P｣, )
   define(｢possible_rex_rxb_bits_R｣, ｢b｣)
   define(｢possible_rex_rxb_bits_S｣, )
+  define(｢possible_rex_rxb_bits_V｣, ｢r｣)
   define(｢possible_rex_rxb_bits_X｣, )
   define(｢possible_rex_rxb_bits_Y｣, )
   define(｢check_rex_rxb_bits｣, ｢ifelse($1, , ,
@@ -216,6 +220,9 @@
       ｢instruction_select(｢memonlydata16｣, shift($@))｣  ｢instruction_select(
 	｢memonlynone｣, shift($@))｣  ｢instruction_select(｢memonlyrexw｣,
 								    shift($@))｣,
+    ｢$1｣, ｢memonlynonerexw｣,
+      ｢instruction_select(｢memonlynone｣, shift(
+			  $@))｣  ｢instruction_select(｢memonlyrexw｣, shift($@))｣,
     ｢$1｣, ｢memonlysize8｣,
       ｢instruction_separator｢｣｢(｣possible_optional_prefixes(
 	｢$5｣) REX_prefix_q(｢$2｣)instruction_body(｢memonlysize8｣,
@@ -240,6 +247,9 @@
       ｢instruction_select(｢regonlydata16｣, shift($@))｣  ｢instruction_select(
 	｢regonlynone｣, shift($@))｣  ｢instruction_select(｢regonlyrexw｣,
 								    shift($@))｣,
+    ｢$1｣, ｢regonlynonerexw｣,
+      ｢instruction_select(｢regonlynone｣, shift(
+			  $@))｣  ｢instruction_select(｢regonlyrexw｣, shift($@))｣,
     ｢$1｣, ｢regonlysize8｣,
       ｢instruction_separator｢｣｢(｣possible_optional_prefixes(
 	｢$5｣) REX_prefix_q(｢$2｣)instruction_body(｢regonlysize8｣,
@@ -384,6 +394,10 @@
   define(｢instruction_argument_size_rexw_I｣, ｢32bit｣)
   define(｢instruction_argument_size_b｣, ｢8bit｣)
   define(｢instruction_argument_size_d｣, ｢32bit｣)
+  define(｢instruction_argument_size_none_Pq｣, ｢mmx｣)
+  define(｢instruction_argument_size_rexw_Pq｣, ｢mmx｣)
+  define(｢instruction_argument_size_none_Vq｣, ｢xmm｣)
+  define(｢instruction_argument_size_rexw_Vq｣, ｢xmm｣)
   define(｢instruction_argument_size_q｣, ｢64bit｣)
   define(｢instruction_argument_size_p｣, ｢farptr｣)
   define(｢instruction_argument_size_o｣, ｢128bit｣)
@@ -419,8 +433,10 @@
       substr(｢$2｣, 0, 1), ｢I｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_immediate｣,
       substr(｢$2｣, 0, 1), ｢J｣, ,
       substr(｢$2｣, 0, 1), ｢M｣, ,
+      substr(｢$2｣, 0, 1), ｢P｣, ,
       substr(｢$2｣, 0, 1), ｢O｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_absolute_disp｣,
       substr(｢$2｣, 0, 1), ｢R｣, ,
+      substr(｢$2｣, 0, 1), ｢V｣, ,
       substr(｢$2｣, 0, 1), ｢S｣, ,
       substr(｢$2｣, 0, 1), ｢X｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_ds_rsi｣,
       substr(｢$2｣, 0, 1), ｢Y｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_es_rdi｣,
@@ -428,8 +444,12 @@
   define(｢instruction_modrm_arguments｣, ｢ifelse(index(｢$2｣, ｢ E｣), -1,
     ｢ifelse(index(｢$2｣, ｢ G｣), -1,
       ｢ifelse(index(｢$2｣, ｢ M｣), -1,
-	｢ifelse(index(｢$2｣, ｢ R｣), -1,
-	  ｢ifelse(index(｢$2｣, ｢ S｣), -1, ,
+	｢ifelse(index(｢$2｣, ｢ P｣), -1,
+	  ｢ifelse(index(｢$2｣, ｢ R｣), -1,
+	    ｢ifelse(index(｢$2｣, ｢ S｣), -1,
+	      ｢ifelse(index(｢$2｣, ｢ V｣), -1, ,
+		｢ _instruction_modrm_arguments($@)｣)｣,
+	      ｢ _instruction_modrm_arguments($@)｣)｣,
 	    ｢ _instruction_modrm_arguments($@)｣)｣,
 	  ｢ _instruction_modrm_arguments($@)｣)｣,
 	｢ _instruction_modrm_arguments($@)｣)｣,
@@ -462,8 +482,10 @@
       substr(｢$1｣, 0, 1), ｢E｣, ｢operand｣decr(｢$#｣)｢_from_modrm_rm｣,
       substr(｢$1｣, 0, 1), ｢G｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢M｣, ｢operand｣decr(｢$#｣)｢_from_modrm_rm｣,
+      substr(｢$1｣, 0, 1), ｢P｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢R｣, ｢operand｣decr(｢$#｣)｢_from_modrm_rm｣,
-      substr(｢$1｣, 0, 1), ｢S｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,)｣)
+      substr(｢$1｣, 0, 1), ｢S｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
+      substr(｢$1｣, 0, 1), ｢V｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣)｣)
   define(｢memory_instruction_modrm_arguments｣,
     ｢(modrm_memory & (any _memory_instruction_modrm_arguments($@) any*))｣)
   define(｢_memory_instruction_modrm_arguments｣, ｢ifelse(eval(｢$#>1｣), 1,
@@ -471,8 +493,10 @@
       substr(｢$1｣, 0, 1), ｢E｣, ｢operand｣decr(｢$#｣)｢_rm｣,
       substr(｢$1｣, 0, 1), ｢G｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢M｣, ｢operand｣decr(｢$#｣)｢_rm｣,
+      substr(｢$1｣, 0, 1), ｢P｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢R｣, ｢operand｣decr(｢$#｣)｢_rm｣,
-      substr(｢$1｣, 0, 1), ｢S｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,)｣)
+      substr(｢$1｣, 0, 1), ｢S｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
+      substr(｢$1｣, 0, 1), ｢V｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣)｣)
   define(｢instruction_immediate_arguments｣, ｢ifelse(
       substr(｢$1｣, 0, 7), ｢memonly｣,
 		  ｢instruction_immediate_arguments(substr(｢$1｣, 7), shift($@))｣,

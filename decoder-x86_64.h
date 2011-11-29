@@ -14,6 +14,7 @@ enum operand_type {
   OperandSize64bit,
   OperandSize128bit,
   OperandST,
+  OperandMMX,
   OperandXMM,
   OperandSegmentRegister, /* Operand is segment register.		       */
   OperandSelector,	  /* Operand is 6bytes/10bytes selector in memory.     */

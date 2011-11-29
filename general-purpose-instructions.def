@@ -1,4 +1,4 @@
-# This file describes instructions from AMD64 Architecture Programmer’s Manual
+# This file des\cribes instructions from AMD64 Architecture Programmer’s Manual
 #				 Volume 3: General-Purpose and System Instruction
 #				 Chapter 3: General-Purpose Instruction Reference
 #################################################################################
@@ -13,7 +13,7 @@
 #   Arguments consist of two parts: argument type and argument size.
 #
 #      Possible argument types:
-#	1: One (for instructions like “shr” or “rol”)
+#	1: One (for instructions like “shr” or “rol”).
 #	a: Accumulator (%al/%ax/%eax/%rax depending on size).
 #	b: A memory operand addressed by the %ds:(%[er]bx). See “xlat”.
 #	c: Implicit %ecx/%rcx (depending on size).
@@ -28,11 +28,17 @@
 #	   register-indirect addressing forms.
 #	G: General purpose register specified by the reg field of ModRM.
 #	I: Immediate value encoded in the instruction.
+#	J: The instruction encoding includes a relative offset that is added to
+#	   the rIP.
 #	M: A memory operand specified by the {mod, r/m}field of the ModRM byte.
 #	   ModRM.mod ≠ 11b.
 #	O: The offset of an operand is encoded in the instruction. There is no
 #	   ModRM byte in the instruction encoding. Indexed register-indirect
-#	   addressing using the SIB byte is not supported
+#	   addressing using the SIB byte is not supported.
+#	P: 64-bit MMX register specified by the ModRM.reg field.
+#	R: General purpose register specified by the ModRM.r/m field.
+#	   The ModRM.mod field must be 11b.
+#	V: YMM/XMM register specified by the ModRM.reg field.
 #	X: A memory operand addressed by the %ds:%[er]si registers. Used in
 #	   string instructions.
 #	Y: A memory operand addressed by the %es:%[er]di registers. Used in
@@ -228,7 +234,7 @@ enter iw Ib, 0xc8
 idiv E, 0xf6 /7
 ######## IMUL ###################################################################
 imul E, 0xf6 /5
-#:imul G E, 0x0f 0xaf
+imul Ev Gv, 0x0f 0xaf
 imul Ib Ev Gv, 0x6b
 imul Iz Ev Gv, 0x69
 ######## IN #####################################################################
@@ -290,14 +296,23 @@ jmpw Ew, 0x66 0xff /4
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
 # in the appropriate files.
 ljmpw Mp, 0x66 0xff /5
-######## LDS/LES/LFS/LGS/LSS ####################################################
-#:lfs Mp Gz, 0x0f 0xb4
-#:lgs Mp Gz, 0x0f 0xb5
-#:lss Mp Gz, 0x0f 0xb2
+######## LDS/LES/LFS/LGS/LSS (AMD version) ######################################
+# AMD manual says “executing LFS, LGS, or LSS with a 64-bit operand size only
+# loads a 32-bit general purpose register and the specified segment register”.
+# lfs Mp Gz, 0x0f 0xb4
+# lgs Mp Gz, 0x0f 0xb5
+# lss Mp Gz, 0x0f 0xb2
+######## LDS/LES/LFS/LGS/LSS (Intel version) ####################################
+# Intel manual says: “Using a REX prefix in the form of REX.W promotes operation
+# to specify a source operand referencing an 80-bit pointer (16-bit selector,
+# 64-bit offset) in memory”.
+lfs Mp Gv, 0x0f 0xb4
+lgs Mp Gv, 0x0f 0xb5
+lss Mp Gv, 0x0f 0xb2
 ######## LEA ####################################################################
 lea Mv Gv, 0x8d
 ######## LFENCE #################################################################
-#:lfence, 0x0f 0xae 0xe8, Fn0000_0001_EDX_SSE2
+lfence, 0x0f 0xae 0xe8, Fn0000_0001_EDX_SSE2
 ######## LLWPCB #################################################################
 #$:llwpcb
 ######## LODS/LODSB/LODSW/LODSD/LODSQ ###########################################
@@ -311,9 +326,9 @@ loopne Jb, 0xe0
 ######## LWPVAL #################################################################
 #$:lwpval
 ######## LZCNT ##################################################################
-#:lzcnt Ev Gv, 0xf3 0x0f 0xbd, Fn0000_0007_EBX_x0_BMI
+lzcnt Ev Gv, 0xf3 0x0f 0xbd, Fn0000_0007_EBX_x0_BMI
 ######## MFENCE #################################################################
-#:mfence, 0x0f 0xae 0xf0, Fn0000_0001_EDX_SSE2
+mfence, 0x0f 0xae 0xf0, Fn0000_0001_EDX_SSE2
 ######## MOV ####################################################################
 mov G E, 0x88
 mov E G, 0x8a
@@ -324,31 +339,52 @@ mov Ib rb, 0xb0
 mov Iv rv, 0xb8
 mov I E, 0xc6 /0
 ######## MOVD ###################################################################
-#:movd Ey Vy, 0x66 0x0f 0x6e, Fn0000_0001_EDX_SSE2
-#:movd Vy Ey, 0x66 0x0f 0x7e, Fn0000_0001_EDX_SSE2
-#:movd Ey Py, 0x0f 0x6e, Fn0000_0001_EDX_MMX
-#:movd Py Ey, 0x0f 0x7e, Fn0000_0001_EDX_MMX
+# This is description according to AMD/Intel manual.
+# movd Ey Vy, 0x66 0x0f 0x6e, Fn0000_0001_EDX_SSE2
+# movd Vy Ey, 0x66 0x0f 0x7e, Fn0000_0001_EDX_SSE2
+# movd Ey Py, 0x0f 0x6e, Fn0000_0001_EDX_MMX
+# movd Py Ey, 0x0f 0x7e, Fn0000_0001_EDX_MMX
+# Objdump names 64bit version not “movd” but movq”.  We describe 32bit version
+# here and 64bit version can be found in x86-64-instructions.def.
+movd Ed Vq, 0x66 0x0f 0x6e, Fn0000_0001_EDX_SSE2
+movd Vq Ed, 0x66 0x0f 0x7e, Fn0000_0001_EDX_SSE2
+movd Ed Pq, 0x0f 0x6e, Fn0000_0001_EDX_MMX
+movd Pq Ed, 0x0f 0x7e, Fn0000_0001_EDX_MMX
 ######## MOVMSKPD ###############################################################
 #:movmskpd Upd Gd, 0x66 0x0f 0x50, Fn0000_0001_EDX_SSE2
 ######## MOVMSKPS ###############################################################
 #:movmskps Ups Gd, 0x0f 0x50, Fn0000_0001_EDX_SSE2
 ######## MOVNTI #################################################################
-#:movnti Gy My, 0x0f 0xc3, Fn0000_0001_EDX_SSE2
+movnti Gy My, 0x0f 0xc3, Fn0000_0001_EDX_SSE2
 ######## MOVS/MOVSB/MOVSW/MOVSD/MOVSQ ###########################################
 movs X Y, 0xa4, rep
 ######## MOVSX ##################################################################
-#:movsx Eb Ev, 0x0f 0xbe
-#:movsx Ew Ey, 0x0f 0xbf
+# This is description according to AMD/Intel manual.
+# movsx Eb Gv, 0x0f 0xbe
+# movsx Ew Gy, 0x0f 0xbf
+# Objdump has different names for this instrustion: “movsbw”, “movsbl”, “movsbq”,
+# “movswl”, “movswq” depending on operand size.  We describe 32bit versions here
+# and 64bit version can be found in x86-64-instructions.def.
+movsbw Eb Gw, data16 0x0f 0xbe
+movsbl Eb Gd, 0x0f 0xbe
+movswl Ew Gd, 0x0f 0xb7
 ######## MOVZX ##################################################################
-#:movzx Eb Ev, 0x0f 0xb6
-#:movzx Ew Ey, 0x0f 0xb7
+# This is description according to AMD/Intel manual.
+# movsx Eb Gv, 0x0f 0xb6
+# movsx Ew Gy, 0x0f 0xb7
+# Objdump has different names for this instrustion: “movzbw”, “movzbl”, “movzbq”,
+# “movzwl”, “movzwq” depending on operand size.  We describe 32bit versions here
+# and 64bit version can be found in x86-64-instructions.def.
+movzbw Eb Gw, data16 0x0f 0xb6
+movzbl Eb Gd, 0x0f 0xb6
+movzwl Ew Gd, 0x0f 0xb7
 ######## MUL ####################################################################
 mul E, 0xf6 /4
 ######## NEG ####################################################################
 neg E, 0xf6 /3, lock
 ######## NOP ####################################################################
 nop, 0x90
-#:nop, 0x0f 0x1f /0
+nop Ed, 0x0f 0x1f /0
 ######## NOT ####################################################################
 not E, 0xf6 /2, lock
 ######## OR #####################################################################
@@ -366,7 +402,7 @@ out az oz, 0xef
 outs Xb ob, 0x6e, rep
 outs Xz oz, 0x6f, rep
 ######## PAUSE ##################################################################
-#:pause, 0xf3 0x90
+pause, 0xf3 0x90
 ######## POP ####################################################################
 # “pop” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
@@ -377,17 +413,17 @@ pop rr, 0x58
 #:pop %fs, 0x0f 0xa1
 #:pop %gs, 0x0f 0xa9
 ######## POPCNT #################################################################
-#:popcnt Ev Gv, 0xf3 0x0f 0xb8, Fn0000_0001_ECX_POPCNT
+popcnt Ev Gv, 0xf3 0x0f 0xb8, Fn0000_0001_ECX_POPCNT
 ######## POPF/POPFD/POPFQ #######################################################
 popfw, data16 0x9d
 ######## PREFETCH/PREFETCHW #####################################################
 prefetch Mb, 0x0f 0x0d /0, Fn8000_0001_ECX_3DNowPrefetch
 prefetchw Mb, 0x0f 0x0d /1, Fn8000_0001_ECX_3DNowPrefetch
 ######## PREFETCHlevel ##########################################################
-#:prefetchnta Mb, 0x0f 0x18 /0
-#:prefetch0 Mb, 0x0f 0x18 /1
-#:prefetch1 Mb, 0x0f 0x18 /2
-#:prefetch2 Mb, 0x0f 0x18 /3
+prefetchnta Mb, 0x0f 0x18 /0
+prefetcht0 Mb, 0x0f 0x18 /1
+prefetcht1 Mb, 0x0f 0x18 /2
+prefetcht2 Mb, 0x0f 0x18 /3
 ######## PUSH ###################################################################
 # “push” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
@@ -397,8 +433,8 @@ push Ew, 0x66 0xff /6
 push rr, 0x50
 push Iz, 0x68
 push Ib, 0x6a
-#:pop %fs, 0x0f 0xa0
-#:pop %gs, 0x0f 0xa8
+#:push %fs, 0x0f 0xa0
+#:push %gs, 0x0f 0xa8
 ######## PUSHF/PUSHFD/PUSHFQ ####################################################
 pushfw, data16 0x9c
 ######## RCL ####################################################################
@@ -462,17 +498,17 @@ seto Eb, 0x0f 0x90, Fn0000_0001_EDX_CMOV
 setp Eb, 0x0f 0x9a, Fn0000_0001_EDX_CMOV
 sets Eb, 0x0f 0x98, Fn0000_0001_EDX_CMOV
 ######## SFENCE #################################################################
-#:sfence, 0x0f 0ae 0xf8, Fn0000_0001_EDX_SFENCE
+sfence, 0x0f 0xae 0xf8, Fn0000_0001_EDX_SFENCE
 ######## SHLD ###################################################################
-#:shld Ib Gv Ev, 0x0f 0xa4
-#:shld cb Gv Ev, 0x0f 0xa5
+shld Ib Gv Ev, 0x0f 0xa4
+shld cb Gv Ev, 0x0f 0xa5
 ######## SHR ####################################################################
 shr E, 0xd0 /5
 shr cb E, 0xd2 /5
 shr Ib E, 0xc0 /5
 ######## SHRD ###################################################################
-#:shrd Ib Gv Ev, 0x0f 0xac
-#:shrd cb Gv Ev, 0x0f 0xad
+shrd Ib Gv Ev, 0x0f 0xac
+shrd cb Gv Ev, 0x0f 0xad
 ######## SLWPCB #################################################################
 #$:slwpcb
 ######## STC ####################################################################
@@ -497,11 +533,11 @@ test I E, 0xf6 /0
 # test I E, 0xf6 /1
 test G E, 0x84
 ######## TZCNT ##################################################################
-#:tzcnt Ev Gv, 0xf3 0x0f 0xbc, Fn0000_0007_EBX_x0_BMI
+tzcnt Ev Gv, 0xf3 0x0f 0xbc, Fn0000_0007_EBX_x0_BMI
 ######## TZMSK ##################################################################
 #$:tzmsk
 ######## XADD ###################################################################
-#:xadd G E, 0x0f 0xc0, lock
+xadd G E, 0x0f 0xc0, lock
 ######## XCHG ###################################################################
 xchg av rv, 0x90
 xchg G E, 0x86, lock

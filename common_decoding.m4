@@ -197,7 +197,7 @@
   operand_size(64bit, Size64bit)
   operand_size(128bit, Size128bit)
   operand_size(x87, X87)
-  operand_size(mm, MM)
+  operand_size(mmx, MMX)
   operand_size(xmm, XMM)
   operand_size(ymm, YMM)
   operand_size(farptr, FarPtr)
@@ -343,3 +343,7 @@
     operand2 = REG_RAX;
   }
   define(｢operand2_rax｣, ｢@operand2｢_｣rax｣)
+  action operand2_rcx {
+    operand2 = REG_RCX;
+  }
+  define(｢operand2_rcx｣, ｢@operand2｢_｣rcx｣)
