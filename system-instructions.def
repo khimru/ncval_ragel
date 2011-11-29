@@ -1,3 +1,7 @@
+# Copyright (c) 2011 The Native Client Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+#################################################################################
 # This file describes instructions from AMD64 Architecture Programmer’s Manual
 #				 Volume 3: General-Purpose and System Instruction
 #					  Chapter 4: System Instruction Reference

@@ -1,3 +1,7 @@
+# Copyright (c) 2011 The Native Client Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
   # Relative jumps and calls.
   rel8 = any rel8_operand;
   rel16 = any{2} rel16_operand;
