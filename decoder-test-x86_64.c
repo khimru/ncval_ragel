@@ -326,7 +326,11 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   }
 #undef print_name
   if ((strcmp(instruction->name, "nop") || instruction->operands_count != 0) &&
-      strcmp(instruction->name, "fwait")) {
+      strcmp(instruction->name, "fwait") &&
+      strcmp(instruction->name, "popq   %fs") &&
+      strcmp(instruction->name, "popq   %gs") &&
+      strcmp(instruction->name, "pushq  %fs") &&
+      strcmp(instruction->name, "pushq  %gs")) {
     while (shown_name < 6) {
       printf(" ");
       shown_name++;

@@ -71,7 +71,7 @@
 #   moved before REX prefix if it's allowed).  Note: data16, repnz, and rep/repz
 #   opcodes will set appropriate flags while 0x66, 0xf2, and 0xf3 will not.
 #   If part of the opcode is stored in ModRM byte then opcode should include the
-#   usual “/0”, “/1”, …, “/0” “bytes”.  Use /s “byte” for segment register
+#   usual “/0”, “/1”, …, “/7” “bytes”.  Use /s “byte” for segment register
 #   operand: it'll make only registers 0..5 valid (there are only six segment
 #   registers in total).
 #################################################################################
@@ -389,7 +389,7 @@ mul E, 0xf6 /4
 neg E, 0xf6 /3, lock
 ######## NOP ####################################################################
 nop, 0x90
-nop Ed, 0x0f 0x1f /0
+nop Ev, 0x0f 0x1f /0
 ######## NOT ####################################################################
 not E, 0xf6 /2, lock
 ######## OR #####################################################################
