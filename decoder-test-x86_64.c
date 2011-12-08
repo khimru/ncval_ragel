@@ -61,12 +61,15 @@ void ReadFile(const char *filename, uint8_t **result, size_t *result_size) {
 }
 
 struct DecodeState {
+  uint8_t width;
   const uint8_t *fwait; /* Set to true if fwait is detetected. */
   const uint8_t *offset;
 };
 
 void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 			struct instruction *instruction, void *userdata) {
+  const char *instruction_name;
+  unsigned char operands_count;
   const uint8_t *p;
   char delimeter = ' ';
   int print_rip = FALSE;
@@ -91,7 +94,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   } else if (((struct DecodeState *)userdata)->fwait) {
     if ((begin[0] < 0xd8) || (begin[0] > 0xdf)) {
       while ((((struct DecodeState *)userdata)->fwait) < begin) {
-	printf("%8x:\t                   \tfwait\n",
+	printf("%*x:\t                   \tfwait\n",
+	  ((struct DecodeState *)userdata)->width,
 	  (((struct DecodeState *)userdata)->fwait++) -
 				     (((struct DecodeState *)userdata)->offset));
       }
@@ -100,7 +104,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     }
     ((struct DecodeState *)userdata)->fwait = FALSE;
   }
-  printf("%8x:\t", begin - (((struct DecodeState *)userdata)->offset));
+  printf("%*x:\t", ((struct DecodeState *)userdata)->width,
+		   begin - (((struct DecodeState *)userdata)->offset));
   for (p = begin; p < begin + 7; p++) {
     if (p >= end) {
       printf("   ");
@@ -109,14 +114,264 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     }
   }
   printf("\t");
-  if (instruction->operands_count > 0) {
+  instruction_name = instruction->name;
+  operands_count = instruction->operands_count;
+  /* “cmppd” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x7. */
+  if (!strcmp(instruction_name, "cmppd")) {
+    if (instruction->imm[0] < 0x08) {
+      switch (instruction->imm[0]) {
+	case 0x00: instruction_name = "cmpeqpd"; break;
+	case 0x01: instruction_name = "cmpltpd"; break;
+	case 0x02: instruction_name = "cmplepd"; break;
+	case 0x03: instruction_name = "cmpunordpd"; break;
+	case 0x04: instruction_name = "cmpneqpd"; break;
+	case 0x05: instruction_name = "cmpnltpd"; break;
+	case 0x06: instruction_name = "cmpnlepd"; break;
+	case 0x07: instruction_name = "cmpordpd"; break;
+      }
+      operands_count--;
+    }
+  }
+  /* “vcmppd” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x1f. */
+  if (!strcmp(instruction_name, "vcmppd")) {
+    if (instruction->imm[0] < 0x20) {
+      switch (instruction->imm[0]) {
+	case 0x00: instruction_name = "vcmpeqpd"; break;
+	case 0x01: instruction_name = "vcmpltpd"; break;
+	case 0x02: instruction_name = "vcmplepd"; break;
+	case 0x03: instruction_name = "vcmpunordpd"; break;
+	case 0x04: instruction_name = "vcmpneqpd"; break;
+	case 0x05: instruction_name = "vcmpnltpd"; break;
+	case 0x06: instruction_name = "vcmpnlepd"; break;
+	case 0x07: instruction_name = "vcmpordpd"; break;
+	case 0x08: instruction_name = "vcmpeq_uqpd"; break;
+	case 0x09: instruction_name = "vcmpngepd"; break;
+	case 0x0a: instruction_name = "vcmpngtpd"; break;
+	case 0x0b: instruction_name = "vcmpfalsepd"; break;
+	case 0x0c: instruction_name = "vcmpneq_oqpd"; break;
+	case 0x0d: instruction_name = "vcmpgepd"; break;
+	case 0x0e: instruction_name = "vcmpgtpd"; break;
+	case 0x0f: instruction_name = "vcmptruepd"; break;
+	case 0x10: instruction_name = "vcmpeq_ospd"; break;
+	case 0x11: instruction_name = "vcmplt_oqpd"; break;
+	case 0x12: instruction_name = "vcmple_oqpd"; break;
+	case 0x13: instruction_name = "vcmpunord_spd"; break;
+	case 0x14: instruction_name = "vcmpneq_uspd"; break;
+	case 0x15: instruction_name = "vcmpnlt_uqpd"; break;
+	case 0x16: instruction_name = "vcmpnle_uqpd"; break;
+	case 0x17: instruction_name = "vcmpord_spd"; break;
+	case 0x18: instruction_name = "vcmpeq_uspd"; break;
+	case 0x19: instruction_name = "vcmpnge_uqpd"; break;
+	case 0x1a: instruction_name = "vcmpngt_uqpd"; break;
+	case 0x1b: instruction_name = "vcmpfalse_ospd"; break;
+	case 0x1c: instruction_name = "vcmpneq_ospd"; break;
+	case 0x1d: instruction_name = "vcmpge_oqpd"; break;
+	case 0x1e: instruction_name = "vcmpgt_oqpd"; break;
+	case 0x1f: instruction_name = "vcmptrue_uspd"; break;
+      }
+      operands_count--;
+    }
+  }
+  /* “cmpps” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x7. */
+  if (!strcmp(instruction_name, "cmpps")) {
+    if (instruction->imm[0] < 0x08) {
+      switch (instruction->imm[0]) {
+	case 0x00: instruction_name = "cmpeqps"; break;
+	case 0x01: instruction_name = "cmpltps"; break;
+	case 0x02: instruction_name = "cmpleps"; break;
+	case 0x03: instruction_name = "cmpunordps"; break;
+	case 0x04: instruction_name = "cmpneqps"; break;
+	case 0x05: instruction_name = "cmpnltps"; break;
+	case 0x06: instruction_name = "cmpnleps"; break;
+	case 0x07: instruction_name = "cmpordps"; break;
+      }
+      operands_count--;
+    }
+  }
+  /* “vcmpps” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x1f. */
+  if (!strcmp(instruction_name, "vcmpps")) {
+    if (instruction->imm[0] < 0x20) {
+      switch (instruction->imm[0]) {
+	case 0x00: instruction_name = "vcmpeqps"; break;
+	case 0x01: instruction_name = "vcmpltps"; break;
+	case 0x02: instruction_name = "vcmpleps"; break;
+	case 0x03: instruction_name = "vcmpunordps"; break;
+	case 0x04: instruction_name = "vcmpneqps"; break;
+	case 0x05: instruction_name = "vcmpnltps"; break;
+	case 0x06: instruction_name = "vcmpnleps"; break;
+	case 0x07: instruction_name = "vcmpordps"; break;
+	case 0x08: instruction_name = "vcmpeq_uqps"; break;
+	case 0x09: instruction_name = "vcmpngeps"; break;
+	case 0x0a: instruction_name = "vcmpngtps"; break;
+	case 0x0b: instruction_name = "vcmpfalseps"; break;
+	case 0x0c: instruction_name = "vcmpneq_oqps"; break;
+	case 0x0d: instruction_name = "vcmpgeps"; break;
+	case 0x0e: instruction_name = "vcmpgtps"; break;
+	case 0x0f: instruction_name = "vcmptrueps"; break;
+	case 0x10: instruction_name = "vcmpeq_osps"; break;
+	case 0x11: instruction_name = "vcmplt_oqps"; break;
+	case 0x12: instruction_name = "vcmple_oqps"; break;
+	case 0x13: instruction_name = "vcmpunord_sps"; break;
+	case 0x14: instruction_name = "vcmpneq_usps"; break;
+	case 0x15: instruction_name = "vcmpnlt_uqps"; break;
+	case 0x16: instruction_name = "vcmpnle_uqps"; break;
+	case 0x17: instruction_name = "vcmpord_sps"; break;
+	case 0x18: instruction_name = "vcmpeq_usps"; break;
+	case 0x19: instruction_name = "vcmpnge_uqps"; break;
+	case 0x1a: instruction_name = "vcmpngt_uqps"; break;
+	case 0x1b: instruction_name = "vcmpfalse_osps"; break;
+	case 0x1c: instruction_name = "vcmpneq_osps"; break;
+	case 0x1d: instruction_name = "vcmpge_oqps"; break;
+	case 0x1e: instruction_name = "vcmpgt_oqps"; break;
+	case 0x1f: instruction_name = "vcmptrue_usps"; break;
+      }
+      operands_count--;
+    }
+  }
+  /* “cmpsd” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x7. */
+  if (!strcmp(instruction_name, "cmpsd")) {
+    if (instruction->imm[0] < 0x08) {
+      switch (instruction->imm[0]) {
+	case 0x00: instruction_name = "cmpeqsd"; break;
+	case 0x01: instruction_name = "cmpltsd"; break;
+	case 0x02: instruction_name = "cmplesd"; break;
+	case 0x03: instruction_name = "cmpunordsd"; break;
+	case 0x04: instruction_name = "cmpneqsd"; break;
+	case 0x05: instruction_name = "cmpnltsd"; break;
+	case 0x06: instruction_name = "cmpnlesd"; break;
+	case 0x07: instruction_name = "cmpordsd"; break;
+      }
+      operands_count--;
+    }
+  }
+  /* “vcmpsd” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x1f. */
+  if (!strcmp(instruction_name, "vcmpsd")) {
+    if (instruction->imm[0] < 0x20) {
+      switch (instruction->imm[0]) {
+	case 0x00: instruction_name = "vcmpeqsd"; break;
+	case 0x01: instruction_name = "vcmpltsd"; break;
+	case 0x02: instruction_name = "vcmplesd"; break;
+	case 0x03: instruction_name = "vcmpunordsd"; break;
+	case 0x04: instruction_name = "vcmpneqsd"; break;
+	case 0x05: instruction_name = "vcmpnltsd"; break;
+	case 0x06: instruction_name = "vcmpnlesd"; break;
+	case 0x07: instruction_name = "vcmpordsd"; break;
+	case 0x08: instruction_name = "vcmpeq_uqsd"; break;
+	case 0x09: instruction_name = "vcmpngesd"; break;
+	case 0x0a: instruction_name = "vcmpngtsd"; break;
+	case 0x0b: instruction_name = "vcmpfalsesd"; break;
+	case 0x0c: instruction_name = "vcmpneq_oqsd"; break;
+	case 0x0d: instruction_name = "vcmpgesd"; break;
+	case 0x0e: instruction_name = "vcmpgtsd"; break;
+	case 0x0f: instruction_name = "vcmptruesd"; break;
+	case 0x10: instruction_name = "vcmpeq_ossd"; break;
+	case 0x11: instruction_name = "vcmplt_oqsd"; break;
+	case 0x12: instruction_name = "vcmple_oqsd"; break;
+	case 0x13: instruction_name = "vcmpunord_ssd"; break;
+	case 0x14: instruction_name = "vcmpneq_ussd"; break;
+	case 0x15: instruction_name = "vcmpnlt_uqsd"; break;
+	case 0x16: instruction_name = "vcmpnle_uqsd"; break;
+	case 0x17: instruction_name = "vcmpord_ssd"; break;
+	case 0x18: instruction_name = "vcmpeq_ussd"; break;
+	case 0x19: instruction_name = "vcmpnge_uqsd"; break;
+	case 0x1a: instruction_name = "vcmpngt_uqsd"; break;
+	case 0x1b: instruction_name = "vcmpfalse_ossd"; break;
+	case 0x1c: instruction_name = "vcmpneq_ossd"; break;
+	case 0x1d: instruction_name = "vcmpge_oqsd"; break;
+	case 0x1e: instruction_name = "vcmpgt_oqsd"; break;
+	case 0x1f: instruction_name = "vcmptrue_ussd"; break;
+      }
+      operands_count--;
+    }
+  }
+  /* “cmpss” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x7. */
+  if (!strcmp(instruction_name, "cmpss")) {
+    if (instruction->imm[0] < 0x08) {
+      switch (instruction->imm[0]) {
+	case 0x00: instruction_name = "cmpeqss"; break;
+	case 0x01: instruction_name = "cmpltss"; break;
+	case 0x02: instruction_name = "cmpless"; break;
+	case 0x03: instruction_name = "cmpunordss"; break;
+	case 0x04: instruction_name = "cmpneqss"; break;
+	case 0x05: instruction_name = "cmpnltss"; break;
+	case 0x06: instruction_name = "cmpnless"; break;
+	case 0x07: instruction_name = "cmpordss"; break;
+      }
+      operands_count--;
+    }
+  }
+  /* “vcmpss” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x1f. */
+  if (!strcmp(instruction_name, "vcmpss")) {
+    if (instruction->imm[0] < 0x20) {
+      switch (instruction->imm[0]) {
+	case 0x00: instruction_name = "vcmpeqss"; break;
+	case 0x01: instruction_name = "vcmpltss"; break;
+	case 0x02: instruction_name = "vcmpless"; break;
+	case 0x03: instruction_name = "vcmpunordss"; break;
+	case 0x04: instruction_name = "vcmpneqss"; break;
+	case 0x05: instruction_name = "vcmpnltss"; break;
+	case 0x06: instruction_name = "vcmpnless"; break;
+	case 0x07: instruction_name = "vcmpordss"; break;
+	case 0x08: instruction_name = "vcmpeq_uqss"; break;
+	case 0x09: instruction_name = "vcmpngess"; break;
+	case 0x0a: instruction_name = "vcmpngtss"; break;
+	case 0x0b: instruction_name = "vcmpfalsess"; break;
+	case 0x0c: instruction_name = "vcmpneq_oqss"; break;
+	case 0x0d: instruction_name = "vcmpgess"; break;
+	case 0x0e: instruction_name = "vcmpgtss"; break;
+	case 0x0f: instruction_name = "vcmptruess"; break;
+	case 0x10: instruction_name = "vcmpeq_osss"; break;
+	case 0x11: instruction_name = "vcmplt_oqss"; break;
+	case 0x12: instruction_name = "vcmple_oqss"; break;
+	case 0x13: instruction_name = "vcmpunord_sss"; break;
+	case 0x14: instruction_name = "vcmpneq_usss"; break;
+	case 0x15: instruction_name = "vcmpnlt_uqss"; break;
+	case 0x16: instruction_name = "vcmpnle_uqss"; break;
+	case 0x17: instruction_name = "vcmpord_sss"; break;
+	case 0x18: instruction_name = "vcmpeq_usss"; break;
+	case 0x19: instruction_name = "vcmpnge_uqss"; break;
+	case 0x1a: instruction_name = "vcmpngt_uqss"; break;
+	case 0x1b: instruction_name = "vcmpfalse_osss"; break;
+	case 0x1c: instruction_name = "vcmpneq_osss"; break;
+	case 0x1d: instruction_name = "vcmpge_oqss"; break;
+	case 0x1e: instruction_name = "vcmpgt_oqss"; break;
+	case 0x1f: instruction_name = "vcmptrue_usss"; break;
+      }
+      operands_count--;
+    }
+  }
+  /* “pclmulqdq” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x3. */
+  if (!strcmp(instruction_name, "pclmulqdq")) {
+    if (instruction->imm[0] < 0x04) {
+      switch (instruction->imm[0]) {
+	case 0x00: instruction_name = "pclmullqlqdq"; break;
+	case 0x01: instruction_name = "pclmulhqlqdq"; break;
+	case 0x02: instruction_name = "pclmullqhqdq"; break;
+	case 0x03: instruction_name = "pclmulhqhqdq"; break;
+      }
+      operands_count--;
+    }
+  }
+  /* “vpclmulqdq” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x3. */
+  if (!strcmp(instruction_name, "vpclmulqdq")) {
+    if (instruction->imm[0] < 0x04) {
+      switch (instruction->imm[0]) {
+	case 0x00: instruction_name = "vpclmullqlqdq"; break;
+	case 0x01: instruction_name = "vpclmulhqlqdq"; break;
+	case 0x02: instruction_name = "vpclmullqhqdq"; break;
+	case 0x03: instruction_name = "vpclmulhqhqdq"; break;
+      }
+      operands_count--;
+    }
+  }
+  if (operands_count > 0) {
     show_name_suffix = TRUE;
-    for (i=instruction->operands_count-1;i>=0;i--) {
+    for (i=operands_count-1;i>=0;i--) {
       if (instruction->operands[i].name == JMP_TO) {
         /* Most control flow instructions never use suffixes, but “call” and
            “jmp” do... unless byte offset is used.  */
-	if ((!strcmp(instruction->name, "call")) ||
-	    (!strcmp(instruction->name, "jmp"))) {
+	if ((!strcmp(instruction_name, "call")) ||
+	    (!strcmp(instruction_name, "jmp"))) {
 	  switch (instruction->operands[i].type) {
 	    case OperandSize8bit: show_name_suffix = FALSE; break;
 	    case OperandSize16bit: show_name_suffix = 'w'; break;
@@ -143,13 +398,17 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case OperandFloatSize80bit:show_name_suffix = 't'; break;
 	    case OperandX87Size32bit: show_name_suffix = 'l'; break;
 	    case OperandX87Size64bit: show_name_suffix = 'L'; break;
+	    case OperandSize2bit:
 	    case OperandX87Size16bit:
 	    case OperandX87BCD:
 	    case OperandX87ENV:
 	    case OperandX87STATE:
 	    case OperandX87MMXXMMSTATE:
 	    case OperandSize128bit:
-	    case OperandFarPtr: 
+	    case OperandSize256bit:
+	    case OperandFarPtr:
+	    case OperandXMM:
+	    case OperandYMM:
 	    case OperandSelector: show_name_suffix = FALSE; break;
 	    default: assert(FALSE);
 	  }
@@ -157,22 +416,22 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       } else {
 	/* First argument of “rcl”/“rcr”/“rol”/“ror”/“sar/”“shl”/“shr”
 	   can not be used to determine size of command.  */
-	if (((i != 1) || (strcmp(instruction->name, "rcl") &&
-			  strcmp(instruction->name, "rcr") &&
-			  strcmp(instruction->name, "rol") &&
-			  strcmp(instruction->name, "ror") &&
-			  strcmp(instruction->name, "sal") &&
-			  strcmp(instruction->name, "sar") &&
-			  strcmp(instruction->name, "shl") &&
-			  strcmp(instruction->name, "shr"))) &&
+	if (((i != 1) || (strcmp(instruction_name, "rcl") &&
+			  strcmp(instruction_name, "rcr") &&
+			  strcmp(instruction_name, "rol") &&
+			  strcmp(instruction_name, "ror") &&
+			  strcmp(instruction_name, "sal") &&
+			  strcmp(instruction_name, "sar") &&
+			  strcmp(instruction_name, "shl") &&
+			  strcmp(instruction_name, "shr"))) &&
 	/* Second argument of “crc32” can not be used to determine size of
 	   command.  */
-	    ((i != 0) || strcmp(instruction->name, "crc32"))) {
+	    ((i != 0) || strcmp(instruction_name, "crc32"))) {
 	  show_name_suffix = FALSE;
 	}
 	/* First argument of “crc32” can be used for that but objdump uses
 	   suffix anyway. */
-	if ((i == 1) && (!strcmp(instruction->name, "crc32"))) {
+	if ((i == 1) && (!strcmp(instruction_name, "crc32"))) {
 	  switch (instruction->operands[i].type) {
 	    case OperandSize8bit: show_name_suffix = 'b'; break;
 	    case OperandSize16bit: show_name_suffix = 'w'; break;
@@ -209,6 +468,35 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       }
     }
   }
+  if ((!strcmp(instruction_name, "cvtsi2sd") ||
+       !strcmp(instruction_name, "cvtsi2ss")) &&
+      instruction->operands[1].name == REG_RM) {
+    if (instruction->operands[1].type == OperandSize32bit) {
+      show_name_suffix = 'l';
+    } else {
+      show_name_suffix = 'q';
+    }
+  }
+  if ((!strcmp(instruction_name, "vcvtpd2dq") ||
+       !strcmp(instruction_name, "vcvtpd2ps") ||
+       !strcmp(instruction_name, "vcvttpd2dq") ||
+       !strcmp(instruction_name, "vcvttpd2ps")) &&
+      instruction->operands[1].name == REG_RM) {
+    if (instruction->operands[1].type == OperandXMM) {
+      show_name_suffix = 'x';
+    } else {
+      show_name_suffix = 'y';
+    }
+  }
+  if ((!strcmp(instruction_name, "vcvtsi2sd") ||
+       !strcmp(instruction_name, "vcvtsi2ss")) &&
+      instruction->operands[2].name == REG_RM) {
+    if (instruction->operands[2].type == OperandSize32bit) {
+      show_name_suffix = 'l';
+    } else {
+      show_name_suffix = 'q';
+    }
+  }
   if (instruction->prefix.lock) {
     print_name("lock ");
   }
@@ -217,9 +505,9 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   }
   if (instruction->prefix.repz) {
     /* This prefix is “rep” for “ins”, “movs”, and “outs”, “repz” otherwise.  */
-    if ((!strcmp(instruction->name, "ins")) ||
-	(!strcmp(instruction->name, "movs")) ||
-	(!strcmp(instruction->name, "outs"))) {
+    if ((!strcmp(instruction_name, "ins")) ||
+	(!strcmp(instruction_name, "movs")) ||
+	(!strcmp(instruction_name, "outs"))) {
       print_name("rep ");
     } else {
       print_name("repz ");
@@ -229,62 +517,62 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     /* First argument of “crc32”/“rcl”/“rcr”/“rol”/“ror”/“sar”/“shl”/“shr”
        confuses objdump: it does not show it in this case.  */
     if (show_name_suffix &&
-	((strcmp(instruction->name, "crc32") &&
-	  strcmp(instruction->name, "rcl") &&
-	  strcmp(instruction->name, "rcr") &&
-	  strcmp(instruction->name, "rol") &&
-	  strcmp(instruction->name, "ror") &&
-	  strcmp(instruction->name, "sal") &&
-	  strcmp(instruction->name, "sar") &&
-	  strcmp(instruction->name, "shl") &&
-	  strcmp(instruction->name, "shr")) ||
+	((strcmp(instruction_name, "crc32") &&
+	  strcmp(instruction_name, "rcl") &&
+	  strcmp(instruction_name, "rcr") &&
+	  strcmp(instruction_name, "rol") &&
+	  strcmp(instruction_name, "ror") &&
+	  strcmp(instruction_name, "sal") &&
+	  strcmp(instruction_name, "sar") &&
+	  strcmp(instruction_name, "shl") &&
+	  strcmp(instruction_name, "shr")) ||
 	 (instruction->operands[1].name > REG_R15))) {
       print_name("rex ");
     }
   }
   if ((instruction->prefix.rex & 0x08) == 0x08) {
     /* rex.W is ignored by “in”/“out”, and “pop”/“push” commands.  */
-    if ((!strcmp(instruction->name, "in")) ||
-	(!strcmp(instruction->name, "ins")) ||
-	(!strcmp(instruction->name, "out")) ||
-	(!strcmp(instruction->name, "outs")) ||
-	(!strcmp(instruction->name, "pop")) ||
-	(!strcmp(instruction->name, "push"))) {
+    if ((!strcmp(instruction_name, "in")) ||
+	(!strcmp(instruction_name, "ins")) ||
+	(!strcmp(instruction_name, "out")) ||
+	(!strcmp(instruction_name, "outs")) ||
+	(!strcmp(instruction_name, "pop")) ||
+	(!strcmp(instruction_name, "push"))) {
       rex_bits = -1;
     }
   }
   if (show_name_suffix == 'b') {
     /* “cflush", “int”, “invlpg”, “prefetch*”, and “setcc” never use suffix. */
-    if ((!strcmp(instruction->name, "clflush")) ||
-	(!strcmp(instruction->name, "int")) ||
-	(!strcmp(instruction->name, "invlpg")) ||
-	(!strcmp(instruction->name, "prefetch")) ||
-	(!strcmp(instruction->name, "prefetchnta")) ||
-	(!strcmp(instruction->name, "prefetcht0")) ||
-	(!strcmp(instruction->name, "prefetcht1")) ||
-	(!strcmp(instruction->name, "prefetcht2")) ||
-	(!strcmp(instruction->name, "prefetchw")) ||
-	(!strcmp(instruction->name, "seta")) ||
-	(!strcmp(instruction->name, "setae")) ||
-	(!strcmp(instruction->name, "setbe")) ||
-	(!strcmp(instruction->name, "setb")) ||
-	(!strcmp(instruction->name, "sete")) ||
-	(!strcmp(instruction->name, "setg")) ||
-	(!strcmp(instruction->name, "setge")) ||
-	(!strcmp(instruction->name, "setle")) ||
-	(!strcmp(instruction->name, "setl")) ||
-	(!strcmp(instruction->name, "setne")) ||
-	(!strcmp(instruction->name, "setno")) ||
-	(!strcmp(instruction->name, "setnp")) ||
-	(!strcmp(instruction->name, "setns")) ||
-	(!strcmp(instruction->name, "seto")) ||
-	(!strcmp(instruction->name, "setp")) ||
-	(!strcmp(instruction->name, "sets"))) {
+    if ((!strcmp(instruction_name, "clflush")) ||
+	(!strcmp(instruction_name, "int")) ||
+	(!strcmp(instruction_name, "invlpg")) ||
+	(!strcmp(instruction_name, "prefetch")) ||
+	(!strcmp(instruction_name, "prefetchnta")) ||
+	(!strcmp(instruction_name, "prefetcht0")) ||
+	(!strcmp(instruction_name, "prefetcht1")) ||
+	(!strcmp(instruction_name, "prefetcht2")) ||
+	(!strcmp(instruction_name, "prefetchw")) ||
+	(!strcmp(instruction_name, "seta")) ||
+	(!strcmp(instruction_name, "setae")) ||
+	(!strcmp(instruction_name, "setbe")) ||
+	(!strcmp(instruction_name, "setb")) ||
+	(!strcmp(instruction_name, "sete")) ||
+	(!strcmp(instruction_name, "setg")) ||
+	(!strcmp(instruction_name, "setge")) ||
+	(!strcmp(instruction_name, "setle")) ||
+	(!strcmp(instruction_name, "setl")) ||
+	(!strcmp(instruction_name, "setne")) ||
+	(!strcmp(instruction_name, "setno")) ||
+	(!strcmp(instruction_name, "setnp")) ||
+	(!strcmp(instruction_name, "setns")) ||
+	(!strcmp(instruction_name, "seto")) ||
+	(!strcmp(instruction_name, "setp")) ||
+	(!strcmp(instruction_name, "sets"))) {
       show_name_suffix = FALSE;
     /* Instruction enter accepts two immediates: word and byte. But
        objdump always uses suffix “q”. This is supremely strange, but
        we want to match objdump exactly, so... here goes.  */
-    } else if (!strcmp(instruction->name, "enter")) {
+    } else if (!strcmp(instruction_name, "enter")) {
       show_name_suffix = 'q';
     }
   }
@@ -293,55 +581,61 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
        “pushw $1” yet “68 01 00 00 00” as "pushq $1" again.  This makes no
        sense whatsoever so we'll just hack around here to make sure we
        produce objdump-compatible output.  */
-    if (!strcmp(instruction->name, "push")) {
+    if (!strcmp(instruction_name, "push")) {
       show_name_suffix = 'q';
     }
   }
   if (show_name_suffix == 'w') {
     /* “lldt”, “[ls]msw”, “lret”, “ltr”, and “ver[rw]” newer use suffixes at
        all.  */
-    if ((!strcmp(instruction->name, "lldt")) ||
-	(!strcmp(instruction->name, "lmsw")) ||
-	(!strcmp(instruction->name, "lret")) ||
-	(!strcmp(instruction->name, "ltr")) ||
-	(!strcmp(instruction->name, "smsw")) ||
-	(!strcmp(instruction->name, "verr")) ||
-	(!strcmp(instruction->name, "verw"))) {
+    if ((!strcmp(instruction_name, "lldt")) ||
+	(!strcmp(instruction_name, "lmsw")) ||
+	(!strcmp(instruction_name, "lret")) ||
+	(!strcmp(instruction_name, "ltr")) ||
+	(!strcmp(instruction_name, "smsw")) ||
+	(!strcmp(instruction_name, "verr")) ||
+	(!strcmp(instruction_name, "verw"))) {
        show_name_suffix = FALSE;
     /* “callw”/“jmpw” already includes suffix in the nanme.  */
-    } else if ((!strcmp(instruction->name, "callw")) ||
-	       (!strcmp(instruction->name, "jmpw"))) {
+    } else if ((!strcmp(instruction_name, "callw")) ||
+	       (!strcmp(instruction_name, "jmpw"))) {
       show_name_suffix = FALSE;
     /* “ret” always uses suffix “q” no matter what.  */
-    } else if (!strcmp(instruction->name, "ret")) {
+    } else if (!strcmp(instruction_name, "ret")) {
       show_name_suffix = 'q';
     }
   }
   if ((show_name_suffix == 'w') || (show_name_suffix == 'l')) {
     /* “sldt” and “str” newer uses suffixes at all.  */
-    if ((!strcmp(instruction->name, "sldt")) ||
-	(!strcmp(instruction->name, "str"))) {
-       show_name_suffix = FALSE;
+    if ((!strcmp(instruction_name, "sldt")) ||
+	(!strcmp(instruction_name, "str"))) {
+      show_name_suffix = FALSE;
     }
   }
   if (show_name_suffix == 'l') {
     /* “popl” does not exist, only “popq” do.  */
-    if (!strcmp(instruction->name, "pop")) {
-       show_name_suffix = 'q';
+    if (!strcmp(instruction_name, "pop")) {
+      show_name_suffix = 'q';
+    } else if (!strcmp(instruction_name, "ldmxcsr") ||
+	       !strcmp(instruction_name, "stmxcsr") ||
+	       !strcmp(instruction_name, "vldmxcsr") ||
+	       !strcmp(instruction_name, "vstmxcsr")) {
+      show_name_suffix = FALSE;
     }
   }
   if (show_name_suffix == 'q') {
     /* “callq”,“cmpxchg8b”/“jmpq” already include suffix in the nanme.  */
-    if ((!strcmp(instruction->name, "callq")) ||
-	(!strcmp(instruction->name, "cmpxchg8b")) ||
-	(!strcmp(instruction->name, "jmpq"))) {
+    if ((!strcmp(instruction_name, "callq")) ||
+	(!strcmp(instruction_name, "cmpxchg8b")) ||
+	(!strcmp(instruction_name, "jmpq"))) {
        show_name_suffix = FALSE;
     }
   }
   i = (instruction->prefix.rex & 0x01) +
       ((instruction->prefix.rex & 0x02) >> 1) +
       ((instruction->prefix.rex & 0x04) >> 2);
-  if (!((i == rex_bits) ||
+  if (instruction->prefix.rex &&
+      !((i == rex_bits) ||
 	(maybe_rex_bits &&
 	 (instruction->prefix.rex & 0x01) && (i == rex_bits + 1)))) {
     print_name("rex.");
@@ -359,8 +653,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     }
     print_name(" ");
   }
-  printf("%s", instruction->name);
-  shown_name += strlen(instruction->name);
+  printf("%s", instruction_name);
+  shown_name += strlen(instruction_name);
   if (show_name_suffix) {
     if (show_name_suffix == 'L') {
       print_name("ll");
@@ -369,37 +663,37 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       shown_name++;
     }
   }
-  if (!strcmp(instruction->name, "mov")) {
+  if (!strcmp(instruction_name, "mov")) {
     if ((instruction->operands[1].name == REG_IMM) &&
        (instruction->operands[1].type == OperandSize64bit)) {
       print_name("abs");
     }
   }
 #undef print_name
-  if ((strcmp(instruction->name, "nop") || instruction->operands_count != 0) &&
-      strcmp(instruction->name, "fwait") &&
-      strcmp(instruction->name, "popq   %fs") &&
-      strcmp(instruction->name, "popq   %gs") &&
-      strcmp(instruction->name, "pushq  %fs") &&
-      strcmp(instruction->name, "pushq  %gs")) {
+  if ((strcmp(instruction_name, "nop") || operands_count != 0) &&
+      strcmp(instruction_name, "fwait") &&
+      strcmp(instruction_name, "popq   %fs") &&
+      strcmp(instruction_name, "popq   %gs") &&
+      strcmp(instruction_name, "pushq  %fs") &&
+      strcmp(instruction_name, "pushq  %gs")) {
     while (shown_name < 6) {
       printf(" ");
       shown_name++;
     }
-    if (instruction->operands_count == 0) {
+    if (operands_count == 0) {
       printf(" ");
     }
   }
-  for (i=instruction->operands_count-1;i>=0;i--) {
+  for (i=operands_count-1;i>=0;i--) {
     printf("%c", delimeter);
-    if ((!strcmp(instruction->name, "callw")) ||
-	(!strcmp(instruction->name, "callq")) ||
-	(!strcmp(instruction->name, "jmpw")) ||
-	(!strcmp(instruction->name, "jmpq")) ||
-	(!strcmp(instruction->name, "ljmpw")) ||
-	(!strcmp(instruction->name, "ljmpq")) ||
-	(!strcmp(instruction->name, "lcallw")) ||
-	(!strcmp(instruction->name, "lcallq"))) {
+    if ((!strcmp(instruction_name, "callw")) ||
+	(!strcmp(instruction_name, "callq")) ||
+	(!strcmp(instruction_name, "jmpw")) ||
+	(!strcmp(instruction_name, "jmpq")) ||
+	(!strcmp(instruction_name, "ljmpw")) ||
+	(!strcmp(instruction_name, "ljmpq")) ||
+	(!strcmp(instruction_name, "lcallw")) ||
+	(!strcmp(instruction_name, "lcallq"))) {
       printf("*");
     }
     /* Dirty hack: both AMD manual and Intel manual agree that mov from general
@@ -421,7 +715,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize64bit: printf("%%rax"); break;
 	case OperandST: printf("%%st(0)"); break;
 	case OperandMMX: printf("%%mm0"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm0"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm0"); break;
 	case OperandSegmentRegister: printf("%%es"); break;
 	case OperandControlRegister: printf("%%cr0"); break;
 	case OperandDebugRegister: printf("%%db0"); break;
@@ -435,7 +734,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize64bit: printf("%%rcx"); break;
 	case OperandST: printf("%%st(1)"); break;
 	case OperandMMX: printf("%%mm1"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm1"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm1"); break;
 	case OperandSegmentRegister: printf("%%cs"); break;
 	case OperandControlRegister: printf("%%cr1"); break;
 	case OperandDebugRegister: printf("%%db1"); break;
@@ -449,7 +753,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize64bit: printf("%%rdx"); break;
 	case OperandST: printf("%%st(2)"); break;
 	case OperandMMX: printf("%%mm2"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm2"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm2"); break;
 	case OperandSegmentRegister: printf("%%ss"); break;
 	case OperandControlRegister: printf("%%cr2"); break;
 	case OperandDebugRegister: printf("%%db2"); break;
@@ -463,7 +772,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize64bit: printf("%%rbx"); break;
 	case OperandST: printf("%%st(3)"); break;
 	case OperandMMX: printf("%%mm3"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm3"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm3"); break;
 	case OperandSegmentRegister: printf("%%ds"); break;
 	case OperandControlRegister: printf("%%cr3"); break;
 	case OperandDebugRegister: printf("%%db3"); break;
@@ -481,7 +795,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize64bit: printf("%%rsp"); break;
 	case OperandST: printf("%%st(4)"); break;
 	case OperandMMX: printf("%%mm4"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm4"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm4"); break;
 	case OperandSegmentRegister: printf("%%fs"); break;
 	case OperandControlRegister: printf("%%cr4"); break;
 	case OperandDebugRegister: printf("%%db4"); break;
@@ -499,7 +818,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize64bit: printf("%%rbp"); break;
 	case OperandST: printf("%%st(5)"); break;
 	case OperandMMX: printf("%%mm5"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm5"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm5"); break;
 	case OperandSegmentRegister: printf("%%gs"); break;
 	case OperandControlRegister: printf("%%cr5"); break;
 	case OperandDebugRegister: printf("%%db5"); break;
@@ -517,7 +841,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize64bit: printf("%%rsi"); break;
 	case OperandST: printf("%%st(6)"); break;
 	case OperandMMX: printf("%%mm6"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm6"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm6"); break;
 	case OperandControlRegister: printf("%%cr6"); break;
 	case OperandDebugRegister: printf("%%db6"); break;
 	default: assert(FALSE);
@@ -534,7 +863,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize64bit: printf("%%rdi"); break;
 	case OperandST: printf("%%st(7)"); break;
 	case OperandMMX: printf("%%mm7"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm7"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm7"); break;
 	case OperandControlRegister: printf("%%cr7"); break;
 	case OperandDebugRegister: printf("%%db7"); break;
 	default: assert(FALSE);
@@ -545,7 +879,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r8w"); break;
 	case OperandSize32bit: printf("%%r8d"); break;
 	case OperandSize64bit: printf("%%r8"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm8"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm8"); break;
 	case OperandControlRegister: printf("%%cr8"); break;
 	default: assert(FALSE);
       }
@@ -555,8 +894,13 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r9w"); break;
 	case OperandSize32bit: printf("%%r9d"); break;
 	case OperandSize64bit: printf("%%r9"); break;
-	case OperandControlRegister: printf("%%cr9"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm9"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm9"); break;
+	case OperandControlRegister: printf("%%cr9"); break;
 	default: assert(FALSE);
       }
       break;
@@ -565,8 +909,13 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r10w"); break;
 	case OperandSize32bit: printf("%%r10d"); break;
 	case OperandSize64bit: printf("%%r10"); break;
-	case OperandControlRegister: printf("%%cr10"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm10"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm10"); break;
+	case OperandControlRegister: printf("%%cr10"); break;
 	default: assert(FALSE);
       }
       break;
@@ -575,7 +924,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r11w"); break;
 	case OperandSize32bit: printf("%%r11d"); break;
 	case OperandSize64bit: printf("%%r11"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm11"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm11"); break;
 	case OperandControlRegister: printf("%%cr11"); break;
 	default: assert(FALSE);
       }
@@ -585,7 +939,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r12w"); break;
 	case OperandSize32bit: printf("%%r12d"); break;
 	case OperandSize64bit: printf("%%r12"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm12"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm12"); break;
 	case OperandControlRegister: printf("%%cr12"); break;
 	default: assert(FALSE);
       }
@@ -595,7 +954,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r13w"); break;
 	case OperandSize32bit: printf("%%r13d"); break;
 	case OperandSize64bit: printf("%%r13"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm13"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm13"); break;
 	case OperandControlRegister: printf("%%cr13"); break;
 	default: assert(FALSE);
       }
@@ -605,7 +969,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r14w"); break;
 	case OperandSize32bit: printf("%%r14d"); break;
 	case OperandSize64bit: printf("%%r14"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm14"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm14"); break;
 	case OperandControlRegister: printf("%%cr14"); break;
 	default: assert(FALSE);
       }
@@ -615,7 +984,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r15w"); break;
 	case OperandSize32bit: printf("%%r15d"); break;
 	case OperandSize64bit: printf("%%r15"); break;
+	case OperandFloatSize32bit:
+	case OperandFloatSize64bit:
+	case OperandSize128bit:
 	case OperandXMM: printf("%%xmm15"); break;
+	case OperandSize256bit:
+	case OperandYMM: printf("%%ymm15"); break;
 	case OperandControlRegister: printf("%%cr15"); break;
 	default: assert(FALSE);
       }
@@ -717,7 +1091,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   printf("\n");
   begin += 7;
   while (begin < end) {
-    printf("%8x:\t", begin - (((struct DecodeState *)userdata)->offset));
+    printf("%*x:\t", ((struct DecodeState *)userdata)->width,
+		     begin - (((struct DecodeState *)userdata)->offset));
     for (p = begin; p < begin + 7; p++) {
       if (p >= end) {
 	printf("\n");
@@ -726,12 +1101,16 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	printf("%02x ", *p);
       }
     }
-    begin += 6;
+    if (p >= end) {
+      printf("\n");
+      return;
+    }
+    begin += 7;
   }
 }
 
 void ProcessError (const uint8_t *ptr, void *userdata) {
-  printf("rejected at %x (byte 0x%02x)\n", ptr - (uint8_t *)userdata, *ptr);
+  printf("rejected at %x (byte 0x%02x)\n", ptr - (((struct DecodeState *)userdata)->offset), *ptr);
 }
 
 int DecodeFile(const char *filename, int repeat_count) {
@@ -757,6 +1136,15 @@ int DecodeFile(const char *filename, int repeat_count) {
 	struct DecodeState state;
 	state.fwait = FALSE;
 	state.offset = data + section->sh_offset - section->sh_addr;
+	if (section->sh_size <= 0xfff) {
+	    state.width = 4;
+	} else if (section->sh_size <= 0xfffffff) {
+	    state.width = 8;
+	} else if (section->sh_size <= 0xfffffffffffLL) {
+	    state.width = 12;
+	} else {
+	    state.width = 16;
+	}
 	CheckBounds(data, data_size,
 		    data + section->sh_offset, section->sh_size);
 	int rc = DecodeChunk(section->sh_addr,
@@ -766,7 +1154,7 @@ int DecodeFile(const char *filename, int repeat_count) {
 	  return rc;
 	} else if (state.fwait) {
 	  while (state.fwait < data + section->sh_offset + section->sh_size) {
-	    printf("%8x:\t                   \tfwait\n",
+	    printf("%*x:\t9b                   \tfwait\n", state.width,
 						   state.fwait++ - state.offset);
 	  }
 	}

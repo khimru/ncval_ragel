@@ -5,7 +5,8 @@ LDFLAGS = -m32 -g
 INST_DEFS = general-purpose-instructions.def \
 	    system-instructions.def \
 	    x86-64-instructions.def \
-	    x87-instructions.def
+	    x87-instructions.def \
+	    xmm-instructions.def
 
 all: decoder-test-x86_64 validator-test-x86_64
 decoder-test-x86_64: decoder-x86_64.o decoder-test-x86_64.o

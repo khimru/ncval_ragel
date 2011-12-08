@@ -13,6 +13,7 @@
   disp64	= any{8} disp64_operand;
 
   # Immediates.
+  imm2 = chartest(｢(c & 0x0c) == 0x00｣) imm2_operand;
   imm8 = any imm8_operand;
   imm16 = any{2} imm16_operand;
   imm32 = any{4} imm32_operand;
@@ -57,6 +58,9 @@
   opcode_7 = chartest(｢(c & 0x38) == 0x38｣);
   # Used for segment operations: there only 6 segment registers.
   opcode_s = chartest(｢(c & 0x38) < 0x30｣);
+  # This is used to move operand name detection after first byte of ModRM.
+  opcode_m = any;
+  opcode_r = any;
 
   # Prefixes.
   data16 = 0x66 data16_prefix;
@@ -73,22 +77,22 @@
   }
   define(｢rex_pfx｣, ｢@rex｢_｣pfx｣)
   REX_NONE = 0x40 rex_pfx;
-  REX_W    = (0x40 | 0x48) rex_pfx;
-  REX_R    = (0x40 | 0x44) rex_pfx;
-  REX_X    = (0x40 | 0x42) rex_pfx;
-  REX_B    = (0x40 | 0x41) rex_pfx;
-  REX_WR   = (0x40 | 0x44 | 0x48 | 0x4C) rex_pfx;
-  REX_WX   = (0x40 | 0x42 | 0x48 | 0x4A) rex_pfx;
-  REX_WB   = (0x40 | 0x41 | 0x48 | 0x49) rex_pfx;
-  REX_RX   = (0x40 | 0x42 | 0x44 | 0x46) rex_pfx;
-  REX_RB   = (0x40 | 0x41 | 0x44 | 0x45) rex_pfx;
-  REX_XB   = (0x40 | 0x41 | 0x42 | 0x43) rex_pfx;
-  REX_WRX  = (0x40 | 0x42 | 0x44 | 0x46 | 0x48 | 0x4A | 0x4C | 0x4E) rex_pfx;
-  REX_WRB  = (0x40 | 0x41 | 0x44 | 0x45 | 0x48 | 0x49 | 0x4C | 0x4D) rex_pfx;
-  REX_WXB  = (0x40 | 0x41 | 0x42 | 0x43 | 0x48 | 0x49 | 0x4A | 0x4B) rex_pfx;
-  REX_RXB  = (0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47) rex_pfx;
-  REX_WRXB = (0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 |
-	      0x48 | 0x49 | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f) rex_pfx;
+  REX_W    = chartest(｢(c & 0xf7) == 0x40｣) rex_pfx;
+  REX_R    = chartest(｢(c & 0xfb) == 0x40｣) rex_pfx;
+  REX_X    = chartest(｢(c & 0xfd) == 0x40｣) rex_pfx;
+  REX_B    = chartest(｢(c & 0xfe) == 0x40｣) rex_pfx;
+  REX_WR   = chartest(｢(c & 0xf3) == 0x40｣) rex_pfx;
+  REX_WX   = chartest(｢(c & 0xf5) == 0x40｣) rex_pfx;
+  REX_WB   = chartest(｢(c & 0xf6) == 0x40｣) rex_pfx;
+  REX_RX   = chartest(｢(c & 0xf9) == 0x40｣) rex_pfx;
+  REX_RB   = chartest(｢(c & 0xfa) == 0x40｣) rex_pfx;
+  REX_XB   = chartest(｢(c & 0xfc) == 0x40｣) rex_pfx;
+  REX_WRX  = chartest(｢(c & 0xf1) == 0x40｣) rex_pfx;
+  REX_WRB  = chartest(｢(c & 0xf2) == 0x40｣) rex_pfx;
+  REX_WXB  = chartest(｢(c & 0xf4) == 0x40｣) rex_pfx;
+  REX_RXB  = chartest(｢(c & 0xf8) == 0x40｣) rex_pfx;
+  REX_WRXB = chartest(｢(c & 0xf0) == 0x40｣) rex_pfx;
+
   rex_w    = REX_W    - REX_NONE;
   rex_r    = REX_R    - REX_NONE;
   rex_x    = REX_X    - REX_NONE;
@@ -105,10 +109,54 @@
   rex_rxb  = REX_RXB  - REX_NONE;
   rex_wrxb = REX_WRXB - REX_NONE;
   REXW_NONE= 0x48 rex_pfx;
-  REXW_R   = (0x48 | 0x4C) rex_pfx;
-  REXW_X   = (0x48 | 0x4A) rex_pfx;
-  REXW_B   = (0x48 | 0x49) rex_pfx;
-  REXW_RX  = (0x48 | 0x4A | 0x4C | 0x4E) rex_pfx;
-  REXW_RB  = (0x48 | 0x49 | 0x4C | 0x4D) rex_pfx;
-  REXW_XB  = (0x48 | 0x49 | 0x4A | 0x4B) rex_pfx;
-  REXW_RXB = (0x48 | 0x49 | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f) rex_pfx;
+  REXW_R   = chartest(｢(c & 0xfb) == 0x48｣) rex_pfx;
+  REXW_X   = chartest(｢(c & 0xfd) == 0x48｣) rex_pfx;
+  REXW_B   = chartest(｢(c & 0xfe) == 0x48｣) rex_pfx;
+  REXW_RX  = chartest(｢(c & 0xf9) == 0x48｣) rex_pfx;
+  REXW_RB  = chartest(｢(c & 0xfa) == 0x48｣) rex_pfx;
+  REXW_XB  = chartest(｢(c & 0xfc) == 0x48｣) rex_pfx;
+  REXW_RXB = chartest(｢(c & 0xf8) == 0x48｣) rex_pfx;
+
+  # VEX/XOP prefix.
+  action vex_pfx {
+    vex_prefix = *p;
+  }
+  define(｢vex_pfx｣, ｢@vex｢_｣pfx｣)
+  # VEX/XOP prefix2.
+  action vex_pfx2 {
+    vex_prefix2 = *p;
+  }
+  define(｢vex_pfx2｣, ｢@vex｢_｣pfx2｣)
+  # VEX/XOP short prefix
+  action vex_pfx_short {
+    /* This emulates two prefixes case. */
+    vex_prefix = (p[0] & 0x80) | 0x61;
+    vex_prefix2 = p[0] & 0x7f;
+  }
+  define(｢vex_pfx_short｣, ｢@vex｢_｣pfx｢_｣short｣)
+
+  define(｢vex_map｣, ｢VEX_$1 = chartest(｢(c & $2) == $2｣) vex_pfx｣)
+  vex_map(NONE, 0xe0);
+  vex_map(R, 0x60);
+  vex_map(X, 0xa0);
+  vex_map(B, 0xc0);
+  vex_map(RX, 0x20);
+  vex_map(RB, 0x40);
+  vex_map(XB, 0x80);
+  vex_map(RXB, 0x00);
+  popdef(｢vex_map｣)
+
+  define(｢vex_map｣, ｢VEX_map$1 = chartest(｢(c & 0x1f) == $2｣)｣)
+  vex_map(｢01｣, 1);
+  vex_map(｢02｣, 2);
+  vex_map(｢03｣, 3);
+  vex_map(｢08｣, 8);
+  vex_map(｢09｣, 9);
+  vex_map(｢0A｣, 10);
+  vex_map(｢00001｣, 1);
+  vex_map(｢00010｣, 2);
+  vex_map(｢00011｣, 3);
+  vex_map(｢01000｣, 8);
+  vex_map(｢01001｣, 9);
+  vex_map(｢01010｣, 10);
+  popdef(｢vex_map｣)

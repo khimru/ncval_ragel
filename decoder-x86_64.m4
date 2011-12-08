@@ -47,6 +47,8 @@
 	repz_prefix = FALSE;
 	branch_not_taken = FALSE;
 	branch_taken = FALSE;
+	vex_prefix = 0xe0;
+	vex_prefix2 = 0x00;
     ｣}
     @{｢
 	switch (disp_type) {
@@ -66,7 +68,8 @@
 	}
 	switch (imm_operand) {
 	  case IMMNONE: instruction.imm[0] = 0; break;
-	  case IMM8: instruction.imm[0] = *imm; break;
+	  case IMM2: instruction.imm[0] = imm[0] & 0x03; break;
+	  case IMM8: instruction.imm[0] = imm[0]; break;
 	  case IMM16: instruction.imm[0] = (int64_t) (imm[0] + 256 * (imm[1]));
 	    break;
 	  case IMM32: instruction.imm[0] = (int64_t)
@@ -80,7 +83,8 @@
 	}
 	switch (imm2_operand) {
 	  case IMMNONE: instruction.imm[1] = 0; break;
-	  case IMM8: instruction.imm[1] = *imm2; break;
+	  case IMM2: instruction.imm[1] = imm2[0] & 0x03; break;
+	  case IMM8: instruction.imm[1] = imm2[0]; break;
 	  case IMM16: instruction.imm[1] = (int64_t)
 	    (imm2[0] + 256 * (imm2[1]));
 	    break;
@@ -118,9 +122,13 @@
 #define operand0_type instruction.operands[0].type
 #define operand1_type instruction.operands[1].type
 #define operand2_type instruction.operands[2].type
+#define operand3_type instruction.operands[3].type
+#define operand4_type instruction.operands[4].type
 #define operand0 instruction.operands[0].name
 #define operand1 instruction.operands[1].name
 #define operand2 instruction.operands[2].name
+#define operand3 instruction.operands[3].name
+#define operand4 instruction.operands[4].name
 #define operands_count instruction.operands_count
 #define instruction_name instruction.name
 
@@ -141,6 +149,7 @@ enum disp_mode {
 
 enum imm_mode {
   IMMNONE,
+  IMM2,
   IMM8,
   IMM16,
   IMM32,
@@ -168,6 +177,7 @@ int DecodeChunk(uint32_t load_addr, uint8_t *data, size_t size,
   const uint8_t *begin;
   const uint8_t *begin_opcode;
   const uint8_t *end_opcode;
+  uint8_t vex_prefix, vex_prefix2;
   enum disp_mode disp_type;
   enum imm_mode imm_operand;
   enum imm_mode imm2_operand;

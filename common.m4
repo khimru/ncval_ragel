@@ -8,10 +8,20 @@ changequote(`｢',`｣')
 ################################################################################
 # ｢unquote｣ just returns arguments without quoting them.  Since m4 expands all
 # arguments it's useful when you want to call define with a constructed name.
+################################################################################
 define(｢unquote｣, ｢$*｣)
 ################################################################################
+# ｢unbrace｣ is used to remove redundant braces when they are not needed.  It
+# accepts one argument it braces and strips them away.
+# For example: ｢unbrace(｢((abc))｣)｣ becomes ｢(abc)｣, but
+#	       ｢unbrace(｢abc｣)｣ becomes ｢abc｣.
+################################################################################
+define(｢unbrace｣, ｢ifelse(｢(｣substr(｢$1｣, 1, decr(decr(len(｢$1｣))))｢)｣, $1,
+			       ｢substr(｢$1｣, 1, decr(decr(len(｢$1｣))))｣, ｢$1｣)｣)
+################################################################################
 # ｢trim｣ removes spurious spaces from the beginning and the end of string
-# For example: ｢trim(｢ 0x10 /3 ｣) becomes ｢0x10 /3｣
+# For example: ｢trim(｢ 0x10 /3 ｣) becomes ｢0x10 /3｣.
+################################################################################
 define(｢trim｣, ｢patsubst(｢$1｣, ｢^ *\([^ ]*.*[^ ]+\) *$｣, ｢\1｣)｣)
 ################################################################################
 # ｢append｣ is used to collect variants of $2 in $1 while avoiding duplicates
@@ -20,6 +30,7 @@ define(｢trim｣, ｢patsubst(｢$1｣, ｢^ *\([^ ]*.*[^ ]+\) *$｣, ｢\1｣)
 #	   append(｢list｣, ｢b,｣)
 #	   append(｢list｣, ｢a,｣)｣
 #   ｢list｣ means ｢a,b,｣
+################################################################################
 define(｢append｣, ｢ifdef(｢append-$1: $2｣, ,
   ｢ifdef(｢$1｣, , ｢define(｢$1｣, )｣)define(｢$1｣,
   defn(｢$1｣)｢$2｣)define(｢append-$1: $2｣, ｢｣)｣)｣)
@@ -27,6 +38,7 @@ define(｢append｣, ｢ifdef(｢append-$1: $2｣, ,
 # ｢split_argument｣ is used to turn arguments separated by spaces to arguments
 # spearated by commas.
 # For example: ｢split_argument( mov  G E )｣ becomes ｢mov,G,E｣.
+################################################################################
 define(｢split_argument｣, ｢ifelse(len(｢$1｣), 0, ,
   substr(｢$1｣, decr(len(｢$1｣))), ｢ ｣,
   ｢split_argument(substr(｢$1｣, 0, decr(len(｢$1｣))))｣, ｢_split_argument(｢$1｣)｣)｣)
@@ -40,6 +52,7 @@ define(｢_split_argument｣,｢ifelse(eval(len(｢$1｣)<2), 1, ｢$1｣,
 # ｢chartest｣ allows you to check character properties and only include, i.e.
 # ones with certain bit set.
 # For example: ｢chartest(｢c >= 40 && c < 44｣)｣ becomes ｢(40|41|42|43)｣.
+################################################################################
 define(｢chartest｣, ｢(pushdef(｢delim｣, ｢｣)_chartest(0,$1)｢｣popdef(｢delim｣))｣)
 define(｢_chartest｣, ｢ifelse(
 	 $1, ｢256｣, ,
@@ -51,7 +64,8 @@ define(｢_chartest｣, ｢ifelse(
 # ｢possible_prefixes｣ is used to generate all posible prefixes permutations.
 # You can use ｢okprefix｣ to filter our bad prefix combinations.
 # For example: ｢possible_prefixes(addr32,lock)｣ becomes
-#              ｢( lock ) | ( addr32 ) | ( addr32 lock ) | ( lock addr32 )｣
+#              ｢( lock ) | ( addr32 ) | ( addr32 lock ) | ( lock addr32 )｣.
+################################################################################
 define(｢possible_prefixes｣, ｢ifelse(｢$#｣, 0, , ｢$1｣, , ,
   ｢(substr(_possible_prefixes(, $@), 3))｣)｣)
 define(｢_possible_prefixes｣, ｢ifelse(
@@ -74,7 +88,8 @@ define(｢ok_prefix｣, 1)
 #		( data16 addr32 ) | ( addr32 data16 ) |
 #		( data16 addr32 lock ) | ( data16 lock addr32 ) |
 #		( addr32 data16 lock ) | ( addr32 lock data16 ) |
-#		( lock data16 addr32 ) | ( lock addr32 data16 )｣
+#		( lock data16 addr32 ) | ( lock addr32 data16 )｣.
+################################################################################
 define(｢one_required_prefix｣, ｢pushdef(｢ok_prefix｣, defn(
   ｢ok_prefix_one_required｣))pushdef(｢_required_prefix｣,
   ｢$1｣)｢｣possible_prefixes($@)｢｣popdef(｢_required_prefix｣)｢｣popdef(
@@ -87,7 +102,7 @@ define(｢ok_prefix_one_required｣, ｢index(｢$1｣, _required_prefix)｣)
 #		( data16 lock ) | ( lock data16 ) |
 #		( data16 lock addr32 ) | ( data16 addr32 lock ) |
 #		( lock data16 addr32 ) | ( lock addr32 data16 ) |
-#		( addr32 data16 lock ) | ( addr32 lock data16 )
+#		( addr32 data16 lock ) | ( addr32 lock data16 ).
 define(｢two_required_prefixes｣, ｢pushdef(｢ok_prefix｣, defn(
   ｢ok_prefix_two_required｣))pushdef(｢_required_prefix_one｣,
   ｢$1｣)pushdef(｢_required_prefix_two｣, ｢$2｣)｢｣possible_prefixes(
@@ -101,7 +116,8 @@ define(｢ok_prefix_two_required｣, ｢ifelse(index(｢$1｣, _required_prefix_
 # For example: ｢two_required_prefixes(data16,loack,addr32)｣ becomes
 #		( data16 lock addr32 ) | ( data16 addr32 lock ) |
 #		( lock data16 addr32 ) | ( lock addr32 data16 ) |
-#		( addr32 data16 lock ) | ( addr32 lock data16 )
+#		( addr32 data16 lock ) | ( addr32 lock data16 ).
+################################################################################
 define(｢three_required_prefixes｣, ｢pushdef(｢ok_prefix｣, defn(
   ｢ok_prefix_three_required｣))pushdef(｢_required_prefix_one｣,
   ｢$1｣)pushdef(｢_required_prefix_two｣, ｢$2｣)pushdef(｢_required_prefix_three｣,
@@ -112,7 +128,7 @@ define(｢ok_prefix_three_required｣, ｢ifelse(index(｢$1｣, _required_prefi
   index(｢$1｣, _required_prefix_three))｣)
 ################################################################################
 # ｢fatal_error｣ reports fatal error and stop processing.
-define(｢fatal_error｣, ｢errprint(｢fatal error: $*
 ################################################################################
+define(｢fatal_error｣, ｢errprint(｢fatal error: $*
 ｣)m4exit(1)｣)
 divert｢｣dnl

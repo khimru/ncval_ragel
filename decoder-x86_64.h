@@ -14,30 +14,33 @@ extern "C" {
 #endif
 
 enum operand_type {
+  OperandSize2bit,	 /* See VPERMIL2Px instruction for description.	      */
   OperandSize8bit,
   OperandSize16bit,
   OperandSize32bit,
   OperandSize64bit,
   OperandSize128bit,
-  OperandFloatSize16bit, /* OperandFloatSize16bit, OperandFloatSize32bit,      */
-  OperandFloatSize32bit, /* OperandFloatSize64bit, and OperandFloatSize80bit   */
-  OperandFloatSize64bit, /* are used for in-memory operands.  Corresponding    */
-  OperandFloatSize80bit, /* registers usually have type OperandST	       */
-  OperandX87Size16bit,	 /* OperandX87Size16bit, OperandX87Size32bit, and      */
-  OperandX87Size32bit,	 /* OperandX87Size64bit are signed integers in memory. */
-  OperandX87Size64bit,	 /* They are used for x87 instructions.		       */
-  OperandX87BCD,	 /* 10-byte packed BCD value in memory.		       */
-  OperandX87ENV,	 /* A 14-byte or 28-byte x87 environment.	       */
-  OperandX87STATE,	 /* A 94-byte or 108-byte x87 state.		       */
-  OperandX87MMXXMMSTATE, /* A 512-byte extended x87/MMX/XMM state.	       */
+  OperandSize256bit,
+  OperandFloatSize16bit, /* OperandFloatSize16bit, OperandFloatSize32bit,     */
+  OperandFloatSize32bit, /* OperandFloatSize64bit, and OperandFloatSize80bit  */
+  OperandFloatSize64bit, /* are used for in-memory operands and XMM:	      */
+  OperandFloatSize80bit, /*   X87 registers always have type OperandST.	      */
+  OperandX87Size16bit,	 /* OperandX87Size16bit, OperandX87Size32bit, and     */
+  OperandX87Size32bit,	 /* OperandX87Size64bit are signed integers in memory.*/
+  OperandX87Size64bit,	 /* They are used for x87 instructions.		      */
+  OperandX87BCD,	 /* 10-byte packed BCD value in memory.		      */
+  OperandX87ENV,	 /* A 14-byte or 28-byte x87 environment.	      */
+  OperandX87STATE,	 /* A 94-byte or 108-byte x87 state.		      */
+  OperandX87MMXXMMSTATE, /* A 512-byte extended x87/MMX/XMM state.	      */
   OperandST,
-  OperandSelector,	  /* Operand is 6bytes/10bytes selector in memory.     */
-  OperandFarPtr,	  /* Operand is 6bytes/10bytes far pointer in memory.  */
-  OperandSegmentRegister, /* Operand is segment register: %{e,c,s,d,f,g}s.     */
-  OperandControlRegister, /* Operand is control register: %crX.		       */
-  OperandDebugRegister,	  /* Operand is debug register: %drX.		       */
+  OperandSelector,	  /* Operand is 6bytes/10bytes selector in memory.    */
+  OperandFarPtr,	  /* Operand is 6bytes/10bytes far pointer in memory. */
+  OperandSegmentRegister, /* Operand is segment register: %{e,c,s,d,f,g}s.    */
+  OperandControlRegister, /* Operand is control register: %crX.		      */
+  OperandDebugRegister,	  /* Operand is debug register: %drX.		      */
   OperandMMX,
-  OperandXMM
+  OperandXMM,
+  OperandYMM,
 };
 
 enum register_name {
