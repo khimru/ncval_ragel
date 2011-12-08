@@ -22,9 +22,11 @@ enum operand_type {
   OperandST,
   OperandMMX,
   OperandXMM,
-  OperandSegmentRegister, /* Operand is segment register.		       */
   OperandSelector,	  /* Operand is 6bytes/10bytes selector in memory.     */
-  OperandFarPtr		  /* Operand is 6bytes/10bytes far pointer in memory.  */
+  OperandFarPtr,	  /* Operand is 6bytes/10bytes far pointer in memory.  */
+  OperandSegmentRegister, /* Operand is segment register: %{e,c,s,d,f,g}s.     */
+  OperandControlRegister, /* Operand is control register: %crX.		       */
+  OperandDebugRegister	  /* Operand is debug register: %drX.		       */
 };
 
 enum register_name {

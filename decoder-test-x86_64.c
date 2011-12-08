@@ -147,6 +147,15 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       if ((instruction->operands[i].name >= REG_R8) &&
 	  (instruction->operands[i].name <= REG_R15)) {
 	rex_bits++;
+	/* HACK: objdump mistakenly allows “lock” with “mov %crX,%rXX” only in
+	   32bit mode.  It's perfectly valid in 64bit mode, too, so instead of
+	   changing the decoder we fix it here.  */
+	if (instruction->operands[i].type == OperandControlRegister) {
+	  if ((*begin == 0xf0) && !(instruction->prefix.lock)) {
+	    print_name("lock ");
+	    instruction->operands[i].name -= 8;
+	  }
+	}
       } else if (instruction->operands[i].name == REG_RM) {
 	if ((instruction->rm.base >= REG_R8) &&
 	    (instruction->rm.base <= REG_R15)) {
@@ -372,6 +381,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandMMX: printf("%%mm0"); break;
 	case OperandXMM: printf("%%xmm0"); break;
 	case OperandSegmentRegister: printf("%%es"); break;
+	case OperandControlRegister: printf("%%cr0"); break;
+	case OperandDebugRegister: printf("%%db0"); break;
 	default: assert(FALSE);
       }
       break;
@@ -384,6 +395,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandMMX: printf("%%mm1"); break;
 	case OperandXMM: printf("%%xmm1"); break;
 	case OperandSegmentRegister: printf("%%cs"); break;
+	case OperandControlRegister: printf("%%cr1"); break;
+	case OperandDebugRegister: printf("%%db1"); break;
 	default: assert(FALSE);
       }
       break;
@@ -396,6 +409,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandMMX: printf("%%mm2"); break;
 	case OperandXMM: printf("%%xmm2"); break;
 	case OperandSegmentRegister: printf("%%ss"); break;
+	case OperandControlRegister: printf("%%cr2"); break;
+	case OperandDebugRegister: printf("%%db2"); break;
 	default: assert(FALSE);
       }
       break;
@@ -408,6 +423,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandMMX: printf("%%mm3"); break;
 	case OperandXMM: printf("%%xmm3"); break;
 	case OperandSegmentRegister: printf("%%ds"); break;
+	case OperandControlRegister: printf("%%cr3"); break;
+	case OperandDebugRegister: printf("%%db3"); break;
 	default: assert(FALSE);
       }
       break;
@@ -424,6 +441,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandMMX: printf("%%mm4"); break;
 	case OperandXMM: printf("%%xmm4"); break;
 	case OperandSegmentRegister: printf("%%fs"); break;
+	case OperandControlRegister: printf("%%cr4"); break;
+	case OperandDebugRegister: printf("%%db4"); break;
 	default: assert(FALSE);
       }
       break;
@@ -440,6 +459,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandMMX: printf("%%mm5"); break;
 	case OperandXMM: printf("%%xmm5"); break;
 	case OperandSegmentRegister: printf("%%gs"); break;
+	case OperandControlRegister: printf("%%cr5"); break;
+	case OperandDebugRegister: printf("%%db5"); break;
 	default: assert(FALSE);
       }
       break;
@@ -455,6 +476,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandST: printf("%%st(6)"); break;
 	case OperandMMX: printf("%%mm6"); break;
 	case OperandXMM: printf("%%xmm6"); break;
+	case OperandControlRegister: printf("%%cr6"); break;
+	case OperandDebugRegister: printf("%%db6"); break;
 	default: assert(FALSE);
       }
       break;
@@ -470,6 +493,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandST: printf("%%st(7)"); break;
 	case OperandMMX: printf("%%mm7"); break;
 	case OperandXMM: printf("%%xmm7"); break;
+	case OperandControlRegister: printf("%%cr7"); break;
+	case OperandDebugRegister: printf("%%db7"); break;
 	default: assert(FALSE);
       }
       break;
@@ -479,6 +504,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%r8d"); break;
 	case OperandSize64bit: printf("%%r8"); break;
 	case OperandXMM: printf("%%xmm8"); break;
+	case OperandControlRegister: printf("%%cr8"); break;
 	default: assert(FALSE);
       }
       break;
@@ -487,6 +513,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r9w"); break;
 	case OperandSize32bit: printf("%%r9d"); break;
 	case OperandSize64bit: printf("%%r9"); break;
+	case OperandControlRegister: printf("%%cr9"); break;
 	case OperandXMM: printf("%%xmm9"); break;
 	default: assert(FALSE);
       }
@@ -496,6 +523,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r10w"); break;
 	case OperandSize32bit: printf("%%r10d"); break;
 	case OperandSize64bit: printf("%%r10"); break;
+	case OperandControlRegister: printf("%%cr10"); break;
 	case OperandXMM: printf("%%xmm10"); break;
 	default: assert(FALSE);
       }
@@ -506,6 +534,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%r11d"); break;
 	case OperandSize64bit: printf("%%r11"); break;
 	case OperandXMM: printf("%%xmm11"); break;
+	case OperandControlRegister: printf("%%cr11"); break;
 	default: assert(FALSE);
       }
       break;
@@ -515,6 +544,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%r12d"); break;
 	case OperandSize64bit: printf("%%r12"); break;
 	case OperandXMM: printf("%%xmm12"); break;
+	case OperandControlRegister: printf("%%cr12"); break;
 	default: assert(FALSE);
       }
       break;
@@ -524,6 +554,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%r13d"); break;
 	case OperandSize64bit: printf("%%r13"); break;
 	case OperandXMM: printf("%%xmm13"); break;
+	case OperandControlRegister: printf("%%cr13"); break;
 	default: assert(FALSE);
       }
       break;
@@ -533,6 +564,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%r14d"); break;
 	case OperandSize64bit: printf("%%r14"); break;
 	case OperandXMM: printf("%%xmm14"); break;
+	case OperandControlRegister: printf("%%cr14"); break;
 	default: assert(FALSE);
       }
       break;
@@ -542,6 +574,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize32bit: printf("%%r15d"); break;
 	case OperandSize64bit: printf("%%r15"); break;
 	case OperandXMM: printf("%%xmm15"); break;
+	case OperandControlRegister: printf("%%cr15"); break;
 	default: assert(FALSE);
       }
       break;

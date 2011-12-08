@@ -171,18 +171,19 @@ divert(｢-1｣)
 #################################################################################
   # Operand sizes mostly follow AMD manual.
   # ｢unknown｣ means ther operands will determine.
-  define(｢possible_command_mode_1｣,｢unknown｣)
-  define(｢possible_command_mode_b｣,｢unknown｣)
-  define(｢possible_command_mode_d｣,｢unknown｣)
-  define(｢possible_command_mode_o｣,｢unknown｣)
-  define(｢possible_command_mode_p｣,｢unknown｣)
-  define(｢possible_command_mode_q｣,｢unknown｣)
-  define(｢possible_command_mode_r｣,｢unknown｣)
-  define(｢possible_command_mode_s｣,｢unknown｣)
-  define(｢possible_command_mode_v｣,｢data16nodataprefixrexw｣)
-  define(｢possible_command_mode_w｣,｢unknown｣)
-  define(｢possible_command_mode_y｣,｢nodataprefixrexw｣)
-  define(｢possible_command_mode_z｣,｢data16nodataprefixrexw｣)
+  define(｢possible_command_mode_1｣, ｢unknown｣)
+  define(｢possible_command_mode_8｣, ｢unknown｣)
+  define(｢possible_command_mode_b｣, ｢unknown｣)
+  define(｢possible_command_mode_d｣, ｢unknown｣)
+  define(｢possible_command_mode_o｣, ｢unknown｣)
+  define(｢possible_command_mode_p｣, ｢unknown｣)
+  define(｢possible_command_mode_q｣, ｢unknown｣)
+  define(｢possible_command_mode_r｣, ｢unknown｣)
+  define(｢possible_command_mode_s｣, ｢unknown｣)
+  define(｢possible_command_mode_v｣, ｢data16nodataprefixrexw｣)
+  define(｢possible_command_mode_w｣, ｢unknown｣)
+  define(｢possible_command_mode_y｣, ｢nodataprefixrexw｣)
+  define(｢possible_command_mode_z｣, ｢data16nodataprefixrexw｣)
   # ｢size8｣ is special "prefix" not included in AMD manual:  w bit in opcode
   # switches between 8bit and 16/32/64 bit versions.  M is just an address in
   # memory: it means register-only encodings are invalid, but other operands
@@ -208,6 +209,8 @@ divert(｢-1｣)
   define(｢possible_rex_rxb_bits_o｣, )
   define(｢possible_rex_rxb_bits_p｣, )
   define(｢possible_rex_rxb_bits_r｣, ｢b｣)
+  define(｢possible_rex_rxb_bits_C｣, ｢r｣)
+  define(｢possible_rex_rxb_bits_D｣, )
   define(｢possible_rex_rxb_bits_E｣, ｢xb｣)
   define(｢possible_rex_rxb_bits_G｣, ｢r｣)
   define(｢possible_rex_rxb_bits_I｣, )
@@ -222,7 +225,9 @@ divert(｢-1｣)
   define(｢possible_rex_rxb_bits_Y｣, )
   define(｢check_rex_rxb_bits｣, ｢ifelse($1, , ,
     $1, ｢b｣, ｢b｣,
+    $1, ｢br｣, ｢rb｣,
     $1, ｢r｣, ｢r｣,
+    $1, ｢rb｣, ｢rb｣,
     $1, ｢rxb｣, ｢rxb｣,
     $1, ｢xb｣, ｢xb｣,
     $1, ｢xbr｣, ｢rxb｣,
@@ -276,6 +281,12 @@ divert(｢-1｣)
 					shift(shift(shift(shift(shift($@))))))｣,
     substr(｢$4｣, 0, 7), ｢data16 ｣,
       ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 7)), ｢data16 $5｣,
+					shift(shift(shift(shift(shift($@))))))｣,
+    substr(｢$4｣, 0, 5), ｢0xf0 ｣,
+      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0xf0 $5｣,
+					shift(shift(shift(shift(shift($@))))))｣,
+    substr(｢$4｣, 0, 5), ｢lock ｣,
+      ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢lock $5｣,
 					shift(shift(shift(shift(shift($@))))))｣,
     substr(｢$4｣, 0, 5), ｢0xf2 ｣,
       ｢instruction_select(｢$1｣, ｢$2｣, ｢$3｣, trim(substr(｢$4｣, 5)), ｢0xf2 $5｣,
@@ -418,6 +429,10 @@ divert(｢-1｣)
 			 ｢one_required_prefix(｢0x66｣, optional_prefixes(｢$1｣))｣,
     substr(｢$1｣, 0, 7), ｢data16 ｣,
 		       ｢one_required_prefix(｢data16｣, optional_prefixes(｢$1｣))｣,
+    substr(｢$1｣, 0, 5), ｢0xf0 ｣,
+			 ｢one_required_prefix(｢0xf0｣, optional_prefixes(｢$1｣))｣,
+    substr(｢$1｣, 0, 5), ｢lock ｣,
+			｢one_required_prefix(｢lock｣, optional_prefixes(｢$1｣))｣,
     substr(｢$1｣, 0, 5), ｢0xf2 ｣,
 			 ｢one_required_prefix(｢0xf2｣, optional_prefixes(｢$1｣))｣,
     substr(｢$1｣, 0, 6), ｢repnz ｣,
@@ -438,6 +453,10 @@ divert(｢-1｣)
 		 ｢two_required_prefixes(｢$1｣, ｢0x66｣, optional_prefixes(｢$2｣))｣,
     substr(｢$2｣, 0, 7), ｢data16 ｣,
 	       ｢two_required_prefixes(｢$1｣, ｢data16｣, optional_prefixes(｢$2｣))｣,
+    substr(｢$2｣, 0, 5), ｢0xf0 ｣,
+		 ｢two_required_prefixes(｢$1｣, ｢0xf0｣, optional_prefixes(｢$2｣))｣,
+    substr(｢$2｣, 0, 5), ｢lock ｣,
+		｢two_required_prefixes(｢$1｣, ｢lock｣, optional_prefixes(｢$2｣))｣,
     substr(｢$2｣, 0, 5), ｢0xf2 ｣,
 		 ｢two_required_prefixes(｢$1｣, ｢0xf2｣, optional_prefixes(｢$2｣))｣,
     substr(｢$2｣, 0, 6), ｢repnz ｣,
@@ -457,6 +476,10 @@ divert(｢-1｣)
          ｢three_required_prefixes(｢$1｣, ｢$2｣, ｢0x66｣, optional_prefixes(｢$3｣))｣,
     substr(｢$3｣, 0, 7), ｢data16 ｣,
        ｢three_required_prefixes(｢$1｣, ｢$2｣, ｢data16｣, optional_prefixes(｢$3｣))｣,
+    substr(｢$3｣, 0, 5), ｢0xf0 ｣,
+	 ｢three_required_prefixes(｢$1｣, ｢$2｣, ｢0xf0｣, optional_prefixes(｢$3｣))｣,
+    substr(｢$3｣, 0, 5), ｢lock ｣,
+	｢three_required_prefixes(｢$1｣, ｢$2｣, ｢lock｣, optional_prefixes(｢$3｣))｣,
     substr(｢$3｣, 0, 5), ｢0xf2 ｣,
 	 ｢three_required_prefixes(｢$1｣, ｢$2｣, ｢0xf2｣, optional_prefixes(｢$3｣))｣,
     substr(｢$3｣, 0, 6), ｢repnz ｣,
@@ -557,6 +580,7 @@ divert(｢-1｣)
   define(｢__opcode_nomodrm｣,
     ｢begin_opcode((trim(｢$3｣))) end_opcode(｢$4｣) ifelse(
       substr(｢$2｣, 0, 5), ｢0x66 ｣, ｢not_data16 ｣,
+      substr(｢$2｣, 0, 5), ｢0xf0 ｣, ｢not_lock ｣,
       substr(｢$2｣, 0, 5), ｢0xf2 ｣, ｢not_repnz ｣,
       substr(｢$2｣, 0, 5), ｢0xf3 ｣, ｢not_repz ｣,
     )instruction_name(
@@ -662,9 +686,6 @@ divert(｢-1｣)
   define(｢instruction_argument_size_data16_v｣, ｢16bit｣)
   define(｢instruction_argument_size_nodataprefix_v｣, ｢32bit｣)
   define(｢instruction_argument_size_rexw_v｣, ｢64bit｣)
-  define(｢instruction_argument_size_data16_Sw｣, ｢segreg｣)
-  define(｢instruction_argument_size_nodataprefix_Sw｣, ｢segreg｣)
-  define(｢instruction_argument_size_rexw_Sw｣, ｢segreg｣)
   define(｢instruction_argument_size_w｣, ｢16bit｣)
   define(｢instruction_argument_size_size8_y｣, ｢32bit｣)
   define(｢instruction_argument_size_data16_y｣, ｢32bit｣)
@@ -673,6 +694,12 @@ divert(｢-1｣)
   define(｢instruction_argument_size_data16_z｣, ｢16bit｣)
   define(｢instruction_argument_size_nodataprefix_z｣, ｢32bit｣)
   define(｢instruction_argument_size_rexw_z｣, ｢32bit｣)
+  define(｢instruction_argument_size_nodataprefix_C8｣, ｢creg｣)
+  define(｢instruction_argument_size_nodataprefix_Cr｣, ｢creg｣)
+  define(｢instruction_argument_size_nodataprefix_Dr｣, ｢dreg｣)
+  define(｢instruction_argument_size_data16_Sw｣, ｢segreg｣)
+  define(｢instruction_argument_size_nodataprefix_Sw｣, ｢segreg｣)
+  define(｢instruction_argument_size_rexw_Sw｣, ｢segreg｣)
 #################################################################################
 # ｢instruction_implied_arguments｣ is inserted where we know all the arguments and
 # are ready to insert appropriate ragel action.  It's used to generate “implied
@@ -698,6 +725,8 @@ divert(｢-1｣)
       substr(｢$2｣, 0, 1), ｢i｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_second_immediate｣,
       substr(｢$2｣, 0, 1), ｢o｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_port_dx｣,
       substr(｢$2｣, 0, 1), ｢r｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_from_opcode｣,
+      substr(｢$2｣, 0, 1), ｢C｣, ,
+      substr(｢$2｣, 0, 1), ｢D｣, ,
       substr(｢$2｣, 0, 1), ｢E｣, ,
       substr(｢$2｣, 0, 1), ｢G｣, ,
       substr(｢$2｣, 0, 1), ｢I｣, ｢ ｣｢operand｣decr(decr(｢$#｣))｢_immediate｣,
@@ -730,12 +759,16 @@ divert(｢-1｣)
 #		      (any @operand0_rm @operand1_from_modrm_reg any*)))｣
 #################################################################################
   define(｢instruction_modrm_arguments｣, ｢ifelse(index(｢$2｣, ｢ E｣), -1,
-    ｢ifelse(index(｢$2｣, ｢ G｣), -1,
-      ｢ifelse(index(｢$2｣, ｢ M｣), -1,
-	｢ifelse(index(｢$2｣, ｢ P｣), -1,
-	  ｢ifelse(index(｢$2｣, ｢ R｣), -1,
-	    ｢ifelse(index(｢$2｣, ｢ S｣), -1,
-	      ｢ifelse(index(｢$2｣, ｢ V｣), -1, ,
+    ｢ifelse(index(｢$2｣, ｢ C｣), -1,
+      ｢ifelse(index(｢$2｣, ｢ D｣), -1,
+	｢ifelse(index(｢$2｣, ｢ G｣), -1,
+	  ｢ifelse(index(｢$2｣, ｢ M｣), -1,
+	    ｢ifelse(index(｢$2｣, ｢ P｣), -1,
+	      ｢ifelse(index(｢$2｣, ｢ R｣), -1,
+		｢ifelse(index(｢$2｣, ｢ S｣), -1,
+		  ｢ifelse(index(｢$2｣, ｢ V｣), -1, ,
+		    ｢ _instruction_modrm_arguments($@)｣)｣,
+		  ｢ _instruction_modrm_arguments($@)｣)｣,
 		｢ _instruction_modrm_arguments($@)｣)｣,
 	      ｢ _instruction_modrm_arguments($@)｣)｣,
 	    ｢ _instruction_modrm_arguments($@)｣)｣,
@@ -748,6 +781,7 @@ divert(｢-1｣)
     ｢(( opcode_\1 end_opcode(split_argument(
       ｢$2｣))) ifelse(
       substr(｢$4｣, 0, 5), ｢0x66 ｣, ｢not_data16 ｣,
+      substr(｢$4｣, 0, 5), ｢0xf0 ｣, ｢not_lock ｣,
       substr(｢$4｣, 0, 5), ｢0xf2 ｣, ｢not_repnz ｣,
       substr(｢$4｣, 0, 5), ｢0xf3 ｣, ｢not_repz ｣,
     )instruction_name(split_argument(
@@ -780,6 +814,8 @@ divert(｢-1｣)
     ｢modrm_registers _register_instruction_modrm_arguments($@)｣)
   define(｢_register_instruction_modrm_arguments｣, ｢ifelse(eval(｢$#>1｣), 1,
     ｢_register_instruction_modrm_arguments(shift($@)) ｣)｢｣ifelse(
+      substr(｢$1｣, 0, 1), ｢C｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
+      substr(｢$1｣, 0, 1), ｢D｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢E｣, ｢operand｣decr(｢$#｣)｢_from_modrm_rm｣,
       substr(｢$1｣, 0, 1), ｢G｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢M｣, ｢operand｣decr(｢$#｣)｢_from_modrm_rm｣,
@@ -809,6 +845,8 @@ divert(｢-1｣)
     ｢(modrm_memory & (any _memory_instruction_modrm_arguments($@) any*))｣)
   define(｢_memory_instruction_modrm_arguments｣, ｢ifelse(eval(｢$#>1｣), 1,
     ｢_memory_instruction_modrm_arguments(shift($@)) ｣)｢｣ifelse(
+      substr(｢$1｣, 0, 1), ｢C｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
+      substr(｢$1｣, 0, 1), ｢D｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢E｣, ｢operand｣decr(｢$#｣)｢_rm｣,
       substr(｢$1｣, 0, 1), ｢G｣, ｢operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢M｣, ｢operand｣decr(｢$#｣)｢_rm｣,

@@ -61,6 +61,17 @@
     data16｢_｣prefix = FALSE;
   }
   define(｢not_data16｣, ｢@not｢_｣data16｢_｣prefix｣)
+  action not_lock_prefix {
+    /* HACK: lock-as-no-lock is used only in “mov %cr8+,%eXX” to make it
+	     possible to specify “%cr8”, …, “%cr15” in 32bit mode.  It can
+	     be used the same way in 64bit mode,  but there “real” rex prefix
+	     can be used, too - and takes precencence, if used.  */
+    if (!rex_prefix) {
+      rex_prefix = 0x44;
+      lock｢_｣prefix = FALSE;
+    }
+  }
+  define(｢not_lock｣, ｢@not｢_｣lock｢_｣prefix｣)
   action not_repnz_prefix {
     repnz｢_｣prefix = FALSE;
   }
@@ -206,6 +217,8 @@
   operand_size(ymm, YMM)
   operand_size(farptr, FarPtr)
   operand_size(segreg, SegmentRegister)
+  operand_size(creg, ControlRegister)
+  operand_size(dreg, DebugRegister)
   operand_size(selector, Selector)
   action operands_count_is_0 {
     operands_count = 0;
