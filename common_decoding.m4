@@ -182,7 +182,7 @@
   }
   define(｢begin_opcode｣, ｢$1 >begin｢_｣opcode｣)
   define(｢end_opcode｣, ｢@end｢_｣opcode｣)
-  define(｢operand_size｣,
+  define(｢operand_type｣,
     ｢action operand0_$1 {
       operand0_type = Operand$2;
      }
@@ -206,20 +206,31 @@
      ifdef(｢OperandSizeList｣,
        ｢append(｢OperandSizeList｣,｢, OperandSize$2｣)｣,
        ｢define(｢OperandSizeList｣,｢OperandSize$2｣)｣)｣)
-  operand_size(8bit, Size8bit)
-  operand_size(16bit, Size16bit)
-  operand_size(32bit, Size32bit)
-  operand_size(64bit, Size64bit)
-  operand_size(128bit, Size128bit)
-  operand_size(x87, X87)
-  operand_size(mmx, MMX)
-  operand_size(xmm, XMM)
-  operand_size(ymm, YMM)
-  operand_size(farptr, FarPtr)
-  operand_size(segreg, SegmentRegister)
-  operand_size(creg, ControlRegister)
-  operand_size(dreg, DebugRegister)
-  operand_size(selector, Selector)
+  operand_type(8bit, Size8bit)
+  operand_type(16bit, Size16bit)
+  operand_type(32bit, Size32bit)
+  operand_type(64bit, Size64bit)
+  operand_type(128bit, Size128bit)
+  operand_type(float16bit, FloatSize16bit)
+  operand_type(float32bit, FloatSize32bit)
+  operand_type(float64bit, FloatSize64bit)
+  operand_type(float80bit, FloatSize80bit)
+  operand_type(x87_16bit, X87Size16bit)
+  operand_type(x87_32bit, X87Size32bit)
+  operand_type(x87_64bit, X87Size64bit)
+  operand_type(x87_bcd, X87BCD)
+  operand_type(x87_env, X87ENV)
+  operand_type(x87_state, X87STATE)
+  operand_type(x87_mmx_xmm_state, X87MMXXMMSTATE)
+  operand_type(x87, ST)
+  operand_type(mmx, MMX)
+  operand_type(xmm, XMM)
+  operand_type(ymm, YMM)
+  operand_type(farptr, FarPtr)
+  operand_type(segreg, SegmentRegister)
+  operand_type(creg, ControlRegister)
+  operand_type(dreg, DebugRegister)
+  operand_type(selector, Selector)
   action operands_count_is_0 {
     operands_count = 0;
   }
@@ -295,6 +306,10 @@
     operand0 = REG_RM;
   }
   define(｢operand0_rm｣, ｢@operand0｢_｣rm｣)
+  action operand0_st {
+    operand0 = REG_ST;
+  }
+  define(｢operand0_st｣, ｢@operand0｢_｣st｣)
   action operand1_absolute_disp {
     operand1 = REG_RM;
     base = REG_NONE;
@@ -325,6 +340,10 @@
   action operand1_immediate {
     operand1 = REG_IMM;
   }
+  action operand1_from_opcode {
+    operand1 = ((*p) & 0x7) | ((rex_prefix & REX_B) << 3);
+  }
+  define(｢operand1_from_opcode｣, ｢@operand1｢_｣from｢_｣opcode｣)
   define(｢operand1_immediate｣, ｢@operand1｢_｣immediate｣)
   action operand1_one {
     operand1 = REG_IMM;
@@ -355,6 +374,10 @@
   action operand2_immediate {
     operand2 = REG_IMM;
   }
+  action operand1_st {
+    operand1 = REG_ST;
+  }
+  define(｢operand1_st｣, ｢@operand1｢_｣st｣)
   define(｢operand2_immediate｣, ｢@operand2｢_｣immediate｣)
   action operand2_rax {
     operand2 = REG_RAX;

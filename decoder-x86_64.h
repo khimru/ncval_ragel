@@ -19,14 +19,25 @@ enum operand_type {
   OperandSize32bit,
   OperandSize64bit,
   OperandSize128bit,
+  OperandFloatSize16bit, /* OperandFloatSize16bit, OperandFloatSize32bit,      */
+  OperandFloatSize32bit, /* OperandFloatSize64bit, and OperandFloatSize80bit   */
+  OperandFloatSize64bit, /* are used for in-memory operands.  Corresponding    */
+  OperandFloatSize80bit, /* registers usually have type OperandST	       */
+  OperandX87Size16bit,	 /* OperandX87Size16bit, OperandX87Size32bit, and      */
+  OperandX87Size32bit,	 /* OperandX87Size64bit are signed integers in memory. */
+  OperandX87Size64bit,	 /* They are used for x87 instructions.		       */
+  OperandX87BCD,	 /* 10-byte packed BCD value in memory.		       */
+  OperandX87ENV,	 /* A 14-byte or 28-byte x87 environment.	       */
+  OperandX87STATE,	 /* A 94-byte or 108-byte x87 state.		       */
+  OperandX87MMXXMMSTATE, /* A 512-byte extended x87/MMX/XMM state.	       */
   OperandST,
-  OperandMMX,
-  OperandXMM,
   OperandSelector,	  /* Operand is 6bytes/10bytes selector in memory.     */
   OperandFarPtr,	  /* Operand is 6bytes/10bytes far pointer in memory.  */
   OperandSegmentRegister, /* Operand is segment register: %{e,c,s,d,f,g}s.     */
   OperandControlRegister, /* Operand is control register: %crX.		       */
-  OperandDebugRegister	  /* Operand is debug register: %drX.		       */
+  OperandDebugRegister,	  /* Operand is debug register: %drX.		       */
+  OperandMMX,
+  OperandXMM
 };
 
 enum register_name {
@@ -56,6 +67,7 @@ enum register_name {
   REG_DS_RSI,	/* For string instructions: %ds:(%rdi).			      */
   REG_PORT_DX,	/* 16-bit DX: for in/out instructions.			      */
   REG_NONE,	/* For modrm: both index and base can be absent.	      */
+  REG_ST,	/* For x87 instructions: implicit %st.			      */
   JMP_TO	/* Operand is jump target address: usually %rip+offset.	      */
 };
 

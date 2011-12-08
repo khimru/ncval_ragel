@@ -26,6 +26,7 @@
 #	o: I/O port in %dx (used in “in”/“out” instructions).
 #	p: Accumulator pair (%dx:%ax/%edx:%eax/%rdx:%rax depending on size).
 #	r: Register in opcode (low 3 bits plus rex.B).
+#	t: Top of the x87 stack (%st).
 #	E: General purpose register or memory operand specified by the r/m
 #	   field of the ModRM byte.  For memory operands, the ModRM byte may
 #	   be followed by a SIB byte to specify one of the indexed
@@ -44,26 +45,37 @@
 #	   The ModRM.mod field must be 11b.
 #	S: Segment register specified by the ModRM.reg field.
 #	V: YMM/XMM register specified by the ModRM.reg field.
-#	X: A memory operand addressed by the %ds:%[er]si registers. Used in
+#		X: A memory operand addressed by the %ds:%[er]si registers. Used in
 #	   string instructions.
 #	Y: A memory operand addressed by the %es:%[er]di registers. Used in
 #	   string instructions.
 #      Possible sizes:
-#	␀: A byte, word, doubleword, or quadword (in 64-bit mode),
-#	   depending on the effective operand size.
-#	b: A byte, irrespective of the effective operand size.
-#	d: A doubleword (32bit), irrespective of the effective operand size.
-#	p: A 32-bit or 48-bit far pointer, depending on the effective operand
-#	   size.
-#	q: A quadword (64bit), irrespective of the effective operand size.
-#	r: Register size (32bit in 32bit mode, 64bit in 64bit mode).
-#	s: A 6-byte or 10-byte pseudo-descriptor.
-#	v: A word, doubleword, or quadword (in 64-bit mode), depending on
-#	   the effective operand size.
-#	w: A word, irrespective of the effective operand size.
-#	y: A doubleword or quadword depending on effective operand size.
-#	z: A word if the effective operand size is 16 bits, or a doubleword
-#	   if the effective operand size is 32 or 64 bits.
+#	␀:  A byte, word, doubleword, or quadword (in 64-bit mode),
+#	    depending on the effective operand size.
+#	7:  x87 register %st(N).
+#	b:  A byte, irrespective of the effective operand size.
+#	d:  A doubleword (32-bit), irrespective of the effective operand size.
+#	p:  A 32-bit or 48-bit far pointer, depending on the effective operand
+#	    size.
+#	q:  A quadword (64-bit), irrespective of the effective operand size.
+#	r:  Register size (32bit in 32bit mode, 64bit in 64bit mode).
+#	s:  A 6-byte or 10-byte pseudo-descriptor.
+#	sb: A scalar 10-byte packed BCD value (scalar BCD).
+#	sd: A scalar double-precision floating-point operand (scalar double).
+#	se: A 14-byte or 28-byte x87 environment.
+#	si: A scalar doubleword (32-bit) integer operand (scalar integer).
+#	sq: A scalar quadword (64-bit) integer operand (scalar integer).
+#	sr: A 94-byte or 108-byte x87 state.
+#	ss: A scalar single-precision floating-point operand (scalar single).
+#	st: A scalar 80bit-precision floating-point operand (scalar ten-bytes).
+#	sw: A scalar word (16-bit) integer operand (scalar integer).
+#	sx: A 512-byte extended x87/MMX/XMM state.
+#	v:  A word, doubleword, or quadword (in 64-bit mode), depending on
+#	    the effective operand size.
+#	w:  A word, irrespective of the effective operand size.
+#	y:  A doubleword or quadword depending on effective operand size.
+#	z:  A word if the effective operand size is 16 bits, or a doubleword
+#	    if the effective operand size is 32 or 64 bits.
 #################################################################################
 # Second column: instruction opcodes.
 #   Includes all opcode bytes.  If first opcode bytes is 0x66/data16, 0xf2/repnz,

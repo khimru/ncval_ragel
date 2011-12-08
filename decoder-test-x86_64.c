@@ -60,6 +60,11 @@ void ReadFile(const char *filename, uint8_t **result, size_t *result_size) {
   *result_size = file_size;
 }
 
+struct DecodeState {
+  const uint8_t *fwait; /* Set to true if fwait is detetected. */
+  const uint8_t *offset;
+};
+
 void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 			struct instruction *instruction, void *userdata) {
   const uint8_t *p;
@@ -72,7 +77,30 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   int shown_name = 0;
   int i, operand_type;
 
-  printf("%8x:\t", begin - (uint8_t *)userdata);
+  /* “fwait” is nasty: any number of them will be included in other X87
+     instructions ("fclex", "finit", “fstcw”, “fstsw”, “fsave” have two
+     names, other instructions are unchanged) - but if after them we see
+     regular instruction then we must print all them.  This convoluted
+     logic is not needed when we  don't print anything so decoder does
+     not include it.  */
+  if ((end == begin + 1) && (begin[0] == 0x9b)) {
+    if (!(((struct DecodeState *)userdata)->fwait)) {
+      ((struct DecodeState *)userdata)->fwait = begin;
+    }
+    return;
+  } else if (((struct DecodeState *)userdata)->fwait) {
+    if ((begin[0] < 0xd8) || (begin[0] > 0xdf)) {
+      while ((((struct DecodeState *)userdata)->fwait) < begin) {
+	printf("%8x:\t                   \tfwait\n",
+	  (((struct DecodeState *)userdata)->fwait++) -
+				     (((struct DecodeState *)userdata)->offset));
+      }
+    } else {
+      begin = ((struct DecodeState *)userdata)->fwait;
+    }
+    ((struct DecodeState *)userdata)->fwait = FALSE;
+  }
+  printf("%8x:\t", begin - (((struct DecodeState *)userdata)->offset));
   for (p = begin; p < begin + 7; p++) {
     if (p >= end) {
       printf("   ");
@@ -110,6 +138,16 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case OperandSize16bit: show_name_suffix = 'w'; break;
 	    case OperandSize32bit: show_name_suffix = 'l'; break;
 	    case OperandSize64bit: show_name_suffix = 'q'; break;
+	    case OperandFloatSize32bit: show_name_suffix = 's'; break;
+	    case OperandFloatSize64bit: show_name_suffix = 'l'; break;
+	    case OperandFloatSize80bit:show_name_suffix = 't'; break;
+	    case OperandX87Size32bit: show_name_suffix = 'l'; break;
+	    case OperandX87Size64bit: show_name_suffix = 'L'; break;
+	    case OperandX87Size16bit:
+	    case OperandX87BCD:
+	    case OperandX87ENV:
+	    case OperandX87STATE:
+	    case OperandX87MMXXMMSTATE:
 	    case OperandSize128bit:
 	    case OperandFarPtr: 
 	    case OperandSelector: show_name_suffix = FALSE; break;
@@ -324,8 +362,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   printf("%s", instruction->name);
   shown_name += strlen(instruction->name);
   if (show_name_suffix) {
-    printf("%c", show_name_suffix);
-    shown_name++;
+    if (show_name_suffix == 'L') {
+      print_name("ll");
+    } else {
+      printf("%c", show_name_suffix);
+      shown_name++;
+    }
   }
   if (!strcmp(instruction->name, "mov")) {
     if ((instruction->operands[1].name == REG_IMM) &&
@@ -578,6 +620,10 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	default: assert(FALSE);
       }
       break;
+      case REG_ST:
+        assert(operand_type == OperandST);
+        printf("%%st");
+        break;
       case REG_RM: {
 	if (instruction->rm.offset) {
 	  printf("0x%llx",instruction->rm.offset);
@@ -654,24 +700,24 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       case REG_ES_RDI: printf("%%es:(%%rdi)"); break;
       case REG_DS_RSI: printf("%%ds:(%%rsi)"); break;
       case JMP_TO: if (instruction->operands[0].type == OperandSize16bit)
-	  printf("0x%x",
-		 (end + instruction->rm.offset - (uint8_t *)userdata) & 0xffff);
+	  printf("0x%x", (end + instruction->rm.offset -
+			   (((struct DecodeState *)userdata)->offset)) & 0xffff);
 	else
-	  printf("0x%x",
-			    end + instruction->rm.offset - (uint8_t *)userdata);
+	  printf("0x%x", end + instruction->rm.offset -
+				     (((struct DecodeState *)userdata)->offset));
 	break;
       default: assert(FALSE);
     }
     delimeter = ',';
   }
   if (print_rip) {
-    printf("        # 0x%8x",
-			    end + instruction->rm.offset - (uint8_t *)userdata);
+    printf("        # 0x%8x", end + instruction->rm.offset -
+				     (((struct DecodeState *)userdata)->offset));
   }
   printf("\n");
   begin += 7;
   while (begin < end) {
-    printf("%8x:\t", begin - (uint8_t *)userdata);
+    printf("%8x:\t", begin - (((struct DecodeState *)userdata)->offset));
     for (p = begin; p < begin + 7; p++) {
       if (p >= end) {
 	printf("\n");
@@ -708,14 +754,21 @@ int DecodeFile(const char *filename, int repeat_count) {
       CheckBounds(data, data_size, section, sizeof(*section));
 
       if ((section->sh_flags & SHF_EXECINSTR) != 0) {
+	struct DecodeState state;
+	state.fwait = FALSE;
+	state.offset = data + section->sh_offset - section->sh_addr;
 	CheckBounds(data, data_size,
 		    data + section->sh_offset, section->sh_size);
 	int rc = DecodeChunk(section->sh_addr,
 			     data + section->sh_offset, section->sh_size,
-			     ProcessInstruction, ProcessError,
-			     data + section->sh_offset - section->sh_addr);
+			     ProcessInstruction, ProcessError, &state);
 	if (rc != 0) {
 	  return rc;
+	} else if (state.fwait) {
+	  while (state.fwait < data + section->sh_offset + section->sh_size) {
+	    printf("%8x:\t                   \tfwait\n",
+						   state.fwait++ - state.offset);
+	  }
 	}
       }
     }
