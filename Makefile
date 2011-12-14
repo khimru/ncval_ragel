@@ -1,9 +1,8 @@
 OUT = out
-TSTDIR = $(OUT)/test
 OUT_DIRS = $(OUT)/build \
 	   $(OUT)/tarballs \
 	   $(OUT)/timestamps \
-	   $(TSTDIR)
+	   $(OUT)/test
 
 CC = gcc
 M4 = m4
@@ -75,12 +74,12 @@ binutils: $(BINUTILS_STAMP)
 
 .PHONY: clean
 clean:
-	rm -rf $(OUT)/build $(OUT)/timestamps $(TSTDIR)
+	rm -rf $(OUT)/build $(OUT)/timestamps $(OUT)/test
 
 .PHONY: check
-check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(TSTDIR)
-	python dfa_possibilities.py one-instruction.xml > $(TSTDIR)/list.s
-	$(GAS) --64 $(TSTDIR)/list.s -o $(TSTDIR)/list.o
-	$(OBJDUMP) -d $(TSTDIR)/list.o > $(TSTDIR)/objdump.txt
-	./decoder-test-x86_64 $(TSTDIR)/list.o > $(TSTDIR)/decoder.txt
-	diff -uNr $(TSTDIR)/objdump.txt $(TSTDIR)/decoder.txt
+check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(OUT)/test
+	python dfa_possibilities.py one-instruction.xml > $(OUT)/test/list.s
+	$(GAS) --64 $(OUT)/test/list.s -o $(OUT)/test/list.o
+	$(OBJDUMP) -d $(OUT)/test/list.o > $(OUT)/test/objdump.txt
+	./decoder-test-x86_64 $(OUT)/test/list.o > $(OUT)/test/decoder.txt
+	diff -uNr $(OUT)/test/objdump.txt $(OUT)/test/decoder.txt
