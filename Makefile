@@ -1,3 +1,7 @@
+# Copyright (c) 2012 The Native Client Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
 OUT = out
 OUT_DIRS = $(OUT)/build \
 	   $(OUT)/tarballs \
@@ -57,7 +61,7 @@ BINUTILS_STAMP = $(OUT)/timestamps/binutils
 OBJDUMP = $(BINUTILS_BUILD_DIR)/binutils/objdump
 GAS = $(BINUTILS_BUILD_DIR)/gas/as-new
 
-$(BINUTILS_TARBALL):
+$(BINUTILS_TARBALL): | $(OUT_DIRS)
 	rm -f $(BINUTILS_TARBALL)
 	cd $(OUT)/tarballs && wget $(BINUTILS_URL_BASE)/$(BINUTILS_VER).tar.bz2
 
@@ -85,3 +89,20 @@ check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(OUT)/test
 	$(OBJDUMP) -d $(OUT)/test/list.o > $(OUT)/test/objdump.txt
 	./decoder-test-x86_64 $(OUT)/test/list.o > $(OUT)/test/decoder.txt
 	diff -uNr $(OUT)/test/objdump.txt $(OUT)/test/decoder.txt
+
+.PHONY: check-n
+check-n: $(BINUTILS_STAMP) one-instruction.dot decoder-test-x86_64 | $(OUT)/test
+	/usr/bin/python2.6 parse_dfa.py <one-instruction.dot \
+	    > "$(OUT)/test/test_dfa_transitions.c"
+	$(CC) -O3 -g -c test_dfa.c -o "$(OUT)/test/test_dfa.o"
+	$(CC) -O0 -g -I. -c "$(OUT)/test/test_dfa_transitions.c" -o \
+	    "$(OUT)/test/test_dfa_transitions.o"
+	$(CC) -g "$(OUT)/test/test_dfa.o" "$(OUT)/test/test_dfa_transitions.o" \
+	    -o $(OUT)/test/test_dfa
+	/usr/bin/python2.6 run_objdump_test.py \
+	  --gas="$(GAS)" \
+	  --objdump="$(OBJDUMP)" \
+	  --decoder=./decoder-test-x86_64 \
+	  --tester=./decoder_test_one_file.sh \
+	  --nthreads=16 -- \
+	  "$(OUT)/test/test_dfa" /dev/shm
