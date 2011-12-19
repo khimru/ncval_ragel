@@ -407,6 +407,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case OperandSize128bit:
 	    case OperandSize256bit:
 	    case OperandFarPtr:
+	    case OperandMMX:
 	    case OperandXMM:
 	    case OperandYMM:
 	    case OperandSelector: show_name_suffix = FALSE; break;
@@ -442,7 +443,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	}
       }
       if ((instruction->operands[i].name >= REG_R8) &&
-	  (instruction->operands[i].name <= REG_R15)) {
+	  (instruction->operands[i].name <= REG_R15) &&
+	  (instruction->operands[i].type != OperandMMX)) {
 	rex_bits++;
 	/* HACK: objdump mistakenly allows “lock” with “mov %crX,%rXX” only in
 	   32bit mode.  It's perfectly valid in 64bit mode, too, so instead of
@@ -879,6 +881,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r8w"); break;
 	case OperandSize32bit: printf("%%r8d"); break;
 	case OperandSize64bit: printf("%%r8"); break;
+	case OperandMMX: printf("%%mm0"); break;
 	case OperandFloatSize32bit:
 	case OperandFloatSize64bit:
 	case OperandSize128bit:
@@ -894,6 +897,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r9w"); break;
 	case OperandSize32bit: printf("%%r9d"); break;
 	case OperandSize64bit: printf("%%r9"); break;
+	case OperandMMX: printf("%%mm1"); break;
 	case OperandFloatSize32bit:
 	case OperandFloatSize64bit:
 	case OperandSize128bit:
@@ -909,6 +913,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r10w"); break;
 	case OperandSize32bit: printf("%%r10d"); break;
 	case OperandSize64bit: printf("%%r10"); break;
+	case OperandMMX: printf("%%mm2"); break;
 	case OperandFloatSize32bit:
 	case OperandFloatSize64bit:
 	case OperandSize128bit:
@@ -924,6 +929,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r11w"); break;
 	case OperandSize32bit: printf("%%r11d"); break;
 	case OperandSize64bit: printf("%%r11"); break;
+	case OperandMMX: printf("%%mm3"); break;
 	case OperandFloatSize32bit:
 	case OperandFloatSize64bit:
 	case OperandSize128bit:
@@ -939,6 +945,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r12w"); break;
 	case OperandSize32bit: printf("%%r12d"); break;
 	case OperandSize64bit: printf("%%r12"); break;
+	case OperandMMX: printf("%%mm4"); break;
 	case OperandFloatSize32bit:
 	case OperandFloatSize64bit:
 	case OperandSize128bit:
@@ -954,6 +961,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r13w"); break;
 	case OperandSize32bit: printf("%%r13d"); break;
 	case OperandSize64bit: printf("%%r13"); break;
+	case OperandMMX: printf("%%mm5"); break;
 	case OperandFloatSize32bit:
 	case OperandFloatSize64bit:
 	case OperandSize128bit:
@@ -969,6 +977,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r14w"); break;
 	case OperandSize32bit: printf("%%r14d"); break;
 	case OperandSize64bit: printf("%%r14"); break;
+	case OperandMMX: printf("%%mm6"); break;
 	case OperandFloatSize32bit:
 	case OperandFloatSize64bit:
 	case OperandSize128bit:
@@ -984,6 +993,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize16bit: printf("%%r15w"); break;
 	case OperandSize32bit: printf("%%r15d"); break;
 	case OperandSize64bit: printf("%%r15"); break;
+	case OperandMMX: printf("%%mm7"); break;
 	case OperandFloatSize32bit:
 	case OperandFloatSize64bit:
 	case OperandSize128bit:

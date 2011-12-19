@@ -12,6 +12,7 @@ INST_DEFS = general-purpose-instructions.def \
 	    system-instructions.def \
 	    x86-64-instructions.def \
 	    x87-instructions.def \
+	    mmx-instructions.def \
 	    xmm-instructions.def
 
 $(OUT_DIRS):

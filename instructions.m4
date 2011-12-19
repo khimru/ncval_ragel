@@ -116,11 +116,13 @@ divert(｢-1｣)
   define(｢_possible_command_modes｣,｢ifelse($#, 0, ｢unknown｣,
     $#, 1, ｢｢ifelse(
       substr($1, 0, 1), ｢M｣, ｢memonly｣,
+      substr($1, 0, 1), ｢N｣, ｢regonly｣,
       substr($1, 0, 1), ｢R｣, ｢regonly｣,
       substr($1, 0, 1), ｢U｣, ｢regonly｣)｢｣possible_command_mode_｣substr($1,
 	1)(substr($1, 0, 1))｣,
     ｢check_prefixes_compatibility(｢ifelse(
       substr($1, 0, 1), ｢M｣, ｢memonly｣,
+      substr($1, 0, 1), ｢N｣, ｢regonly｣,
       substr($1, 0, 1), ｢R｣, ｢regonly｣,
       substr($1, 0, 1), ｢U｣, ｢regonly｣)｢｣possible_command_mode_｣substr($1, 1)(
 	substr($1, 0, 1)), _possible_command_modes(shift($@)))｣)｣)
@@ -280,8 +282,10 @@ divert(｢-1｣)
   define(｢possible_rex_rxb_bits_J｣, )
   define(｢possible_rex_rxb_bits_L｣, )
   define(｢possible_rex_rxb_bits_M｣, ｢xb｣)
+  define(｢possible_rex_rxb_bits_N｣, )
   define(｢possible_rex_rxb_bits_O｣, )
   define(｢possible_rex_rxb_bits_P｣, )
+  define(｢possible_rex_rxb_bits_Q｣, ｢xb｣)
   define(｢possible_rex_rxb_bits_R｣, ｢b｣)
   define(｢possible_rex_rxb_bits_S｣, )
   define(｢possible_rex_rxb_bits_U｣, ｢b｣)
@@ -875,7 +879,7 @@ define(｢make_operands_128bit｣,
 ################################################################################
   define(｢instruction_body｣, ｢opcode_nomodrm(｢$1｣, ｢$4｣, ｢$3｣,
     split_argument(｢$2｣))｢｣instruction_modrm_arguments(
-    $@)｢｣instruction_immediate_arguments(｢$1｣, shift(split_argument(｢$2｣))))｣)
+    $@)｢｣instruction_immediate_arguments($@))｣)
 ################################################################################
 # ｢opcode_nomodrm｣ processes mail part of instruction opcode (without “ModRM”
 # and “SIB” bytes, displacement, immediates, etc).  If the instruction does not
@@ -891,10 +895,10 @@ define(｢make_operands_128bit｣,
 #		     @operands_count_is_2 @operand0_16bit @operand1_16bit｣
 ################################################################################
   define(｢opcode_nomodrm｣,
-    ｢ifelse(regexp(｢$3｣, ｢\(.*\) /[0-7mrs]\(.*\)｣, ｢\1\2｣), ,
+    ｢ifelse(regexp(｢$3｣, ｢\(.*\) /[ 0-7mrs]｣, ｢\1｣), ,
       ｢__opcode_nomodrm(｢$1｣, ｢$2｣, _opcode_nomodrm(shift(shift($@))),
 						      shift(shift(shift($@))))｣,
-      ｢___opcode_nomodrm(regexp($3, ｢\(.*\) /[0-7mrs]\(.*\)｣, ｢\1\2｣),
+      ｢___opcode_nomodrm(regexp($3, ｢\(.*\) /[ 0-7mrs]｣, ｢\1｣),
 						    shift(shift(shift($@))))｣)｣)
   define(｢_opcode_nomodrm｣, ｢ifelse(｢$3｣, , ｢$1｣,
     ｢ifelse(substr(｢$3｣, 0, 1), ｢r｣, regopcode(｢$1｣),
@@ -1023,8 +1027,12 @@ define(｢make_operands_128bit｣,
   define(｢instruction_argument_size_do｣, ｢256bit｣)
   define(｢instruction_argument_size_dq｣, ｢128bit｣)
   define(｢instruction_argument_size_fq｣, ｢256bit｣)
+  define(｢instruction_argument_size_nodataprefix_Nq｣, ｢mmx｣)
+  define(｢instruction_argument_size_rexw_Nq｣, ｢mmx｣)
   define(｢instruction_argument_size_nodataprefix_Pq｣, ｢mmx｣)
   define(｢instruction_argument_size_rexw_Pq｣, ｢mmx｣)
+  define(｢instruction_argument_size_nodataprefix_Qq｣, ｢mmx｣)
+  define(｢instruction_argument_size_rexw_Qq｣, ｢mmx｣)
   define(｢instruction_argument_size_nodataprefix_Uq｣, ｢xmm｣)
   define(｢instruction_argument_size_nodataprefix_Vq｣, ｢xmm｣)
   define(｢instruction_argument_size_nodataprefix_Wq｣, ｢xmm｣)
@@ -1088,12 +1096,13 @@ define(｢make_operands_128bit｣,
 # It receives “instruction mode” and all the arguments in question.
 # For example: ｢instruction_implied_arguments(｢data16｣, ｢I｣, ｢a｣)｣
 #     becomes: ｢@operand0_rax @operand1_immediate｣
-# Note: it does not process ｢C｣, ｢D｣, ｢E｣, ｢G｣, ｢J｣, ｢L｣, ｢M｣, ｢P｣, ｢R｣, ｢S｣,
-# ｢U｣, ｢V｣, and ｢W｣ arguments.
-# ｢C｣, ｢D｣, ｢E｣, ｢G｣, ｢M｣, ｢P｣, ｢R｣, ｢S｣, ｢U｣, ｢V｣ and ｢W｣ are “ModRM”-style
-# arguments and thus are processed by ｢instruction_modrm_arguments｣ later,
-# while ｢J｣ and ｢L｣ arguments are processed by ｢instruction_immediate_arguments｣
-# because that's where they can be found in the command encoding.
+# Note: it does not process ｢C｣, ｢D｣, ｢E｣, ｢G｣, ｢J｣, ｢L｣, ｢M｣, ｢N｣, ｢P｣, ｢Q｣,
+#  ｢R｣, ｢S｣, ｢U｣, ｢V｣, and ｢W｣ arguments.
+# ｢C｣, ｢D｣, ｢E｣, ｢G｣, ｢M｣, ｢N｣, ｢P｣, ｢Q｣, ｢R｣, ｢S｣, ｢U｣, ｢V｣ and ｢W｣ are
+# “ModRM”-style arguments and are processed by ｢instruction_modrm_arguments｣
+# later, while ｢J｣ and ｢L｣ arguments are processed at the very end by
+# ｢instruction_immediate_arguments｣ because that's where they can be found in
+# the command encoding.
 ################################################################################
   define(｢instruction_implied_arguments｣, ｢ifelse(eval(｢$#>2｣), 1,
     ｢instruction_implied_arguments(｢$1｣, shift(shift($@)))｣)｢｣ifelse(
@@ -1117,8 +1126,10 @@ define(｢make_operands_128bit｣,
       substr(｢$2｣, 0, 1), ｢J｣, ,
       substr(｢$2｣, 0, 1), ｢L｣, ,
       substr(｢$2｣, 0, 1), ｢M｣, ,
+      substr(｢$2｣, 0, 1), ｢N｣, ,
       substr(｢$2｣, 0, 1), ｢P｣, ,
       substr(｢$2｣, 0, 1), ｢O｣, ｢ operand｣decr(decr(｢$#｣))｢_absolute_disp｣,
+      substr(｢$2｣, 0, 1), ｢Q｣, ,
       substr(｢$2｣, 0, 1), ｢R｣, ,
       substr(｢$2｣, 0, 1), ｢S｣, ,
       substr(｢$2｣, 0, 1), ｢U｣, ,
@@ -1139,7 +1150,7 @@ define(｢make_operands_128bit｣,
 #		  @operand0_16bit @operand1_8bit @operand1_immediate any* &
 #		  ( modrm_registers @operand0_from_modrm_rm  | (modrm_memory &
 #		  (any @operand0_rm  any*)) ))｣
-# Another example: ｢instruction_modrm_arguments(data16｣, ｢adc G E｣, ｢0x11｣
+# Another example: ｢instruction_modrm_arguments(｢data16｣, ｢adc G E｣, ｢0x11｣
 #									｢lock｣)｣
 #	  becomes: ｢ ( modrm_registers @operand0_from_modrm_rm
 #		      @operand1_from_modrm_reg | (modrm_memory &
@@ -1151,12 +1162,16 @@ define(｢make_operands_128bit｣,
         ｢ifelse(index(｢$2｣, ｢ E｣), -1,
 	  ｢ifelse(index(｢$2｣, ｢ G｣), -1,
 	    ｢ifelse(index(｢$2｣, ｢ M｣), -1,
-	      ｢ifelse(index(｢$2｣, ｢ P｣), -1,
-		｢ifelse(index(｢$2｣, ｢ R｣), -1,
-		  ｢ifelse(index(｢$2｣, ｢ S｣), -1,
-		    ｢ifelse(index(｢$2｣, ｢ U｣), -1,
-		      ｢ifelse(index(｢$2｣, ｢ V｣), -1,
-			｢ifelse(index(｢$2｣, ｢ W｣), -1, ,
+	      ｢ifelse(index(｢$2｣, ｢ N｣), -1,
+		｢ifelse(index(｢$2｣, ｢ P｣), -1,
+		  ｢ifelse(index(｢$2｣, ｢ Q｣), -1,
+		    ｢ifelse(index(｢$2｣, ｢ R｣), -1,
+		      ｢ifelse(index(｢$2｣, ｢ S｣), -1,
+			｢ifelse(index(｢$2｣, ｢ U｣), -1,
+			  ｢ifelse(index(｢$2｣, ｢ V｣), -1,
+			    ｢ifelse(index(｢$2｣, ｢ W｣), -1, ,
+			      ｢_instruction_modrm_arguments($@)｣)｣,
+			    ｢_instruction_modrm_arguments($@)｣)｣,
 			  ｢_instruction_modrm_arguments($@)｣)｣,
 			｢_instruction_modrm_arguments($@)｣)｣,
 		      ｢_instruction_modrm_arguments($@)｣)｣,
@@ -1181,7 +1196,7 @@ define(｢make_operands_128bit｣,
       ｢$2｣)))｢｣instruction_arguments_sizes(｢$1｣, shift(split_argument(
       ｢$2｣)))｢｣instruction_implied_arguments(｢$1｣, shift(split_argument(
       ｢$2｣))) any* & ｣)｣)｢( ｣__instruction_modrm_arguments($@)｢｣ifelse(
-    index(｢$3｣, ｢/｣), -1, , ｢ )｣)｢)｣｣)
+    index(｢$3｣, ｢/｣), -1, , ｢ifelse(index(｢$3｣, ｢/ ｣), -1, ｢ )｣)｣)｢)｣｣)
   define(｢__instruction_modrm_arguments｣, ｢ifelse(
     substr(｢$1｣, 0, 7), ｢memonly｣,
 		｢memory_instruction_modrm_arguments(shift(split_argument($2)))｣,
@@ -1211,7 +1226,9 @@ define(｢make_operands_128bit｣,
       substr(｢$1｣, 0, 1), ｢E｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_rm｣,
       substr(｢$1｣, 0, 1), ｢G｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢M｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_rm｣,
+      substr(｢$1｣, 0, 1), ｢N｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_rm｣,
       substr(｢$1｣, 0, 1), ｢P｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_reg｣,
+      substr(｢$1｣, 0, 1), ｢Q｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_rm｣,
       substr(｢$1｣, 0, 1), ｢R｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_rm｣,
       substr(｢$1｣, 0, 1), ｢S｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢U｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_rm｣,
@@ -1244,7 +1261,9 @@ define(｢make_operands_128bit｣,
       substr(｢$1｣, 0, 1), ｢E｣, ｢ operand｣decr(｢$#｣)｢_rm｣,
       substr(｢$1｣, 0, 1), ｢G｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢M｣, ｢ operand｣decr(｢$#｣)｢_rm｣,
+      substr(｢$1｣, 0, 1), ｢N｣, ｢ operand｣decr(｢$#｣)｢_rm｣,
       substr(｢$1｣, 0, 1), ｢P｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_reg｣,
+      substr(｢$1｣, 0, 1), ｢Q｣, ｢ operand｣decr(｢$#｣)｢_rm｣,
       substr(｢$1｣, 0, 1), ｢R｣, ｢ operand｣decr(｢$#｣)｢_rm｣,
       substr(｢$1｣, 0, 1), ｢S｣, ｢ operand｣decr(｢$#｣)｢_from_modrm_reg｣,
       substr(｢$1｣, 0, 1), ｢U｣, ｢ operand｣decr(｢$#｣)｢_rm｣,
@@ -1253,22 +1272,40 @@ define(｢make_operands_128bit｣,
 ################################################################################
 # ｢instruction_immediate_arguments｣ is placed in place where we have parsed
 # everything except immedite... or offset in jmp/call... or part of the opcode
-# for “3DNow!” instruction (this last part is not implemented but will also go
-# here because “3DNow!” uses “immediate” byte at the end of the instructions as
-# the final part of the opcode).  Here we only need to write one word (if even
-# that) - but we receive all the arguments for the sake of uniformity.
-# For example: ｢instruction_immediate_arguments(｢data16｣, ｢I｣, ｢a｣)｣
+# for “3DNow!” instruction.  Here we only need to write one word (if even that),
+# but we receive all the arguments for the sake of uniformity.
+# For example: ｢instruction_immediate_arguments(
+#					   ｢data16｣, ｢adc I a｣, ｢0x14｣, ｢lock｣)｣
 #     becomes: ｢imm16｣
-# Another example: ｢instruction_immediate_arguments(｢rexw｣, ｢Jz｣)｣
+# Another example: ｢instruction_immediate_arguments(
+#						  ｢rexw｣, ｢ja Jz｣, ｢0x0f 0x87｣)｣
 #	  becomes: ｢rel32｣
-# Last, trivial, example: ｢instruction_immediate_arguments(｢data16｣, ｢E｣, ｢G｣)｣
+# 3DNow! example: ｢instruction_immediate_arguments(｢nodataprefix｣,
+#		  ｢pavgusb Qq Pq｣, ｢0x0f 0x0f / 0xbf｣, ｢Fn8000_0001_EDX_3DNow｣)｣
+#	  becomes: ｢(0xbf) @end_opcode @instruction_pavgusb @operands_count_is_2
+#						   @operand0_mmx @operand1_mmx)｣
+# Last, trivial, example: ｢instruction_immediate_arguments(
+#					   ｢data16｣, ｢adc E G｣, ｢0x12｣, ｢lock｣)｣
 #		 becomes: ｢｣ (i.e.: nothing)
 ################################################################################
-  define(｢instruction_immediate_arguments｣, ｢ifelse(
+  define(｢instruction_immediate_arguments｣, ｢ifelse(index(｢$3｣, ｢/ ｣), -1,
+    ｢_instruction_immediate_arguments(｢$1｣, shift(split_argument(｢$2｣)))｣,
+    ｢regexp(｢$3｣, ｢/ \(.*\)｣, ｢(\1) end_opcode(split_argument(
+      ｢$2｣)) ifelse(
+      substr(｢$4｣, 0, 5), ｢0x66 ｣, ｢not_data16 ｣,
+      substr(｢$4｣, 0, 5), ｢0xf0 ｣, ｢not_lock ｣,
+      substr(｢$4｣, 0, 5), ｢0xf2 ｣, ｢not_repnz ｣,
+      substr(｢$4｣, 0, 5), ｢0xf3 ｣, ｢not_repz ｣,
+    )instruction_name(split_argument(
+      ｢$2｣))｢｣instruction_arguments_number(shift(split_argument(
+      ｢$2｣)))｢｣instruction_arguments_sizes(｢$1｣, shift(split_argument(
+      ｢$2｣)))｢｣instruction_implied_arguments(｢$1｣, shift(split_argument(
+      ｢$2｣)))｣)｣)｣)
+  define(｢_instruction_immediate_arguments｣, ｢ifelse(
       substr(｢$1｣, 0, 7), ｢memonly｣,
-		  ｢instruction_immediate_arguments(substr(｢$1｣, 7), shift($@))｣,
+		  ｢_instruction_immediate_arguments(substr(｢$1｣, 7), shift($@))｣,
       substr(｢$1｣, 0, 7), ｢regonly｣,
-		  ｢instruction_immediate_arguments(substr(｢$1｣, 7), shift($@))｣,
+		  ｢_instruction_immediate_arguments(substr(｢$1｣, 7), shift($@))｣,
       ｢ifelse(substr(｢$2｣, 0, 1), ｢i｣, ｢ifelse(len(｢$2｣), 1,
 	  ｢ifelse(instruction_immediate_arguments_$1,
 	    ｢instruction_immediate_arguments_$1｣,
@@ -1318,7 +1355,7 @@ define(｢make_operands_128bit｣,
 	    ｢ chartest(｢(c & 0x0f) == 0x00｣) operand｣decr(
 						        decr(｢$#｣))｢_from_is4｣)｣,
 	substr(｢$2｣, 0, 1), ｢O｣, ｢ disp64｣)｢｣ifelse(eval(｢$#>2｣), 1,
-	｢instruction_immediate_arguments(｢$1｣, shift(shift($@)))｣)｣)｣)
+	｢_instruction_immediate_arguments(｢$1｣, shift(shift($@)))｣)｣)｣)
   define(｢instruction_immediate_arguments_size8｣, ｢ imm8｣)
   define(｢instruction_immediate_arguments_data16｣, ｢ imm16｣)
   define(｢instruction_immediate_arguments_nodataprefix｣, ｢ imm32｣)
@@ -1353,6 +1390,7 @@ divert｢｣dnl
   instructions_defines(include(｢x86-64-instructions.def｣))
   instructions_defines(include(｢system-instructions.def｣))
   instructions_defines(include(｢x87-instructions.def｣))
+  instructions_defines(include(｢mmx-instructions.def｣))
   instructions_defines(include(｢xmm-instructions.def｣))
 
   valid_instruction =
@@ -1360,4 +1398,5 @@ divert｢｣dnl
     instructions(include(｢system-instructions.def｣))
     instructions(include(｢x86-64-instructions.def｣))
     instructions(include(｢x87-instructions.def｣))
+    instructions(include(｢mmx-instructions.def｣))
     instructions(include(｢xmm-instructions.def｣));

@@ -40,12 +40,18 @@
 #	L: YMM or XMM register specified using the most-significant 4 bits of an
 #	   8-bit immediate value.  In legacy or compatibility mode the most
 #	   significant bit is ignored.
-#	M: A memory operand specified by the {mod, r/m}field of the ModRM byte.
+#	M: A memory operand specified by the {mod, r/m} field of the ModRM byte.
 #	   ModRM.mod ≠ 11b.
+#	N: 64-bit MMX register specified by the ModRM.r/m field. The ModRM.mod
+#	   field must be 11b.
 #	O: The offset of an operand is encoded in the instruction. There is no
 #	   ModRM byte in the instruction encoding. Indexed register-indirect
 #	   addressing using the SIB byte is not supported.
 #	P: 64-bit MMX register specified by the ModRM.reg field.
+#	Q: 64-bit MMX-register or memory operand specified by the {mod, r/m}
+#	   field of the ModRM byte.  For memory operands, the ModRM byte may
+#	   be followed by a SIB byte to specify one of the indexed
+#	   register-indirect addressing forms.
 #	R: General purpose register specified by the ModRM.r/m field.
 #	   The ModRM.mod field must be 11b.
 #	S: Segment register specified by the ModRM.reg field.
@@ -191,6 +197,9 @@
 #	Fn8000_0001_ECX_TBM: Fn8000_0001_ECX[TBM]
 #	Fn8000_0001_ECX_XOP: Fn8000_0001_ECX[XOP]
 #	Fn8000_0001_EDX_3DNow: Fn8000_0001_EDX[3DNow]
+#	Fn8000_0001_EDX_MmxExt: Fn8000_0001_EDX[MmxExt]
+#	Fn8000_0001_EDX_MmxExtOrSSE: Fn8000_0001_EDX[MmxExt] ||
+#				     Fn0000_0001_EDX[SSE]
 #	Fn8000_0001_EDX_RDTSCP: Fn8000_0001_EDX[RDTSCP]
 #	Fn8000_0001_EDX_SYSCALL: Fn8000_0001_EDX[SYSCALL]
 ######## ADC ###################################################################
