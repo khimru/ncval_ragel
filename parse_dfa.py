@@ -1,4 +1,4 @@
-#!/usr/bin/python2.6
+#!/usr/bin/python
 # Copyright (c) 2012 The Native Client Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -102,21 +102,6 @@ def InitStateIfNeeded(states, st):
   return states[st]
 
 
-def BoolToStr(bool_value):
-  ret = 'false'
-  if bool_value:
-    ret = ' true'
-  return ret
-
-
-def AddTransition(states, state_from, begin_byte, end_byte, state_to):
-  InitStateIfNeeded(states, state_from)
-  InitStateIfNeeded(states, state_to)
-  states[state_from]['transitions'].append({'begin_byte': begin_byte,
-                                            'end_byte': end_byte,
-                                            'state_to': state_to,
-                                            })
-
 def Main():
   met_finals = False
   started_edges = False
@@ -172,8 +157,12 @@ def Main():
           else:
             begin_byte = byte_range_text
             end_byte = begin_byte
-          AddTransition(states, state_from, begin_byte, end_byte, state_to)
-
+          InitStateIfNeeded(states, state_from)
+          InitStateIfNeeded(states, state_to)
+          states[state_from]['transitions'].append({'begin_byte': begin_byte,
+                                                    'end_byte': end_byte,
+                                                    'state_to': state_to,
+                                                    })
       while True:
         action_m = re.match('( / |, )(\w+)(.*)$', label_text)
         if not action_m:
@@ -193,6 +182,11 @@ def Main():
   print '#include "test_dfa.h"'
   print
   print 'struct state states[] = {'
+  def BoolToStr(bool_value):
+    ret = 'false'
+    if bool_value:
+      ret = ' true'
+    return ret
   for i in xrange(max_state + 1):
     if not states.get(str(i),None):
       print '  { {}, false, false, false }, /* %d */' % i

@@ -9,6 +9,7 @@
 #   decoder_test_one_file.sh GAS=... OBJDUMP=... DECODER=... ASMFILE=...
 
 set -e
+set -u
 
 # Parse arguments.
 eval "$@"
@@ -24,15 +25,13 @@ if [[ ! -f "$ASMFILE" ]] ; then
   exit 3
 fi
 
-readonly asmfile=$ASMFILE
-
 # Produce an object file, disassemble it in 2 ways and compare results.
-$GAS --64 "$asmfile" -o "$asmfile.o"
-rm -f "$asmfile"
-$DECODER "$asmfile.o" > "$asmfile.decoder"
+$GAS --64 "$ASMFILE" -o "$ASMFILE.o"
+rm -f "$ASMFILE"
+$DECODER "$ASMFILE.o" > "$ASMFILE.decoder"
 # Take objdump output starting at line 8 to skip the unimportant header that
 # is not emulated in the decoder test.
-$OBJDUMP -d "$asmfile.o" |
+$OBJDUMP -d "$ASMFILE.o" |
   tail -n+8 - |
-  cmp - "$asmfile.decoder"
-rm -f "$asmfile.o" "$asmfile.decoder"
+  cmp - "$ASMFILE.decoder"
+rm -f "$ASMFILE.o" "$ASMFILE.decoder"

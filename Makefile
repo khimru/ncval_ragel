@@ -8,6 +8,7 @@ OUT_DIRS = $(OUT)/build \
 	   $(OUT)/timestamps \
 	   $(OUT)/test
 
+PYTHON2X=/usr/bin/python2.6
 CC = gcc
 M4 = m4
 CFLAGS = -Wall -Werror -O3 -m32 -g
@@ -18,6 +19,8 @@ INST_DEFS = general-purpose-instructions.def \
 	    x87-instructions.def \
 	    mmx-instructions.def \
 	    xmm-instructions.def
+
+FAST_TMP_FOR_TEST=/dev/shm
 
 $(OUT_DIRS):
 	install -m 755 -d $@
@@ -80,7 +83,8 @@ binutils: $(BINUTILS_STAMP)
 
 .PHONY: clean
 clean:
-	rm -rf $(OUT)/build $(OUT)/timestamps $(OUT)/test
+	rm -rf "$(OUT)"/build "$(OUT)"/timestamps "$(OUT)"/test \
+	    "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
 
 .PHONY: check
 check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(OUT)/test
@@ -92,17 +96,17 @@ check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(OUT)/test
 
 .PHONY: check-n
 check-n: $(BINUTILS_STAMP) one-instruction.dot decoder-test-x86_64 | $(OUT)/test
-	/usr/bin/python2.6 parse_dfa.py <one-instruction.dot \
+	$(PYTHON2X) parse_dfa.py <one-instruction.dot \
 	    > "$(OUT)/test/test_dfa_transitions.c"
 	$(CC) -O3 -g -c test_dfa.c -o "$(OUT)/test/test_dfa.o"
 	$(CC) -O0 -g -I. -c "$(OUT)/test/test_dfa_transitions.c" -o \
 	    "$(OUT)/test/test_dfa_transitions.o"
 	$(CC) -g "$(OUT)/test/test_dfa.o" "$(OUT)/test/test_dfa_transitions.o" \
 	    -o $(OUT)/test/test_dfa
-	/usr/bin/python2.6 run_objdump_test.py \
+	$(PYTHON2X) run_objdump_test.py \
 	  --gas="$(GAS)" \
 	  --objdump="$(OBJDUMP)" \
 	  --decoder=./decoder-test-x86_64 \
 	  --tester=./decoder_test_one_file.sh \
 	  --nthreads=16 -- \
-	  "$(OUT)/test/test_dfa" /dev/shm
+	  "$(OUT)/test/test_dfa" "$(FAST_TMP_FOR_TEST)"
