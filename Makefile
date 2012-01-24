@@ -86,6 +86,10 @@ clean:
 	rm -rf "$(OUT)"/build "$(OUT)"/timestamps "$(OUT)"/test \
 	    "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
 
+.PHONY: clean-tests
+clean-tests:
+	rm -rf "$(OUT)"/test "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
+
 .PHONY: check
 check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(OUT)/test
 	python dfa_possibilities.py one-instruction.xml > $(OUT)/test/list.s
