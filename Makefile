@@ -1,9 +1,14 @@
+# Copyright (c) 2012 The Native Client Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
 OUT = out
 OUT_DIRS = $(OUT)/build \
 	   $(OUT)/tarballs \
 	   $(OUT)/timestamps \
 	   $(OUT)/test
 
+PYTHON2X=/usr/bin/python2.6
 CC = gcc
 M4 = m4
 CFLAGS = -Wall -Werror -O3 -m32 -g
@@ -14,6 +19,8 @@ INST_DEFS = general-purpose-instructions.def \
 	    x87-instructions.def \
 	    mmx-instructions.def \
 	    xmm-instructions.def
+
+FAST_TMP_FOR_TEST=/dev/shm
 
 $(OUT_DIRS):
 	install -m 755 -d $@
@@ -57,7 +64,7 @@ BINUTILS_STAMP = $(OUT)/timestamps/binutils
 OBJDUMP = $(BINUTILS_BUILD_DIR)/binutils/objdump
 GAS = $(BINUTILS_BUILD_DIR)/gas/as-new
 
-$(BINUTILS_TARBALL):
+$(BINUTILS_TARBALL): | $(OUT_DIRS)
 	rm -f $(BINUTILS_TARBALL)
 	cd $(OUT)/tarballs && wget $(BINUTILS_URL_BASE)/$(BINUTILS_VER).tar.bz2
 
@@ -76,7 +83,12 @@ binutils: $(BINUTILS_STAMP)
 
 .PHONY: clean
 clean:
-	rm -rf $(OUT)/build $(OUT)/timestamps $(OUT)/test
+	rm -rf "$(OUT)"/build "$(OUT)"/timestamps "$(OUT)"/test \
+	    "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
+
+.PHONY: clean-tests
+clean-tests:
+	rm -rf "$(OUT)"/test "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
 
 .PHONY: check
 check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(OUT)/test
@@ -85,3 +97,20 @@ check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(OUT)/test
 	$(OBJDUMP) -d $(OUT)/test/list.o > $(OUT)/test/objdump.txt
 	./decoder-test-x86_64 $(OUT)/test/list.o > $(OUT)/test/decoder.txt
 	diff -uNr $(OUT)/test/objdump.txt $(OUT)/test/decoder.txt
+
+.PHONY: check-n
+check-n: $(BINUTILS_STAMP) one-instruction.dot decoder-test-x86_64 | $(OUT)/test
+	$(PYTHON2X) parse_dfa.py <one-instruction.dot \
+	    > "$(OUT)/test/test_dfa_transitions.c"
+	$(CC) -O3 -g -c test_dfa.c -o "$(OUT)/test/test_dfa.o"
+	$(CC) -O0 -g -I. -c "$(OUT)/test/test_dfa_transitions.c" -o \
+	    "$(OUT)/test/test_dfa_transitions.o"
+	$(CC) -g "$(OUT)/test/test_dfa.o" "$(OUT)/test/test_dfa_transitions.o" \
+	    -o $(OUT)/test/test_dfa
+	$(PYTHON2X) run_objdump_test.py \
+	  --gas="$(GAS)" \
+	  --objdump="$(OBJDUMP)" \
+	  --decoder=./decoder-test-x86_64 \
+	  --tester=./decoder_test_one_file.sh \
+	  --nthreads=16 -- \
+	  "$(OUT)/test/test_dfa" "$(FAST_TMP_FOR_TEST)"
