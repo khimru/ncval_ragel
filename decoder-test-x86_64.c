@@ -376,7 +376,31 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case OperandSize8bit: show_name_suffix = FALSE; break;
 	    case OperandSize16bit: show_name_suffix = 'w'; break;
 	    case OperandSize32bit: show_name_suffix = 'q'; break;
-	    default: assert(FALSE);
+	    case OperandSize2bit:
+	    case OperandSize64bit:
+	    case OperandSize128bit:
+	    case OperandSize256bit:
+	    case OperandFloatSize16bit:
+	    case OperandFloatSize32bit:
+	    case OperandFloatSize64bit:
+	    case OperandFloatSize80bit:
+	    case OperandX87Size16bit:
+	    case OperandX87Size32bit:
+	    case OperandX87Size64bit:
+	    case OperandX87BCD:
+	    case OperandX87ENV:
+	    case OperandX87STATE:
+	    case OperandX87MMXXMMSTATE:
+	    case OperandST:
+	    case OperandSelector:
+	    case OperandFarPtr:
+	    case OperandSegmentRegister:
+	    case OperandControlRegister:
+	    case OperandDebugRegister:
+	    case OperandMMX:
+	    case OperandXMM:
+	    case OperandYMM:
+	      assert(FALSE);
 	  }
 	} else {
 	  show_name_suffix = FALSE;
@@ -411,7 +435,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case OperandXMM:
 	    case OperandYMM:
 	    case OperandSelector: show_name_suffix = FALSE; break;
-	    default: assert(FALSE);
+	    case OperandFloatSize16bit:
+	    case OperandST:
+	    case OperandSegmentRegister:
+	    case OperandControlRegister:
+	    case OperandDebugRegister:
+	      assert(FALSE);
 	  }
 	}
       } else {
@@ -438,7 +467,30 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case OperandSize16bit: show_name_suffix = 'w'; break;
 	    case OperandSize32bit: show_name_suffix = 'l'; break;
 	    case OperandSize64bit: show_name_suffix = 'q'; break;
-	    default: assert(FALSE);
+	    case OperandSize2bit:
+	    case OperandSize128bit:
+	    case OperandSize256bit:
+	    case OperandFloatSize16bit:
+	    case OperandFloatSize32bit:
+	    case OperandFloatSize64bit:
+	    case OperandFloatSize80bit:
+	    case OperandX87Size16bit:
+	    case OperandX87Size32bit:
+	    case OperandX87Size64bit:
+	    case OperandX87BCD:
+	    case OperandX87ENV:
+	    case OperandX87STATE:
+	    case OperandX87MMXXMMSTATE:
+	    case OperandST:
+	    case OperandSelector:
+	    case OperandFarPtr:
+	    case OperandSegmentRegister:
+	    case OperandControlRegister:
+	    case OperandDebugRegister:
+	    case OperandMMX:
+	    case OperandXMM:
+	    case OperandYMM:
+	      assert(FALSE);
 	  }
 	}
       }
@@ -1036,7 +1088,17 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	  case REG_R15: printf("%%r15"); break;
 	  case REG_RIP: printf("%%rip"); print_rip = TRUE; break;
 	  case REG_NONE: break;
-	  default: assert(FALSE);
+	  case REG_RM:
+	  case REG_RIZ:
+	  case REG_IMM:
+	  case REG_IMM2:
+	  case REG_DS_RBX:
+	  case REG_ES_RDI:
+	  case REG_DS_RSI:
+	  case REG_PORT_DX:
+	  case REG_ST:
+	  case JMP_TO:
+	    assert(FALSE);
 	}
 	switch (instruction->rm.index) {
 	  case REG_RAX: printf(",%%rax,%d",1<<instruction->rm.scale); break;
@@ -1062,7 +1124,17 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	      printf(",%%riz,%d",1<<instruction->rm.scale);
 	    break;
 	  case REG_NONE: break;
-	  default: assert(FALSE);
+	  case REG_RM:
+	  case REG_RIP:
+	  case REG_IMM:
+	  case REG_IMM2:
+	  case REG_DS_RBX:
+	  case REG_ES_RDI:
+	  case REG_DS_RSI:
+	  case REG_PORT_DX:
+	  case REG_ST:
+	  case JMP_TO:
+	    assert(FALSE);
 	}
 	if ((instruction->rm.base != REG_NONE) ||
 	    (instruction->rm.index != REG_RIZ) ||
@@ -1090,7 +1162,10 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	  printf("0x%x", end + instruction->rm.offset -
 				     (((struct DecodeState *)userdata)->offset));
 	break;
-      default: assert(FALSE);
+      case REG_RIP:
+      case REG_RIZ:
+      case REG_NONE:
+        assert(FALSE);
     }
     delimeter = ',';
   }
@@ -1126,9 +1201,9 @@ void ProcessError (const uint8_t *ptr, void *userdata) {
 int DecodeFile(const char *filename, int repeat_count) {
   size_t data_size;
   uint8_t *data;
-  ReadFile(filename, &data, &data_size);
-
   int count;
+
+  ReadFile(filename, &data, &data_size);
   for (count = 0; count < repeat_count; count++) {
     Elf_Ehdr *header;
     int index;
@@ -1144,6 +1219,8 @@ int DecodeFile(const char *filename, int repeat_count) {
 
       if ((section->sh_flags & SHF_EXECINSTR) != 0) {
 	struct DecodeState state;
+	int res;
+
 	state.fwait = FALSE;
 	state.offset = data + section->sh_offset - section->sh_addr;
 	if (section->sh_size <= 0xfff) {
@@ -1157,11 +1234,10 @@ int DecodeFile(const char *filename, int repeat_count) {
 	}
 	CheckBounds(data, data_size,
 		    data + section->sh_offset, section->sh_size);
-	int rc = DecodeChunk(section->sh_addr,
-			     data + section->sh_offset, section->sh_size,
-			     ProcessInstruction, ProcessError, &state);
-	if (rc != 0) {
-	  return rc;
+	res = DecodeChunk(data + section->sh_offset, section->sh_size,
+			  ProcessInstruction, ProcessError, &state);
+	if (res != 0) {
+	  return res;
 	} else if (state.fwait) {
 	  while (state.fwait < data + section->sh_offset + section->sh_size) {
 	    printf("%*x:\t9b                   \tfwait\n", state.width,

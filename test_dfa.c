@@ -18,7 +18,7 @@
 
 
 const int kInstsPerFile = 1000000;
-const int kInvalidState = UINT16_MAX;
+const uint16_t kInvalidState = UINT16_MAX;
 
 /* The list of error codes.  */
 const int kErrArgc = 1;
@@ -142,6 +142,7 @@ static struct output_state g_output;
  * about, we generate 0x01, 0x23, 0x45, ... as the field bytes.  */
 static void TraverseStates(uint16_t entry, bool in_anyfield) {
   int i;
+  uint8_t prev_byte;
   struct state st = states[entry];
   uint16_t st2;
 
@@ -166,7 +167,7 @@ static void TraverseStates(uint16_t entry, bool in_anyfield) {
       for (i = 0; i < 256; i++) {
         st2 = st.transitions[i];
         if (st2 != kInvalidState) {
-          assert(0 <= st2 && st2 < NumStates());
+          assert(st2 < NumStates());
           inst_bytes[inst_len++] = i;
           TraverseStates(st2, false);
           inst_len--;
@@ -176,7 +177,8 @@ static void TraverseStates(uint16_t entry, bool in_anyfield) {
   } else {
     /* Continue anyfield traversal.  */
     assert(AllTransitionsEqual(st));
-    inst_bytes[inst_len++] = inst_bytes[inst_len - 1] + 0x22;
+    prev_byte = inst_bytes[inst_len - 1];
+    inst_bytes[inst_len++] = prev_byte + 0x22;
     if (st.anyfield_end) {
       TraverseStates(st.transitions[0], false);
     } else {

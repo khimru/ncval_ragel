@@ -189,10 +189,12 @@ def Main():
     return ret
   for i in xrange(max_state + 1):
     if not states.get(str(i),None):
-      print '  { {}, false, false, false }, /* %d */' % i
+      print ('  { .is_final = false, .anyfield_begin = false,' +
+             ' .anyfield_end = false }, /* %d */' % i)
       continue
     st = states[str(i)]
-    print '  { {}, %s, %s, %s }, /* %d */' % (
+    print ('  { .is_final = %s, .anyfield_begin = %s,' +
+           ' .anyfield_end = %s }, /* %d */') % (
         BoolToStr(st['is_final']),
         BoolToStr(st['anyfield_begin']),
         BoolToStr(st['anyfield_end']),

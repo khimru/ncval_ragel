@@ -9,10 +9,10 @@ OUT_DIRS = $(OUT)/build \
 	   $(OUT)/test
 
 PYTHON2X=/usr/bin/python2.6
-CC = gcc
+CC = gcc -std=gnu99 -Wdeclaration-after-statement -Wall -pedantic -Wextra -Wno-long-long -Wswitch-enum -Wsign-compare -Wno-variadic-macros -Werror -O3 -m32
 M4 = m4
-CFLAGS = -Wall -Werror -O3 -m32 -g
-LDFLAGS = -m32 -g
+CFLAGS = -g
+LDFLAGS = -g
 INST_DEFS = general-purpose-instructions.def \
 	    system-instructions.def \
 	    x86-64-instructions.def \
@@ -102,10 +102,10 @@ check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(OUT)/test
 check-n: $(BINUTILS_STAMP) one-instruction.dot decoder-test-x86_64 | $(OUT)/test
 	$(PYTHON2X) parse_dfa.py <one-instruction.dot \
 	    > "$(OUT)/test/test_dfa_transitions.c"
-	$(CC) -O3 -g -c test_dfa.c -o "$(OUT)/test/test_dfa.o"
-	$(CC) -O0 -g -I. -c "$(OUT)/test/test_dfa_transitions.c" -o \
+	$(CC) $(CFLAGS) -c test_dfa.c -o "$(OUT)/test/test_dfa.o"
+	$(CC) $(CFLAGS) -O0 -I. -c "$(OUT)/test/test_dfa_transitions.c" -o \
 	    "$(OUT)/test/test_dfa_transitions.o"
-	$(CC) -g "$(OUT)/test/test_dfa.o" "$(OUT)/test/test_dfa_transitions.o" \
+	$(CC) $(LDFLAGS) "$(OUT)/test/test_dfa.o" "$(OUT)/test/test_dfa_transitions.o" \
 	    -o $(OUT)/test/test_dfa
 	$(PYTHON2X) run_objdump_test.py \
 	  --gas="$(GAS)" \
