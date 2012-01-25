@@ -79,12 +79,12 @@ struct instruction {
   unsigned char operands_count;
   struct {
     unsigned char rex;	      /* Mostly to distingush cases like %ah vs %spl. */
-    int data16:1;	      /* "Normal", non-rex prefixes. */
-    int lock:1;
-    int repnz:1;
-    int repz:1;
-    int branch_not_taken:1;
-    int branch_taken:1;
+    _Bool data16:1;	      /* "Normal", non-rex prefixes. */
+    _Bool lock:1;
+    _Bool repnz:1;
+    _Bool repz:1;
+    _Bool branch_not_taken:1;
+    _Bool branch_taken:1;
   } prefix;
   struct {
     enum register_name name;
@@ -106,7 +106,7 @@ typedef void (*process_instruction_func) (const uint8_t *begin,
 
 typedef void (*process_error_func) (const uint8_t *ptr, void *userdata);
 
-int DecodeChunk(uint32_t load_addr, uint8_t *data, size_t size, 
+int DecodeChunk(uint8_t *data, size_t size, 
 		process_instruction_func process_instruction,
 		process_error_func process_error, void *userdata);
 
