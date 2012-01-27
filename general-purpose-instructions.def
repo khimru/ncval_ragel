@@ -203,19 +203,19 @@
 #	Fn8000_0001_EDX_RDTSCP: Fn8000_0001_EDX[RDTSCP]
 #	Fn8000_0001_EDX_SYSCALL: Fn8000_0001_EDX[SYSCALL]
 ######## ADC ###################################################################
-adc I a, 0x14, lock
+adc I a, 0x14
 adc I E, 0x80 /2, lock
 adc Ib Ev, 0x83 /2, lock
 adc G E, 0x10, lock
 adc E G, 0x12, lock
 ######## ADD ###################################################################
-add I a, 0x04, lock
+add I a, 0x04
 add I E, 0x80 /0, lock
 add Ib Ev, 0x83 /0, lock
 add G E, 0x00, lock
 add E G, 0x02, lock
 ######## AND ###################################################################
-and I a, 0x24, lock
+and I a, 0x24
 and I E, 0x80 /4, lock
 and Ib Ev, 0x83 /4, lock
 and G E, 0x20, lock
@@ -487,7 +487,7 @@ nop Ev, 0x0f 0x1f /0
 ######## NOT ###################################################################
 not E, 0xf6 /2, lock
 ######## OR ####################################################################
-or I a, 0x0c, lock
+or I a, 0x0c
 or I E, 0x80 /1, lock
 or Ib Ev, 0x83 /1, lock
 or G E, 0x08, lock
@@ -568,7 +568,7 @@ sar Ib E, 0xc0 /7
 sar E, 0xd0 /7
 sar cb E, 0xd2 /7
 ######## SBB ###################################################################
-sbb I a, 0x1c, lock
+sbb I a, 0x1c
 sbb I E, 0x80 /3, lock
 sbb Ib Ev, 0x83 /3, lock
 sbb G E, 0x18, lock
@@ -613,7 +613,7 @@ std, 0xfd
 ######## STOS/STOSB/STOSW/STOSD/STOSQ ##########################################
 stos a Y, 0xaa
 ######## SUB ###################################################################
-sub I a, 0x2c, lock
+sub I a, 0x2c
 sub I E, 0x80 /5, lock
 sub Ib Ev, 0x83 /5, lock
 sub G E, 0x28, lock
@@ -639,7 +639,7 @@ xchg G E, 0x86, lock
 ######## XLAT ##################################################################
 xlat bb, 0xd7
 ######## XOR ###################################################################
-xor I a, 0x34, lock
+xor I a, 0x34
 xor I E, 0x80 /6, lock
 xor Ib Ev, 0x83 /6, lock
 xor G E, 0x30, lock

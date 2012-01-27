@@ -75,7 +75,7 @@ enum register_name {
 };
 
 struct instruction {
-  char *name;
+  const char *name;
   unsigned char operands_count;
   struct {
     unsigned char rex;        /* Mostly to distingush cases like %ah vs %spl. */

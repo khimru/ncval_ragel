@@ -10,8 +10,10 @@ OUT_DIRS = $(OUT)/build \
 
 PYTHON2X=/usr/bin/python2.6
 CC = gcc -std=gnu99 -Wdeclaration-after-statement -Wall -pedantic -Wextra -Wno-long-long -Wswitch-enum -Wsign-compare -Wno-variadic-macros -Werror -O3 -m32
+CXX = g++ -std=c++0x -O3 -m32
 M4 = m4
 CFLAGS = -g
+CXXFLAGS = -g
 LDFLAGS = -g
 INST_DEFS = general-purpose-instructions.def \
 	    system-instructions.def \
@@ -28,9 +30,11 @@ $(OUT_DIRS):
 all: decoder-test-x86_64 validator-test-x86_64
 decoder-test-x86_64: decoder-x86_64.o decoder-test-x86_64.o
 validator-test-x86_64: validator-x86_64.o validator-test-x86_64.o
-.INTERMEDIATE: decoder-x86_64.rl
-decoder-x86_64.rl: decoder-x86_64.m4 $(INST_DEFS) \
-  common.m4 common_decoding.m4 instruction_parts.m4 instructions.m4
+.INTERMEDIATE: decoder-x86_64.c
+decoder-x86_64.c: decoder-x86_64-instruction.rl
+.INTERMEDIATE: decoder-x86_64-instruction.rl gen-decoder
+decoder-x86_64-instruction.rl: gen-decoder $(INST_DEFS)
+	./gen-decoder -o decoder-x86_64-instruction.rl $(INST_DEFS)
 .INTERMEDIATE: one-instruction.rl
 one-instruction.rl: one-instruction.m4 $(INST_DEFS) \
   common.m4 common_decoding.m4 instruction_parts.m4 instructions.m4
@@ -112,5 +116,5 @@ check-n: $(BINUTILS_STAMP) one-instruction.dot decoder-test-x86_64 | $(OUT)/test
 	  --objdump="$(OBJDUMP)" \
 	  --decoder=./decoder-test-x86_64 \
 	  --tester=./decoder_test_one_file.sh \
-	  --nthreads=16 -- \
+	  --nthreads=`cat /proc/cpuinfo | grep processor | wc -l` -- \
 	  "$(OUT)/test/test_dfa" "$(FAST_TMP_FOR_TEST)"
