@@ -524,8 +524,18 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   if (instruction->prefix.rex == 0x40) {
     /* First argument of “crc32”/“rcl”/“rcr”/“rol”/“ror”/“sar”/“shl”/“shr”
        confuses objdump: it does not show it in this case.  */
-    if (show_name_suffix &&
+    if ((show_name_suffix ||
+	 !strcmp(instruction_name, "movsbl") ||
+	 !strcmp(instruction_name, "movsbw") ||
+	 !strcmp(instruction_name, "movzbl") ||
+	 !strcmp(instruction_name, "movzbw") ||
+	 !strcmp(instruction_name, "pextrb") ||
+	 !strcmp(instruction_name, "pinsrb")) &&
 	((strcmp(instruction_name, "crc32") &&
+	  strcmp(instruction_name, "movsbl") &&
+	  strcmp(instruction_name, "movsbw") &&
+	  strcmp(instruction_name, "movzbl") &&
+	  strcmp(instruction_name, "movzbw") &&
 	  strcmp(instruction_name, "rcl") &&
 	  strcmp(instruction_name, "rcr") &&
 	  strcmp(instruction_name, "rol") &&
