@@ -94,9 +94,9 @@ struct instruction {
     enum register_name base;
     enum register_name index;
     int scale;
-    int64_t offset;
+    uint64_t offset;
   } rm;
-  int64_t imm[2];
+  uint64_t imm[2];
 };
 
 typedef void (*process_instruction_func) (const uint8_t *begin,

@@ -30,12 +30,21 @@ $(OUT_DIRS):
 all: decoder-test-x86_64 validator-test-x86_64
 decoder-test-x86_64: decoder-x86_64.o decoder-test-x86_64.o
 validator-test-x86_64: validator-x86_64.o validator-test-x86_64.o
-.INTERMEDIATE: decoder-x86_64.c
+.INTERMEDIATE: gen-decoder decoder-x86_64.c
+decoder-x86_64.c: decoder-x86_64-instruction-consts.c
 decoder-x86_64.c: decoder-x86_64-instruction.rl
-.INTERMEDIATE: decoder-x86_64-instruction.rl gen-decoder
-decoder-x86_64-instruction.rl: gen-decoder $(INST_DEFS)
-	./gen-decoder -o decoder-x86_64-instruction.rl $(INST_DEFS)
-.INTERMEDIATE: one-instruction.rl
+.INTERMEDIATE: decoder-x86_64-instruction.rl decoder-x86_64-instruction-consts.c
+decoder-x86_64-instruction-consts.c decoder-x86_64-instruction.rl: \
+							gen-decoder $(INST_DEFS)
+	./gen-decoder -o decoder-x86_64-instruction.rl $(INST_DEFS) \
+	  -d opcode,mark_data_fields
+one-instruction.rl: one-valid-instruction-consts.c
+one-instruction.rl: one-valid-instruction.rl
+.INTERMEDIATE: one-valid-instruction.rl one-valid-instruction-consts.c
+one-valid-instruction-consts.c one-valid-instruction.rl: \
+							gen-decoder $(INST_DEFS)
+	./gen-decoder -o one-valid-instruction.rl $(INST_DEFS)
+.INTERMEDIATE: one-instruction.rl one-instruction.dot one-instruction.xml
 one-instruction.rl: one-instruction.m4 $(INST_DEFS) \
   common.m4 common_decoding.m4 instruction_parts.m4 instructions.m4
 

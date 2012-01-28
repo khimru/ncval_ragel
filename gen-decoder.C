@@ -77,6 +77,9 @@ where they are insered:
                          0xf2, 0xf3) or immediate byte (“cmpeqpd”, “pf2id”,
                          etc) to distinguish operands—these are not captured
                          between “>opcode_begin” and “@opcode_end”
+   parse_operands      this will grab instruction operands
+   mark_data_fields    this will make “data fields” (dispXX, immXX, relXX) with
+                         xxxXX_operand_begin and xxxXX_operand_end
 )END");
 
   const char*const kVersionHelp = N_(R"END(%1$s %2$s
@@ -89,13 +92,17 @@ found in the LICENSE file.
     kRexPrefix,
     vVexPrefix,
     kInstructionName,
-    kOpcode
+    kOpcode,
+    kParseOperands,
+    kMarkDataFields
   };
   const char* kDisablableActionsList[] = {
     "rex_prefix",
     "vex_prefix",
     "instruction_name",
-    "opcode"
+    "opcode",
+    "parse_operands",
+    "mark_data_fields"
   };
   bool disabled_actions[arraysize(kDisablableActionsList)];
 
@@ -244,6 +251,7 @@ found in the LICENSE file.
     }
     return result + " )";
   }
+  #define chartest(x) (chartest([=](int c) { return x; }).c_str())
 
   void print_consts(void)  {
     std::vector<std::string> names;
@@ -424,7 +432,9 @@ found in the LICENSE file.
     imm2_operand = IMM64;
     imm2 = p - 7;
   }
-  action modrm_only_base {
+)END");
+    if (!disabled_actions[kParseOperands]) {
+      fprintf(out_file, R"END(  action modrm_only_base {
     disp_type = DISPNONE;
     index = REG_NONE;
     base = ((*p) & 0x07) |
@@ -463,66 +473,89 @@ found in the LICENSE file.
 			    (((~vex_prefix) & 0x40) >> 3)];
     scale = ((*p) & 0xc0) >> 6;
   }
-
+)END");
+    }
+    fprintf(out_file, R"END(
   # Relative jumps and calls.
-  rel8 = any @rel8_operand;
-  rel16 = any{2} @rel16_operand;
-  rel32 = any{4} @rel32_operand;
-
+  rel8 = any %s;
+  rel16 = any{2} %s;
+  rel32 = any{4} %s;
+)END", disabled_actions[kMarkDataFields] ?
+	 "@rel8_operand" : ">rel8_operand_begin @rel8_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@rel16_operand" : ">rel16_operand_begin @rel16_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@rel32_operand" : ">rel32_operand_begin @rel32_operand_end");
+    fprintf(out_file, R"END(
   # Displacements.
-  disp8		= any @disp8_operand;
-  disp32	= any{4} @disp32_operand;
-  disp64	= any{8} @disp64_operand;
-
+  disp8		= any %s;
+  disp32	= any{4} %s;
+  disp64	= any{8} %s;
+)END", disabled_actions[kMarkDataFields] ?
+	 "@disp8_operand" : ">disp8_operand_begin @disp8_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@disp32_operand" : ">disp32_operand_begin @disp32_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@disp64_operand" : ">disp64_operand_begin @disp64_operand_end");
+    fprintf(out_file, R"END(
   # Immediates.
   imm2 = %s @imm2_operand;
-)END", chartest([](int c) { return (c & 0x0c) == 0x00; }).c_str());
-    fprintf(out_file, R"END(  imm8 = any @imm8_operand;
-  imm16 = any{2} @imm16_operand;
-  imm32 = any{4} @imm32_operand;
-  imm64 = any{8} @imm64_operand;
-  imm8n2 = any @imm8_second_operand;
-  imm16n2 = any{2} @imm16_second_operand;
-  imm32n2 = any{4} @imm32_second_operand;
-  imm64n2 = any{8} @imm64_second_operand;
-
+)END", chartest((c & 0x0c) == 0x00));
+    fprintf(out_file, R"END(  imm8 = any %s;
+  imm16 = any{2} %s;
+  imm32 = any{4} %s;
+  imm64 = any{8} %s;
+  imm8n2 = any %s;
+  imm16n2 = any{2} %s;
+  imm32n2 = any{4} %s;
+  imm64n2 = any{8} %s;
+)END", disabled_actions[kMarkDataFields] ?
+	 "@imm8_operand" : ">imm8_operand_begin @imm8_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@imm16_operand" : ">imm8_operand_begin @imm16_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@imm32_operand" : ">imm8_operand_begin @imm32_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@imm64_operand" : ">imm8_operand_begin @imm64_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@imm8_second_operand" : ">imm8_operand_begin @imm8_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@imm16_second_operand" : ">imm16_operand_begin @imm16_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@imm32_second_operand" : ">imm32_operand_begin @imm32_operand_end",
+       disabled_actions[kMarkDataFields] ?
+	 "@imm64_second_operand" : ">imm64_operand_begin @imm64_operand_end");
+    fprintf(out_file, R"END(
   # Different types of operands.
   operand_sib_base_index = 
     (%s . (%s @modrm_parse_sib)) |
     (%s . (any @modrm_parse_sib) . disp8) |
     (%s . (any @modrm_parse_sib) . disp32);
-)END", chartest([](int c) {
-		   return (c & 0xC0) == 0    && (c & 0x07) == 0x04; }).c_str(),
-       chartest([](int c) { return (c & 0x07) != 0x05; }).c_str(),
-       chartest([](int c) {
-		   return (c & 0xC0) == 0x40 && (c & 0x07) == 0x04; }).c_str(),
-       chartest([](int c) {
-		   return (c & 0xC0) == 0x80 && (c & 0x07) == 0x04; }).c_str());
+)END", chartest((c & 0xC0) == 0    && (c & 0x07) == 0x04),
+       chartest((c & 0x07) != 0x05),
+       chartest((c & 0xC0) == 0x40 && (c & 0x07) == 0x04),
+       chartest((c & 0xC0) == 0x80 && (c & 0x07) == 0x04));
     fprintf(out_file, R"END(  operand_sib_pure_index = %s .
     (%s @modrm_pure_index) . disp32;
-)END", chartest([](int c) {
-		   return (c & 0xC0) == 0    && (c & 0x07) == 0x04; }).c_str(),
-       chartest([](int c) { return (c & 0x07) == 0x05; }).c_str());
+)END", chartest((c & 0xC0) == 0    && (c & 0x07) == 0x04),
+       chartest((c & 0x07) == 0x05));
     fprintf(out_file, R"END(  operand_disp  =
     (%s @modrm_base_disp . disp8) |
     (%s @modrm_base_disp . disp32);
-)END", chartest([](int c) {
-		   return (c & 0xC0) == 0x40 && (c & 0x07) != 0x04; }).c_str(),
-       chartest([](int c) {
-		   return (c & 0xC0) == 0x80 && (c & 0x07) != 0x04; }).c_str());
+)END", chartest((c & 0xC0) == 0x40 && (c & 0x07) != 0x04),
+       chartest((c & 0xC0) == 0x80 && (c & 0x07) != 0x04));
     fprintf(out_file, "  # It's pure disp32 in IA32 case, "
 	    R"END(but offset(%%rip) in x86-64 case.
   operand_rip = %s @modrm_rip . disp32;
-)END", chartest([](int c) {
-		    return (c & 0xC0) == 0   && (c & 0x07) == 0x05; }).c_str());
+)END", chartest((c & 0xC0) == 0   && (c & 0x07) == 0x05));
     fprintf(out_file, R"END(  single_register_memory = %s @modrm_only_base;
-)END", chartest([](int c) { return (c & 0xC0) == 0 &&
-			  (c & 0x07) != 0x04 && (c & 0x07) != 0x05; }).c_str());
+)END", chartest((c & 0xC0) == 0   && (c & 0x07) != 0x04 &&
+				     (c & 0x07) != 0x05));
     fprintf(out_file, R"END(  modrm_memory = (operand_disp | operand_rip |
 		  operand_sib_base_index | operand_sib_pure_index |
 		  single_register_memory) @check_access;
   modrm_registers = %s;
-)END", chartest([](int c) { return (c & 0xC0) == 0xC0; }).c_str());
+)END", chartest((c & 0xC0) == 0xC0));
     fprintf(out_file, R"END(
   # Operations selected using opcode in ModR/M.
   opcode_0 = %s;
@@ -538,15 +571,15 @@ found in the LICENSE file.
   # This is used to move operand name detection after first byte of ModRM.
   opcode_m = any;
   opcode_r = any;
-)END", chartest([](int c) { return (c & 0x38) == 0x00; }).c_str(),
-       chartest([](int c) { return (c & 0x38) == 0x08; }).c_str(),
-       chartest([](int c) { return (c & 0x38) == 0x10; }).c_str(),
-       chartest([](int c) { return (c & 0x38) == 0x18; }).c_str(),
-       chartest([](int c) { return (c & 0x38) == 0x20; }).c_str(),
-       chartest([](int c) { return (c & 0x38) == 0x28; }).c_str(),
-       chartest([](int c) { return (c & 0x38) == 0x30; }).c_str(),
-       chartest([](int c) { return (c & 0x38) == 0x38; }).c_str(),
-       chartest([](int c) { return (c & 0x38) < 0x30; }).c_str());
+)END", chartest((c & 0x38) == 0x00),
+       chartest((c & 0x38) == 0x08),
+       chartest((c & 0x38) == 0x10),
+       chartest((c & 0x38) == 0x18),
+       chartest((c & 0x38) == 0x20),
+       chartest((c & 0x38) == 0x28),
+       chartest((c & 0x38) == 0x30),
+       chartest((c & 0x38) == 0x38),
+       chartest((c & 0x38) < 0x30));
     fprintf(out_file, R"END(
   # Prefixes.
   data16 = 0x66 @data16_prefix;
@@ -577,21 +610,21 @@ found in the LICENSE file.
   REX_WXB  = %s @rex_pfx;
   REX_RXB  = %s @rex_pfx;
   REX_WRXB = %s @rex_pfx;
-)END", chartest([](int c) { return (c & 0xf7) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xfb) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xfd) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xfe) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xf3) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xf5) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xf6) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xf9) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xfa) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xfc) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xf1) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xf2) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xf4) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xf8) == 0x40; }).c_str(),
-       chartest([](int c) { return (c & 0xf0) == 0x40; }).c_str());
+)END", chartest((c & 0xf7) == 0x40),
+       chartest((c & 0xfb) == 0x40),
+       chartest((c & 0xfd) == 0x40),
+       chartest((c & 0xfe) == 0x40),
+       chartest((c & 0xf3) == 0x40),
+       chartest((c & 0xf5) == 0x40),
+       chartest((c & 0xf6) == 0x40),
+       chartest((c & 0xf9) == 0x40),
+       chartest((c & 0xfa) == 0x40),
+       chartest((c & 0xfc) == 0x40),
+       chartest((c & 0xf1) == 0x40),
+       chartest((c & 0xf2) == 0x40),
+       chartest((c & 0xf4) == 0x40),
+       chartest((c & 0xf8) == 0x40),
+       chartest((c & 0xf0) == 0x40));
     fprintf(out_file, R"END(
   rex_w    = REX_W    - REX_NONE;
   rex_r    = REX_R    - REX_NONE;
@@ -616,13 +649,13 @@ found in the LICENSE file.
   REXW_RB  = %s @rex_pfx;
   REXW_XB  = %s @rex_pfx;
   REXW_RXB = %s @rex_pfx;
-)END", chartest([](int c) { return (c & 0xfb) == 0x48; }).c_str(),
-       chartest([](int c) { return (c & 0xfd) == 0x48; }).c_str(),
-       chartest([](int c) { return (c & 0xfe) == 0x48; }).c_str(),
-       chartest([](int c) { return (c & 0xf9) == 0x48; }).c_str(),
-       chartest([](int c) { return (c & 0xfa) == 0x48; }).c_str(),
-       chartest([](int c) { return (c & 0xfc) == 0x48; }).c_str(),
-       chartest([](int c) { return (c & 0xf8) == 0x48; }).c_str());
+)END", chartest((c & 0xfb) == 0x48),
+       chartest((c & 0xfd) == 0x48),
+       chartest((c & 0xfe) == 0x48),
+       chartest((c & 0xf9) == 0x48),
+       chartest((c & 0xfa) == 0x48),
+       chartest((c & 0xfc) == 0x48),
+       chartest((c & 0xf8) == 0x48));
     fprintf(out_file, R"END(
   # VEX/XOP prefix.
   action vex_pfx {
@@ -651,8 +684,7 @@ found in the LICENSE file.
       T { "RXB",	0x00 }
     } ) {
       fprintf(out_file, R"END(  VEX_%s = %s @vex_pfx;
-)END", vex.first, chartest([vex](int c) {
-			     return (c & vex.second) == vex.second; }).c_str());
+)END", vex.first, chartest((c & vex.second) == vex.second));
     }
     for (auto vex : {
       T { "01",		1	},
@@ -669,15 +701,18 @@ found in the LICENSE file.
       T { "01010",	10	},
     } ) {
       fprintf(out_file, R"END(  VEX_map%s = %s;
-)END", vex.first, chartest([&vex](int c) {
-				   return (c & 0x1f) == vex.second; }).c_str());
+)END", vex.first, chartest((c & 0x1f) == vex.second));
     }
-    fprintf(out_file, R"END(
+    if (!disabled_actions[kOpcode]) {
+      fprintf(out_file, R"END(
   action begin_opcode {
+    begin_opcode = p;
   }
   action end_opcode {
+    end_opcode = p;
   }
 )END");
+    }
     for (auto i = 0 ; i <= 5; ++i) {
       fprintf(out_file, R"END(  action operands_count_is_%1$d {
     operands_count = %1$d;
@@ -824,7 +859,7 @@ found in the LICENSE file.
 		case '0':
 		  (*opcode) = "(";
 		  opcode->append(saved_opcode);
-		  for (auto c = '1'; c <= '7'; c++) {
+		  for (auto c = '1'; c <= '7'; ++c) {
 		    opcode->push_back('|');
 		    (*(saved_opcode.rbegin())) = c;
 		    opcode->append(saved_opcode);
@@ -1295,7 +1330,7 @@ found in the LICENSE file.
 				   &operand - &(*operands.begin()), it->second);
 	  }
 	}
-	fprintf(out_file, " . any* &%s", std::get<0>(mode));
+	fprintf(out_file, " . any* &%s @check_access", std::get<0>(mode));
 	fprintf(out_file, ")");
 	if (opcode_in_imm) {
 	  print_immediate_opcode();
@@ -1323,7 +1358,7 @@ found in the LICENSE file.
 
     bool mod_reg_is_used() {
       for (auto &operand : operands) {
-	for (auto c : { 'C', 'D', 'G', 'P', 'S', 'V' }) {
+	for (auto c : { 'C', 'G', 'P', 'V' }) {
 	  if (operand[0] == c) {
 	    return true;
 	  }
@@ -1572,7 +1607,9 @@ found in the LICENSE file.
 	}
 	fprintf(out_file, ")");
       }
-      fprintf(out_file, " >begin_opcode");
+      if (!disabled_actions[kOpcode]) {
+	fprintf(out_file, " >begin_opcode");
+      }
       for (auto &operand : operands) {
 	if (operand[0] == 'r') {
 	  fprintf(out_file, " @operand%zd_from_opcode",
@@ -1591,7 +1628,9 @@ found in the LICENSE file.
 	  }
 	}
       }
-      fprintf(out_file, " @end_opcode");
+      if (!disabled_actions[kOpcode]) {
+	fprintf(out_file, " @end_opcode");
+      }
       for (auto &prefix : required_prefixes) {
 	if (prefix == "0x66") {
 	  fprintf(out_file, " @not_data16_prefix");
@@ -1813,8 +1852,7 @@ found in the LICENSE file.
 	}
 	if (*operand->begin() == 'L') {
 	  if (operands.size() == 4) {
-	    fprintf(out_file, " %s", chartest([](int c) {
-					 return (c & 0x0f) == 0x00; }).c_str());
+	    fprintf(out_file, " %s", chartest((c & 0x0f) == 0x00));
 	  }
 	  fprintf(out_file, " @operand%zd_from_is4",
 						 operands.rend() - operand - 1);
