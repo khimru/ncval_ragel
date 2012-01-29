@@ -32,8 +32,6 @@
   action rel32_operand_begin { }
   action rel32_operand_end { }
 
-  action check_access { }
-
   include decode_x86_64 "one-valid-instruction.rl";
 
   main := valid_instruction;

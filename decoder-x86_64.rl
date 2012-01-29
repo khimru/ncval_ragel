@@ -25,9 +25,6 @@
   machine x86_64_decoder;
   alphtype unsigned char;
 
-  action check_access {
-  }
-
   include decode_x86_64 "decoder-x86_64-instruction.rl";
 
   main := (valid_instruction
@@ -43,8 +40,8 @@
 	repz_prefix = FALSE;
 	branch_not_taken = FALSE;
 	branch_taken = FALSE;
-	vex_prefix = 0xe0;
-	vex_prefix2 = 0x00;
+	vex_prefix2 = 0xe0;
+	vex_prefix3 = 0x00;
     }
     @{
 	switch (disp_type) {
@@ -151,13 +148,6 @@ enum imm_mode {
   IMM64
 };
 
-static const uint8_t index_registers[] = {
-  REG_RAX, REG_RCX, REG_RDX, REG_RBX,
-  REG_RIZ, REG_RBP, REG_RSI, REG_RDI,
-  REG_R8,  REG_R9,  REG_R10, REG_R11,
-  REG_R12, REG_R13, REG_R14, REG_R15
-};
-
 static const uint8_t one = 1;
 
 int DecodeChunk(uint8_t *data, size_t size,
@@ -170,7 +160,7 @@ int DecodeChunk(uint8_t *data, size_t size,
   const uint8_t *imm = NULL;
   const uint8_t *imm2 = NULL;
   const uint8_t *begin;
-  uint8_t vex_prefix, vex_prefix2;
+  uint8_t vex_prefix2, vex_prefix3;
   enum disp_mode disp_type;
   enum imm_mode imm_operand;
   enum imm_mode imm2_operand;

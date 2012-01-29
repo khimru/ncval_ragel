@@ -59,7 +59,7 @@ where they are insered:
    vex_prefix          triggered when VEX-encoded action is detected
      @vex_prefix2        inserted after second byte of three-byte VEX/XOP prefix
      @vex_prefix3        inserted after third byte of three-byte VEX/XOP prefix
-     @vex_pfx_short      inserted after second byte of two-byte VEX prefix
+     @vex_prefix_short   inserted after second byte of two-byte VEX prefix
                        Note: there are no “vex_prefix1” because first byte of
                          VEX/XOP encoding is multiplexed to “lds”, “les” or
                          “pop Eq” instruction
@@ -80,6 +80,8 @@ where they are insered:
    parse_operands      this will grab instruction operands
    mark_data_fields    this will make “data fields” (dispXX, immXX, relXX) with
                          xxxXX_operand_begin and xxxXX_operand_end
+   check_access        this will check memory access (actions is not generated
+                         by %1$s, you need to define it in your program)
 )END");
 
   const char*const kVersionHelp = N_(R"END(%1$s %2$s
@@ -88,13 +90,14 @@ Use of this source code is governed by a BSD-style license that can be
 found in the LICENSE file.
 )END");
 
-  enum Actions {
+  enum class Actions {
     kRexPrefix,
-    vVexPrefix,
+    kVexPrefix,
     kInstructionName,
     kOpcode,
     kParseOperands,
-    kMarkDataFields
+    kMarkDataFields,
+    kCheckAccess
   };
   const char* kDisablableActionsList[] = {
     "rex_prefix",
@@ -102,9 +105,14 @@ found in the LICENSE file.
     "instruction_name",
     "opcode",
     "parse_operands",
-    "mark_data_fields"
+    "mark_data_fields",
+    "check_access"
   };
   bool disabled_actions[arraysize(kDisablableActionsList)];
+
+  bool disabled(Actions action) {
+    return disabled_actions[static_cast<int>(action)];
+  }
 
   std::map<std::string, size_t> instruction_names;
   struct Instruction {
@@ -254,56 +262,67 @@ found in the LICENSE file.
   #define chartest(x) (chartest([=](int c) { return x; }).c_str())
 
   void print_consts(void)  {
-    std::vector<std::string> names;
-    std::transform(instruction_names.begin(), instruction_names.end(),
-      std::back_inserter(names),
-      [](decltype(*instruction_names.begin()) pair) { return pair.first; });
-    std::sort(names.begin(), names.end(), [](std::string x, std::string y) {
-      return (x.length() > y.length()) || ((x.length() == y.length()) && x < y);
-    });
-    for (auto &name : names) {
-      if (instruction_names[name] == 0) {
-	for (decltype(name.length()) p = 1; p < name.length(); ++p) {
-	  auto it = instruction_names.find(std::string(name, p));
-	  if (it != instruction_names.end()) {
-	    it->second = 1;
+    if (!disabled(Actions::kInstructionName)) {
+      std::vector<std::string> names;
+      std::transform(instruction_names.begin(), instruction_names.end(),
+	std::back_inserter(names),
+	[](decltype(*instruction_names.begin()) pair) { return pair.first; });
+      std::sort(names.begin(), names.end(), [](std::string x, std::string y) {
+        return (x.size() > y.size()) || ((x.size() == y.size()) && x < y);
+      });
+      for (auto &name : names) {
+	if (instruction_names[name] == 0) {
+	  for (decltype(name.length()) p = 1; p < name.length(); ++p) {
+	    auto it = instruction_names.find(std::string(name, p));
+	    if (it != instruction_names.end()) {
+	      it->second = 1;
+	    }
 	  }
 	}
       }
-    }
-    size_t offset = 0;
-    for (auto &pair : instruction_names) {
-      if (pair.second != 1) {
-	pair.second = offset;
-	offset += pair.first.length() + 1;
+      size_t offset = 0;
+      for (auto &pair : instruction_names) {
+	if (pair.second != 1) {
+	  pair.second = offset;
+	  offset += pair.first.length() + 1;
+	}
       }
-    }
-    for (auto &name : names) {
-      auto offset = instruction_names[name];
-      if (offset != 1) {
-	for (decltype(name.length()) p = 1; p < name.length(); ++p) {
-	  auto it = instruction_names.find(std::string(name, p));
-	  if ((it != instruction_names.end()) && (it->second == 1)) {
-	    it->second = offset + p;
+      for (auto &name : names) {
+	auto offset = instruction_names[name];
+	if (offset != 1) {
+	  for (decltype(name.length()) p = 1; p < name.length(); ++p) {
+	    auto it = instruction_names.find(std::string(name, p));
+	    if ((it != instruction_names.end()) && (it->second == 1)) {
+	      it->second = offset + p;
+	    }
 	  }
 	}
       }
-    }
-    offset = 0;
-    auto delimeter = "static const char instruction_names[] = {\n  ";
-    for (auto &pair : instruction_names) {
-      if (pair.second == offset) {
-        fprintf(const_file, "%s", delimeter);
-        for (auto &c : pair.first) {
-          fprintf(const_file, "0x%02x, ", static_cast<int>(c));
-        }
-        fprintf(const_file, "\'\\0\',  /* ");
-        fprintf(const_file, "%s", pair.first.c_str());
-        offset += pair.first.length() + 1;
-        delimeter = " */\n  ";
+      offset = 0;
+      auto delimeter = "static const char instruction_names[] = {\n  ";
+      for (auto &pair : instruction_names) {
+	if (pair.second == offset) {
+	  fprintf(const_file, "%s", delimeter);
+	  for (auto &c : pair.first) {
+	    fprintf(const_file, "0x%02x, ", static_cast<int>(c));
+	  }
+	  fprintf(const_file, "\'\\0\',  /* ");
+	  fprintf(const_file, "%s", pair.first.c_str());
+	  offset += pair.first.length() + 1;
+	  delimeter = " */\n  ";
+	}
       }
+      fprintf(const_file, " */\n};\n");
     }
-    fprintf(const_file, " */\n};\n");
+    if (!disabled(Actions::kParseOperands)) {
+      fprintf(const_file, R"END(static const uint8_t index_registers[] = {
+  REG_RAX, REG_RCX, REG_RDX, REG_RBX,
+  REG_RIZ, REG_RBP, REG_RSI, REG_RDI,
+  REG_R8,  REG_R9,  REG_R10, REG_R11,
+  REG_R12, REG_R13, REG_R14, REG_R15
+};
+)END");
+    }
   }
 
   std::string c_identifier(std::string text) {
@@ -433,19 +452,19 @@ found in the LICENSE file.
     imm2 = p - 7;
   }
 )END");
-    if (!disabled_actions[kParseOperands]) {
+    if (!disabled(Actions::kParseOperands)) {
       fprintf(out_file, R"END(  action modrm_only_base {
     disp_type = DISPNONE;
     index = REG_NONE;
     base = ((*p) & 0x07) |
 	   ((rex_prefix & 0x01) << 3) |
-	   (((~vex_prefix) & 0x20) >> 2);
+	   (((~vex_prefix2) & 0x20) >> 2);
   }
   action modrm_base_disp {
     index = REG_NONE;
     base = ((*p) & 0x07) |
 	   ((rex_prefix & 0x01) << 3) |
-	   (((~vex_prefix) & 0x20) >> 2);
+	   (((~vex_prefix2) & 0x20) >> 2);
   }
   action modrm_rip {
     index = REG_NONE;
@@ -460,17 +479,17 @@ found in the LICENSE file.
     base = REG_NONE;
     index = index_registers[(((*p) & 0x38) >> 3) |
 			    ((rex_prefix & 0x02) << 2) |
-			    (((~vex_prefix) & 0x40) >> 3)];
+			    (((~vex_prefix2) & 0x40) >> 3)];
     scale = ((*p) & 0xc0) >> 6;
   }
   action modrm_parse_sib {
     disp_type = DISPNONE;
     base = ((*p) & 0x7) |
 	   ((rex_prefix & 0x01) << 3) |
-	   (((~vex_prefix) & 0x20) >> 2);
+	   (((~vex_prefix2) & 0x20) >> 2);
     index = index_registers[(((*p) & 0x38) >> 3) |
 			    ((rex_prefix & 0x02) << 2) |
-			    (((~vex_prefix) & 0x40) >> 3)];
+			    (((~vex_prefix2) & 0x40) >> 3)];
     scale = ((*p) & 0xc0) >> 6;
   }
 )END");
@@ -480,22 +499,22 @@ found in the LICENSE file.
   rel8 = any %s;
   rel16 = any{2} %s;
   rel32 = any{4} %s;
-)END", disabled_actions[kMarkDataFields] ?
+)END", disabled(Actions::kMarkDataFields) ?
 	 "@rel8_operand" : ">rel8_operand_begin @rel8_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@rel16_operand" : ">rel16_operand_begin @rel16_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@rel32_operand" : ">rel32_operand_begin @rel32_operand_end");
     fprintf(out_file, R"END(
   # Displacements.
   disp8		= any %s;
   disp32	= any{4} %s;
   disp64	= any{8} %s;
-)END", disabled_actions[kMarkDataFields] ?
+)END", disabled(Actions::kMarkDataFields) ?
 	 "@disp8_operand" : ">disp8_operand_begin @disp8_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@disp32_operand" : ">disp32_operand_begin @disp32_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@disp64_operand" : ">disp64_operand_begin @disp64_operand_end");
     fprintf(out_file, R"END(
   # Immediates.
@@ -509,53 +528,56 @@ found in the LICENSE file.
   imm16n2 = any{2} %s;
   imm32n2 = any{4} %s;
   imm64n2 = any{8} %s;
-)END", disabled_actions[kMarkDataFields] ?
+)END", disabled(Actions::kMarkDataFields) ?
 	 "@imm8_operand" : ">imm8_operand_begin @imm8_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@imm16_operand" : ">imm8_operand_begin @imm16_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@imm32_operand" : ">imm8_operand_begin @imm32_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@imm64_operand" : ">imm8_operand_begin @imm64_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@imm8_second_operand" : ">imm8_operand_begin @imm8_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@imm16_second_operand" : ">imm16_operand_begin @imm16_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@imm32_second_operand" : ">imm32_operand_begin @imm32_operand_end",
-       disabled_actions[kMarkDataFields] ?
+       disabled(Actions::kMarkDataFields) ?
 	 "@imm64_second_operand" : ">imm64_operand_begin @imm64_operand_end");
     fprintf(out_file, R"END(
   # Different types of operands.
-  operand_sib_base_index = 
-    (%s . (%s @modrm_parse_sib)) |
-    (%s . (any @modrm_parse_sib) . disp8) |
-    (%s . (any @modrm_parse_sib) . disp32);
-)END", chartest((c & 0xC0) == 0    && (c & 0x07) == 0x04),
+  operand_sib_base_index = (%2$s . %3$s%1$s) |
+			   (%4$s . any%1$s . disp8) |
+			   (%5$s . any%1$s . disp32);
+)END", disabled(Actions::kParseOperands) ? "" : " @modrm_parse_sib",
+       chartest((c & 0xC0) == 0    && (c & 0x07) == 0x04),
        chartest((c & 0x07) != 0x05),
        chartest((c & 0xC0) == 0x40 && (c & 0x07) == 0x04),
        chartest((c & 0xC0) == 0x80 && (c & 0x07) == 0x04));
-    fprintf(out_file, R"END(  operand_sib_pure_index = %s .
-    (%s @modrm_pure_index) . disp32;
-)END", chartest((c & 0xC0) == 0    && (c & 0x07) == 0x04),
+    fprintf(out_file, R"END(  operand_sib_pure_index = %2$s . %3$s%1$s . disp32;
+)END", disabled(Actions::kParseOperands) ? "" : " @modrm_pure_index",
+       chartest((c & 0xC0) == 0    && (c & 0x07) == 0x04),
        chartest((c & 0x07) == 0x05));
-    fprintf(out_file, R"END(  operand_disp  =
-    (%s @modrm_base_disp . disp8) |
-    (%s @modrm_base_disp . disp32);
-)END", chartest((c & 0xC0) == 0x40 && (c & 0x07) != 0x04),
+    fprintf(out_file, R"END(  operand_disp  = (%2$s%1$s . disp8) |
+		  (%3$s%1$s . disp32);
+)END", disabled(Actions::kParseOperands) ? "" : " @modrm_base_disp",
+       chartest((c & 0xC0) == 0x40 && (c & 0x07) != 0x04),
        chartest((c & 0xC0) == 0x80 && (c & 0x07) != 0x04));
     fprintf(out_file, "  # It's pure disp32 in IA32 case, "
 	    R"END(but offset(%%rip) in x86-64 case.
-  operand_rip = %s @modrm_rip . disp32;
-)END", chartest((c & 0xC0) == 0   && (c & 0x07) == 0x05));
-    fprintf(out_file, R"END(  single_register_memory = %s @modrm_only_base;
-)END", chartest((c & 0xC0) == 0   && (c & 0x07) != 0x04 &&
+  operand_rip = %2$s%1$s . disp32;
+)END", disabled(Actions::kParseOperands) ? "" : " @modrm_rip",
+       chartest((c & 0xC0) == 0   && (c & 0x07) == 0x05));
+    fprintf(out_file, R"END(  single_register_memory = %2$s%1$s;
+)END", disabled(Actions::kParseOperands) ? "" : " @modrm_only_base",
+       chartest((c & 0xC0) == 0   && (c & 0x07) != 0x04 &&
 				     (c & 0x07) != 0x05));
     fprintf(out_file, R"END(  modrm_memory = (operand_disp | operand_rip |
 		  operand_sib_base_index | operand_sib_pure_index |
-		  single_register_memory) @check_access;
-  modrm_registers = %s;
-)END", chartest((c & 0xC0) == 0xC0));
+		  single_register_memory)%1$s;
+  modrm_registers = %2$s;
+)END", disabled(Actions::kCheckAccess) ? "" : " @check_access",
+       chartest((c & 0xC0) == 0xC0));
     fprintf(out_file, R"END(
   # Operations selected using opcode in ModR/M.
   opcode_0 = %s;
@@ -589,28 +611,33 @@ found in the LICENSE file.
   rep = 0xf3 @rep_prefix;
   repnz = 0xf2 @repnz_prefix;
   repz = 0xf3 @repz_prefix;
-
+)END");
+    if (!disabled(Actions::kRexPrefix)) {
+      fprintf(out_file, R"END(
   # REX prefixes.
-  action rex_pfx {
+  action rex_prefix {
     rex_prefix = *p;
   }
-  REX_NONE = 0x40 @rex_pfx;
-  REX_W    = %s @rex_pfx;
-  REX_R    = %s @rex_pfx;
-  REX_X    = %s @rex_pfx;
-  REX_B    = %s @rex_pfx;
-  REX_WR   = %s @rex_pfx;
-  REX_WX   = %s @rex_pfx;
-  REX_WB   = %s @rex_pfx;
-  REX_RX   = %s @rex_pfx;
-  REX_RB   = %s @rex_pfx;
-  REX_XB   = %s @rex_pfx;
-  REX_WRX  = %s @rex_pfx;
-  REX_WRB  = %s @rex_pfx;
-  REX_WXB  = %s @rex_pfx;
-  REX_RXB  = %s @rex_pfx;
-  REX_WRXB = %s @rex_pfx;
-)END", chartest((c & 0xf7) == 0x40),
+)END");
+    }
+    fprintf(out_file, R"END(  REX_NONE = 0x40%1$s;
+  REX_W    = %2$s%1$s;
+  REX_R    = %3$s%1$s;
+  REX_X    = %4$s%1$s;
+  REX_B    = %5$s%1$s;
+  REX_WR   = %6$s%1$s;
+  REX_WX   = %7$s%1$s;
+  REX_WB   = %8$s%1$s;
+  REX_RX   = %9$s%1$s;
+  REX_RB   = %10$s%1$s;
+  REX_XB   = %11$s%1$s;
+  REX_WRX  = %12$s%1$s;
+  REX_WRB  = %13$s%1$s;
+  REX_WXB  = %14$s%1$s;
+  REX_RXB  = %15$s%1$s;
+  REX_WRXB = %16$s%1$s;
+)END", disabled(Actions::kRexPrefix) ? "" : " @rex_prefix",
+       chartest((c & 0xf7) == 0x40),
        chartest((c & 0xfb) == 0x40),
        chartest((c & 0xfd) == 0x40),
        chartest((c & 0xfe) == 0x40),
@@ -641,37 +668,40 @@ found in the LICENSE file.
   rex_wxb  = REX_WXB  - REX_NONE;
   rex_rxb  = REX_RXB  - REX_NONE;
   rex_wrxb = REX_WRXB - REX_NONE;
-  REXW_NONE= 0x48 @rex_pfx;
-  REXW_R   = %s @rex_pfx;
-  REXW_X   = %s @rex_pfx;
-  REXW_B   = %s @rex_pfx;
-  REXW_RX  = %s @rex_pfx;
-  REXW_RB  = %s @rex_pfx;
-  REXW_XB  = %s @rex_pfx;
-  REXW_RXB = %s @rex_pfx;
-)END", chartest((c & 0xfb) == 0x48),
+  REXW_NONE= 0x48%1$s;
+  REXW_R   = %2$s%1$s;
+  REXW_X   = %3$s%1$s;
+  REXW_B   = %4$s%1$s;
+  REXW_RX  = %5$s%1$s;
+  REXW_RB  = %6$s%1$s;
+  REXW_XB  = %7$s%1$s;
+  REXW_RXB = %8$s%1$s;
+)END", disabled(Actions::kRexPrefix) ? "" : " @rex_prefix",
+       chartest((c & 0xfb) == 0x48),
        chartest((c & 0xfd) == 0x48),
        chartest((c & 0xfe) == 0x48),
        chartest((c & 0xf9) == 0x48),
        chartest((c & 0xfa) == 0x48),
        chartest((c & 0xfc) == 0x48),
        chartest((c & 0xf8) == 0x48));
-    fprintf(out_file, R"END(
+    if (!disabled(Actions::kVexPrefix)) {
+      fprintf(out_file, R"END(
   # VEX/XOP prefix.
-  action vex_pfx {
-    vex_prefix = *p;
-  }
-  # VEX/XOP prefix2.
-  action vex_pfx2 {
+  action vex_prefix2 {
     vex_prefix2 = *p;
   }
+  # VEX/XOP prefix2.
+  action vex_prefix3 {
+    vex_prefix3 = *p;
+  }
   # VEX/XOP short prefix
-  action vex_pfx_short {
+  action vex_prefix_short {
     /* This emulates two prefixes case. */
-    vex_prefix = (p[0] & 0x80) | 0x61;
-    vex_prefix2 = p[0] & 0x7f;
+    vex_prefix2 = (p[0] & 0x80) | 0x61;
+    vex_prefix3 = p[0] & 0x7f;
   }
 )END");
+    }
     typedef std::pair<const char *, int> T;
     for (auto vex : {
       T { "NONE",	0xe0 },
@@ -683,8 +713,9 @@ found in the LICENSE file.
       T { "XB",		0x80 },
       T { "RXB",	0x00 }
     } ) {
-      fprintf(out_file, R"END(  VEX_%s = %s @vex_pfx;
-)END", vex.first, chartest((c & vex.second) == vex.second));
+      fprintf(out_file, R"END(  VEX_%2$s = %3$s%1$s;
+)END", disabled(Actions::kVexPrefix) ? "" : " @vex_prefix2",
+       vex.first, chartest((c & vex.second) == vex.second));
     }
     for (auto vex : {
       T { "01",		1	},
@@ -700,10 +731,10 @@ found in the LICENSE file.
       T { "01001",	9	},
       T { "01010",	10	},
     } ) {
-      fprintf(out_file, R"END(  VEX_map%s = %s;
+      fprintf(out_file, R"END(  VEX_map%1$s = %2$s;
 )END", vex.first, chartest((c & 0x1f) == vex.second));
     }
-    if (!disabled_actions[kOpcode]) {
+    if (!disabled(Actions::kOpcode)) {
       fprintf(out_file, R"END(
   action begin_opcode {
     begin_opcode = p;
@@ -713,49 +744,50 @@ found in the LICENSE file.
   }
 )END");
     }
-    for (auto i = 0 ; i <= 5; ++i) {
-      fprintf(out_file, R"END(  action operands_count_is_%1$d {
+    if (!disabled(Actions::kParseOperands)) {
+      for (auto i = 0 ; i <= 5; ++i) {
+	fprintf(out_file, R"END(  action operands_count_is_%1$d {
     operands_count = %1$d;
   }
 )END", i);
-    }
-    for (auto i = 0 ; i < 5; ++i) {
-      typedef std::pair<const char *, const char *> T;
-      for (auto size : {
-	T { "2bit",		"Size2bit"			},
-	T { "8bit",		"Size8bit"			},
-	T { "16bit",		"Size16bit"			},
-	T { "32bit",		"Size32bit"			},
-	T { "64bit",		"Size64bit"			},
-	T { "128bit",		"Size128bit"			},
-	T { "256bit",		"Size256bit"			},
-	T { "float16bit",		"FloatSize16bit"	},
-	T { "float32bit",		"FloatSize32bit"	},
-	T { "float64bit",		"FloatSize64bit"	},
-	T { "float80bit",		"FloatSize80bit"	},
-	T { "x87_16bit",		"X87Size16bit"		},
-	T { "x87_32bit",		"X87Size32bit"		},
-	T { "x87_64bit",		"X87Size64bit"		},
-	T { "x87_bcd",		"X87BCD"			},
-	T { "x87_env",		"X87ENV"			},
-	T { "x87_state",		"X87STATE"		},
-	T { "x87_mmx_xmm_state",	"X87MMXXMMSTATE"	},
-	T { "x87",		"ST"				},
-	T { "mmx",		"MMX"				},
-	T { "xmm",		"XMM"				},
-	T { "ymm",		"YMM"				},
-	T { "farptr",		"FarPtr"			},
-	T { "segreg",		"SegmentRegister"		},
-	T { "creg",		"ControlRegister"		},
-	T { "dreg",		"DebugRegister"			},
-	T { "selector",		"Selector"			}
-    } ) {
-	fprintf(out_file, R"END(  action operand%1$d_%2$s {
+      }
+      for (auto i = 0 ; i < 5; ++i) {
+	typedef std::pair<const char *, const char *> T;
+	for (auto size : {
+	  T { "2bit",			"Size2bit"			},
+	  T { "8bit",			"Size8bit"			},
+	  T { "16bit",			"Size16bit"			},
+	  T { "32bit",			"Size32bit"			},
+	  T { "64bit",			"Size64bit"			},
+	  T { "128bit",			"Size128bit"			},
+	  T { "256bit",			"Size256bit"			},
+	  T { "float16bit",		"FloatSize16bit"		},
+	  T { "float32bit",		"FloatSize32bit"		},
+	  T { "float64bit",		"FloatSize64bit"		},
+	  T { "float80bit",		"FloatSize80bit"		},
+	  T { "x87_16bit",		"X87Size16bit"			},
+	  T { "x87_32bit",		"X87Size32bit"			},
+	  T { "x87_64bit",		"X87Size64bit"			},
+	  T { "x87_bcd",		"X87BCD"			},
+	  T { "x87_env",		"X87ENV"			},
+	  T { "x87_state",		"X87STATE"			},
+	  T { "x87_mmx_xmm_state",	"X87MMXXMMSTATE"		},
+	  T { "x87",			"ST"				},
+	  T { "mmx",			"MMX"				},
+	  T { "xmm",			"XMM"				},
+	  T { "ymm",			"YMM"				},
+	  T { "farptr",			"FarPtr"			},
+	  T { "segreg",			"SegmentRegister"		},
+	  T { "creg",			"ControlRegister"		},
+	  T { "dreg",			"DebugRegister"			},
+	  T { "selector",		"Selector"			}
+	} ) {
+	  fprintf(out_file, R"END(  action operand%1$d_%2$s {
     operand%1$d_type = Operand%3$s;
   }
 )END", i, size.first, size.second);
-    }
-    fprintf(out_file, R"END(  action operand%1$d_absolute_disp {
+	}
+	fprintf(out_file, R"END(  action operand%1$d_absolute_disp {
     operand%1$d = REG_RM;
     base = REG_NONE;
     index = REG_RIZ;
@@ -773,7 +805,7 @@ found in the LICENSE file.
   action operand%1$d_from_opcode {
     operand%1$d = ((*p) & 0x7) |
 	       ((rex_prefix & 0x01) << 3) |
-	       (((~vex_prefix) & 0x20) >> 2);
+	       (((~vex_prefix2) & 0x20) >> 2);
   }
   action operand%1$d_from_is4 {
     operand%1$d = p[0] >> 4;
@@ -781,15 +813,15 @@ found in the LICENSE file.
   action operand%1$d_from_modrm_rm {
     operand%1$d = ((*p) & 0x07) |
 	       ((rex_prefix & 0x01) << 3) |
-	       (((~vex_prefix) & 0x20) >> 2);
+	       (((~vex_prefix2) & 0x20) >> 2);
   }
   action operand%1$d_from_modrm_reg {
     operand%1$d = (((*p) & 0x38) >> 3) |
 	       ((rex_prefix & 0x04) << 1) |
-	       (((~vex_prefix) & 0x80) >> 4);
+	       (((~vex_prefix2) & 0x80) >> 4);
   }
   action operand%1$d_from_vex {
-    operand%1$d = ((~vex_prefix2) & 0x78) >> 3;
+    operand%1$d = ((~vex_prefix3) & 0x78) >> 3;
   }
   action operand%1$d_immediate {
     operand%1$d = REG_IMM;
@@ -816,6 +848,7 @@ found in the LICENSE file.
     operand%1$d = REG_ST;
   }
 )END", i);
+      }
     }
   }
 
@@ -1228,10 +1261,6 @@ found in the LICENSE file.
 	rex.r = true;
       }
       if (mod_rm_is_used()) {
-#if 1
-	/* For compatibility with M4-generated validator.  */
-	rex.x = true;
-#endif
 	rex.b = true;
       }
       print_legacy_prefixes();
@@ -1241,26 +1270,28 @@ found in the LICENSE file.
         print_opcode_recognition();
       }
       fprintf(out_file, " modrm_registers");
-      for (auto &operand : operands) {
-	static const std::map<char, const char*> operand_type {
-	  { 'C', "reg"	},
-	  { 'D', "reg"	},
-	  { 'E', "rm"	},
-	  { 'G', "reg"	},
-	  { 'M', "rm"	},
-	  { 'N', "rm"	},
-	  { 'P', "reg"	},
-	  { 'Q', "rm"	},
-	  { 'R', "rm"	},
-	  { 'S', "reg"	},
-	  { 'U', "rm"	},
-	  { 'V', "reg"	},
-	  { 'W', "rm"	}
-        };
-	auto it = operand_type.find(operand[0]);
-	if (it != operand_type.end()) {
-	  fprintf(out_file, " @operand%zd_from_modrm_%s",
+      if (!disabled(Actions::kParseOperands)) {
+        for (auto &operand : operands) {
+	  static const std::map<char, const char*> operand_type {
+	    { 'C', "reg"	},
+	    { 'D', "reg"	},
+	    { 'E', "rm"	},
+	    { 'G', "reg"	},
+	    { 'M', "rm"	},
+	    { 'N', "rm"	},
+	    { 'P', "reg"	},
+	    { 'Q', "rm"	},
+	    { 'R', "rm"	},
+	    { 'S', "reg"	},
+	    { 'U', "rm"	},
+	    { 'V', "reg"	},
+	    { 'W', "rm"	}
+	  };
+	  auto it = operand_type.find(operand[0]);
+	  if (it != operand_type.end()) {
+	    fprintf(out_file, " @operand%zd_from_modrm_%s",
 				   &operand - &(*operands.begin()), it->second);
+	  }
 	}
       }
       if (opcode_in_modrm) {
@@ -1288,14 +1319,8 @@ found in the LICENSE file.
 	  rex.r = true;
 	}
 	if (mod_rm_is_used()) {
-#if 1
-	  /* For compatibility with M4-generated validator.  */
-	  rex.x = true;
-	  rex.b = true;
-#else
 	  rex.x = std::get<1>(mode);
 	  rex.x = std::get<2>(mode);
-#endif
 	}
 	print_legacy_prefixes();
 	print_rex_prefix();
@@ -1308,29 +1333,34 @@ found in the LICENSE file.
 	} else {
 	  fprintf(out_file, " (any");
 	}
-	for (auto &operand : operands) {
-	  static const std::map<char, const char*> operand_type {
-	    { 'C', "from_modrm_reg"	},
-	    { 'D', "from_modrm_reg"	},
-	    { 'E',"rm"			},
-	    { 'G', "from_modrm_reg"	},
-	    { 'M', "rm"			},
-	    { 'N', "rm"			},
-	    { 'P', "from_modrm_reg"	},
-	    { 'Q', "rm"			},
-	    { 'R', "rm"			},
-	    { 'S', "from_modrm_reg"	},
-	    { 'U', "rm"			},
-	    { 'V', "from_modrm_reg"	},
-	    { 'W', "rm"			}
-          };
-	  auto it = operand_type.find(operand[0]);
-	  if (it != operand_type.end()) {
-	    fprintf(out_file, " @operand%zd_%s",
+	if (!disabled(Actions::kParseOperands)) {
+	  for (auto &operand : operands) {
+	    static const std::map<char, const char*> operand_type {
+	      { 'C', "from_modrm_reg"	},
+	      { 'D', "from_modrm_reg"	},
+	      { 'E', "rm"		},
+	      { 'G', "from_modrm_reg"	},
+	      { 'M', "rm"		},
+	      { 'N', "rm"		},
+	      { 'P', "from_modrm_reg"	},
+	      { 'Q', "rm"		},
+	      { 'R', "rm"		},
+	      { 'S', "from_modrm_reg"	},
+	      { 'U', "rm"		},
+	      { 'V', "from_modrm_reg"	},
+	      { 'W', "rm"		}
+            };
+	    auto it = operand_type.find(operand[0]);
+	    if (it != operand_type.end()) {
+	      fprintf(out_file, " @operand%zd_%s",
 				   &operand - &(*operands.begin()), it->second);
+	    }
 	  }
 	}
-	fprintf(out_file, " . any* &%s @check_access", std::get<0>(mode));
+	fprintf(out_file, " . any* &%s", std::get<0>(mode));
+	if (!disabled(Actions::kCheckAccess)) {
+	  fprintf(out_file, " @check_access");
+	}
 	fprintf(out_file, ")");
 	if (opcode_in_imm) {
 	  print_immediate_opcode();
@@ -1567,7 +1597,9 @@ found in the LICENSE file.
 	    }
 	  };
 	  print_third_byte();
-	  fprintf(out_file, " @vex_pfx2");
+	  if (!disabled(Actions::kVexPrefix)) {
+	    fprintf(out_file, " @vex_prefix3");
+	  }
 	  if (c5_ok) {
 	    fprintf(out_file, ") | (0xc5 ");
 	    if (rex.r) {
@@ -1576,7 +1608,9 @@ found in the LICENSE file.
 	      third_byte[0] = '1';
 	    }
 	    print_third_byte();
-	    fprintf(out_file, " @vex_pfx_short");
+	    if (!disabled(Actions::kVexPrefix)) {
+	      fprintf(out_file, " @vex_prefix_short");
+	    }
 	    fprintf(out_file, "))");
 	  }
 	  for (auto opcode = ++++++opcodes.begin(); opcode != opcodes.end();
@@ -1607,13 +1641,15 @@ found in the LICENSE file.
 	}
 	fprintf(out_file, ")");
       }
-      if (!disabled_actions[kOpcode]) {
+      if (!disabled(Actions::kOpcode)) {
 	fprintf(out_file, " >begin_opcode");
       }
-      for (auto &operand : operands) {
-	if (operand[0] == 'r') {
-	  fprintf(out_file, " @operand%zd_from_opcode",
+      if (!disabled(Actions::kParseOperands)) {
+	for (auto &operand : operands) {
+	  if (operand[0] == 'r') {
+	    fprintf(out_file, " @operand%zd_from_opcode",
 					       &operand - &(*operands.begin()));
+	  }
 	}
       }
     }
@@ -1628,7 +1664,7 @@ found in the LICENSE file.
 	  }
 	}
       }
-      if (!disabled_actions[kOpcode]) {
+      if (!disabled(Actions::kOpcode)) {
 	fprintf(out_file, " @end_opcode");
       }
       for (auto &prefix : required_prefixes) {
@@ -1655,134 +1691,136 @@ found in the LICENSE file.
 	  break;
 	}
       }
-      if (!disabled_actions[kInstructionName]) {
+      if (!disabled(Actions::kInstructionName)) {
 	fprintf(out_file, " @instruction_%s", c_identifier(name).c_str());
       }
-      fprintf(out_file, " @operands_count_is_%zd", operands.size());
-      for (auto &operand : operands) {
-        typedef std::tuple<InstructionClass, char, std::string> T;
-        static const std::map<T, const char*> operand_sizes {
-	  { T { InstructionClass::kDefault, ' ', ""	},	"32bit"	      },
-	  { T { InstructionClass::kSize8,   ' ', ""	},	"8bit"	      },
-	  { T { InstructionClass::kData16,  ' ', ""	},	"16bit"	      },
-	  { T { InstructionClass::kRexW,    ' ', ""	},	"64bit"	      },
-	  { T { InstructionClass::kUnknown, 'H', ""	},	"128bit"      },
-	  { T { InstructionClass::kRexW,    'I', ""	},	"32bit"	      },
-	  { T { InstructionClass::kUnknown, 'L', ""	},	"128bit"      },
-	  { T { InstructionClass::kUnknown, 'V', ""	},	"128bit"      },
-	  { T { InstructionClass::kUnknown, 'W', ""	},	"128bit"      },
-	  { T { InstructionClass::kUnknown, ' ', "2"	},	"2bit"	      },
-	  { T { InstructionClass::kUnknown, ' ', "7"	},	"x87"	      },
-	  { T { InstructionClass::kUnknown, ' ', "b"	},	"8bit"	      },
-	  { T { InstructionClass::kUnknown, ' ', "d"	},	"32bit"	      },
-	  { T { InstructionClass::kUnknown, ' ', "do"	},	"256bit"      },
-	  { T { InstructionClass::kUnknown, ' ', "dq"	},	"128bit"      },
-	  { T { InstructionClass::kUnknown, ' ', "fq"	},	"256bit"      },
-	  { T { InstructionClass::kUnknown, ' ', "o"	},	"128bit"      },
-	  { T { InstructionClass::kUnknown, ' ', "p"	},	"farptr"      },
-	  { T { InstructionClass::kUnknown, ' ', "pb"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pd"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pdw"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pdwx"	},	"ymm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pdx"	},	"ymm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "ph"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pi"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pj"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pjx"	},	"ymm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pk"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pq"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pqw"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pqwx"	},	"ymm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "ps"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "psx"	},	"ymm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "pw"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "q"	},	"64bit"	      },
-	  { T { InstructionClass::kUnknown, 'N', "q"	},	"mmx"	      },
-	  { T { InstructionClass::kUnknown, 'P', "q"	},	"mmx"	      },
-	  { T { InstructionClass::kUnknown, 'Q', "q"	},	"mmx"	      },
-	  { T { InstructionClass::kUnknown, 'U', "q"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, 'V', "q"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, 'W', "q"	},	"xmm"	      },
-	  { T { InstructionClass::kUnknown, ' ', "r"	},	"64bit"	      },
-	  { T { InstructionClass::kUnknown, 'C', "r"	},	"creg"	      },
-	  { T { InstructionClass::kUnknown, 'D', "r"	},	"dreg"	      },
-	  { T { InstructionClass::kUnknown, ' ', "s"	},	"selector"    },
-	  { T { InstructionClass::kUnknown, ' ', "sb"	},	"x87_bcd"     },
-	  { T { InstructionClass::kUnknown, ' ', "sd"	},	"float64bit"  },
-	  { T { InstructionClass::kUnknown, ' ', "se"	},	"x87_env"     },
-	  { T { InstructionClass::kUnknown, ' ', "si"	},	"x87_32bit"   },
-	  { T { InstructionClass::kUnknown, ' ', "sq"	},	"x87_64bit"   },
-	  { T { InstructionClass::kUnknown, ' ', "sr"	},	"x87_state"   },
-	  { T { InstructionClass::kUnknown, ' ', "ss"	},	"float32bit"  },
-	  { T { InstructionClass::kUnknown, ' ', "st"	},	"float80bit"  },
-	  { T { InstructionClass::kUnknown, ' ', "sw"	},	"x87_16bit"   },
-	  { T { InstructionClass::kUnknown, ' ', "sx"	},
+      if (!disabled(Actions::kParseOperands)) {
+	fprintf(out_file, " @operands_count_is_%zd", operands.size());
+        for (auto &operand : operands) {
+          typedef std::tuple<InstructionClass, char, std::string> T;
+          static const std::map<T, const char*> operand_sizes {
+	    { T { InstructionClass::kDefault, ' ', ""	  },	"32bit"	      },
+	    { T { InstructionClass::kSize8,   ' ', ""	  },	"8bit"	      },
+	    { T { InstructionClass::kData16,  ' ', ""	  },	"16bit"	      },
+	    { T { InstructionClass::kRexW,    ' ', ""	  },	"64bit"	      },
+	    { T { InstructionClass::kUnknown, 'H', ""	  },	"128bit"      },
+	    { T { InstructionClass::kRexW,    'I', ""	  },	"32bit"	      },
+	    { T { InstructionClass::kUnknown, 'L', ""	  },	"128bit"      },
+	    { T { InstructionClass::kUnknown, 'V', ""	  },	"128bit"      },
+	    { T { InstructionClass::kUnknown, 'W', ""	  },	"128bit"      },
+	    { T { InstructionClass::kUnknown, ' ', "2"	  },	"2bit"	      },
+	    { T { InstructionClass::kUnknown, ' ', "7"	  },	"x87"	      },
+	    { T { InstructionClass::kUnknown, ' ', "b"	  },	"8bit"	      },
+	    { T { InstructionClass::kUnknown, ' ', "d"	  },	"32bit"	      },
+	    { T { InstructionClass::kUnknown, ' ', "do"	  },	"256bit"      },
+	    { T { InstructionClass::kUnknown, ' ', "dq"	  },	"128bit"      },
+	    { T { InstructionClass::kUnknown, ' ', "fq"	  },	"256bit"      },
+	    { T { InstructionClass::kUnknown, ' ', "o"	  },	"128bit"      },
+	    { T { InstructionClass::kUnknown, ' ', "p"	  },	"farptr"      },
+	    { T { InstructionClass::kUnknown, ' ', "pb"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pd"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pdw"  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pdwx" },	"ymm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pdx"  },	"ymm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "ph"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pi"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pj"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pjx"  },	"ymm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pk"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pq"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pqw"  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pqwx" },	"ymm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "ps"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "psx"  },	"ymm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "pw"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "q"	  },	"64bit"	      },
+	    { T { InstructionClass::kUnknown, 'N', "q"	  },	"mmx"	      },
+	    { T { InstructionClass::kUnknown, 'P', "q"	  },	"mmx"	      },
+	    { T { InstructionClass::kUnknown, 'Q', "q"	  },	"mmx"	      },
+	    { T { InstructionClass::kUnknown, 'U', "q"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, 'V', "q"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, 'W', "q"	  },	"xmm"	      },
+	    { T { InstructionClass::kUnknown, ' ', "r"	  },	"64bit"	      },
+	    { T { InstructionClass::kUnknown, 'C', "r"	  },	"creg"	      },
+	    { T { InstructionClass::kUnknown, 'D', "r"	  },	"dreg"	      },
+	    { T { InstructionClass::kUnknown, ' ', "s"	  },	"selector"    },
+	    { T { InstructionClass::kUnknown, ' ', "sb"	  },	"x87_bcd"     },
+	    { T { InstructionClass::kUnknown, ' ', "sd"	  },	"float64bit"  },
+	    { T { InstructionClass::kUnknown, ' ', "se"	  },	"x87_env"     },
+	    { T { InstructionClass::kUnknown, ' ', "si"	  },	"x87_32bit"   },
+	    { T { InstructionClass::kUnknown, ' ', "sq"	  },	"x87_64bit"   },
+	    { T { InstructionClass::kUnknown, ' ', "sr"	  },	"x87_state"   },
+	    { T { InstructionClass::kUnknown, ' ', "ss"	  },	"float32bit"  },
+	    { T { InstructionClass::kUnknown, ' ', "st"	  },	"float80bit"  },
+	    { T { InstructionClass::kUnknown, ' ', "sw"	  },	"x87_16bit"   },
+	    { T { InstructionClass::kUnknown, ' ', "sx"	  },
 							  "x87_mmx_xmm_state" },
-	  { T { InstructionClass::kData16,  ' ', "v"	},	"16bit"	      },
-	  { T { InstructionClass::kDefault, ' ', "v"	},	"32bit"	      },
-	  { T { InstructionClass::kRexW,    ' ', "v"	},	"64bit"	      },
-	  { T { InstructionClass::kUnknown, ' ', "w"	},	"16bit"	      },
-	  { T { InstructionClass::kUnknown, 'S', "w"	},	"segreg"      },
-	  { T { InstructionClass::kUnknown, 'H', "x"	},	"256bit"      },
-	  { T { InstructionClass::kUnknown, 'L', "x"	},	"256bit"      },
-	  { T { InstructionClass::kUnknown, 'V', "x"	},	"256bit"      },
-	  { T { InstructionClass::kUnknown, 'W', "x"	},	"256bit"      },
-	  { T { InstructionClass::kDefault, ' ', "y"	},	"32bit"	      },
-	  { T { InstructionClass::kSize8,   ' ', "y"	},	"32bit"	      },
-	  { T { InstructionClass::kData16,  ' ', "y"	},	"32bit"	      },
-	  { T { InstructionClass::kDefault, ' ', "y"	},	"32bit"	      },
-	  { T { InstructionClass::kRexW,    ' ', "y"	},	"64bit"	      },
-	  { T { InstructionClass::kRexW,    'U', "y"	},	"xmm"	      },
-	  { T { InstructionClass::kData16,  ' ', "z"	},	"16bit"	      },
-	  { T { InstructionClass::kDefault, ' ', "z"	},	"32bit"	      },
-	  { T { InstructionClass::kRexW,    ' ', "z"	},	"32bit"	      }
-        };
-	auto it = operand_sizes.find(T {instruction_class,
-					operand[0], operand.substr(1)});
-	if (it == operand_sizes.end()) {
-	  it = operand_sizes.find(T {InstructionClass::kUnknown,
-				     operand[0], operand.substr(1)});
-	}
-	if (it == operand_sizes.end()) {
-	  it = operand_sizes.find(T {instruction_class,
-				     ' ', operand.substr(1)});
-	}
-	if (it == operand_sizes.end()) {
-	  it = operand_sizes.find(T {instruction_class,
-				     operand[0], ""});
-	}
-	if (it == operand_sizes.end()) {
-	  it = operand_sizes.find(T {InstructionClass::kUnknown,
-				     ' ', operand.substr(1)});
-	}
-	if (it == operand_sizes.end()) {
-	  fprintf(stderr, _("%s: error - can not determine operand size: %s"),
+	    { T { InstructionClass::kData16,  ' ', "v"	  },	"16bit"	      },
+	    { T { InstructionClass::kDefault, ' ', "v"	  },	"32bit"	      },
+	    { T { InstructionClass::kRexW,    ' ', "v"	  },	"64bit"	      },
+	    { T { InstructionClass::kUnknown, ' ', "w"	  },	"16bit"	      },
+	    { T { InstructionClass::kUnknown, 'S', "w"	  },	"segreg"      },
+	    { T { InstructionClass::kUnknown, 'H', "x"	  },	"256bit"      },
+	    { T { InstructionClass::kUnknown, 'L', "x"	  },	"256bit"      },
+	    { T { InstructionClass::kUnknown, 'V', "x"	  },	"256bit"      },
+	    { T { InstructionClass::kUnknown, 'W', "x"	  },	"256bit"      },
+	    { T { InstructionClass::kDefault, ' ', "y"	  },	"32bit"	      },
+	    { T { InstructionClass::kSize8,   ' ', "y"	  },	"32bit"	      },
+	    { T { InstructionClass::kData16,  ' ', "y"	  },	"32bit"	      },
+	    { T { InstructionClass::kDefault, ' ', "y"	  },	"32bit"	      },
+	    { T { InstructionClass::kRexW,    ' ', "y"	  },	"64bit"	      },
+	    { T { InstructionClass::kRexW,    'U', "y"	  },	"xmm"	      },
+	    { T { InstructionClass::kData16,  ' ', "z"	  },	"16bit"	      },
+	    { T { InstructionClass::kDefault, ' ', "z"	  },	"32bit"	      },
+	    { T { InstructionClass::kRexW,    ' ', "z"	  },	"32bit"	      }
+	  };
+	  auto it = operand_sizes.find(T {instruction_class,
+					  operand[0], operand.substr(1)});
+	  if (it == operand_sizes.end()) {
+	    it = operand_sizes.find(T {InstructionClass::kUnknown,
+				       operand[0], operand.substr(1)});
+	  }
+	  if (it == operand_sizes.end()) {
+	    it = operand_sizes.find(T {instruction_class,
+				       ' ', operand.substr(1)});
+	  }
+	  if (it == operand_sizes.end()) {
+	    it = operand_sizes.find(T {instruction_class,
+				       operand[0], ""});
+	  }
+	  if (it == operand_sizes.end()) {
+	    it = operand_sizes.find(T {InstructionClass::kUnknown,
+				       ' ', operand.substr(1)});
+	  }
+	  if (it == operand_sizes.end()) {
+	    fprintf(stderr, _("%s: error - can not determine operand size: %s"),
 					   short_program_name, operand.c_str());
-	  exit(1);
-	} else {
-	  fprintf(out_file, " @operand%zd_%s", &operand - &(*operands.begin()),
+	    exit(1);
+	  } else {
+	    fprintf(out_file, " @operand%zd_%s", &operand - &(*operands.begin()),
 								    it->second);
-	}
-	static std::map<char, const char*> operand_type {
-	  { '1', "one"			},
-	  { 'a', "rax"			},
-	  { 'b', "ds_rbx"		},
-	  { 'c', "rcx"			},
-	  { 'd', "rdx"			},
-	  { 'i', "second_immediate"	},
-	  { 'o', "port_dx"		},
-	  { 't', "st"			},
-	  { 'B', "from_vex"		},
-	  { 'H', "from_vex"		},
-	  { 'I', "immediate"		},
-	  { 'O', "absolute_disp"	},
-	  { 'X', "ds_rsi"		},
-	  { 'Y', "es_rdi"		}
-	};
-	auto it2 = operand_type.find(operand[0]);
-	if (it2 != operand_type.end()) {
-	  fprintf(out_file, " @operand%zd_%s", &operand - &(*operands.begin()),
+	  }
+	  static std::map<char, const char*> operand_type {
+	    { '1', "one"		},
+	    { 'a', "rax"		},
+	    { 'b', "ds_rbx"		},
+	    { 'c', "rcx"		},
+	    { 'd', "rdx"		},
+	    { 'i', "second_immediate"	},
+	    { 'o', "port_dx"		},
+	    { 't', "st"			},
+	    { 'B', "from_vex"		},
+	    { 'H', "from_vex"		},
+	    { 'I', "immediate"		},
+	    { 'O', "absolute_disp"	},
+	    { 'X', "ds_rsi"		},
+	    { 'Y', "es_rdi"		}
+	  };
+	  auto it2 = operand_type.find(operand[0]);
+	  if (it2 != operand_type.end()) {
+	    fprintf(out_file, " @operand%zd_%s", &operand - &(*operands.begin()),
 								   it2->second);
+	  }
 	}
       }
       if (opcode_in_modrm) {
@@ -1854,8 +1892,10 @@ found in the LICENSE file.
 	  if (operands.size() == 4) {
 	    fprintf(out_file, " %s", chartest((c & 0x0f) == 0x00));
 	  }
-	  fprintf(out_file, " @operand%zd_from_is4",
+	  if (!disabled(Actions::kParseOperands)) {
+	    fprintf(out_file, " @operand%zd_from_is4",
 						 operands.rend() - operand - 1);
+	  }
 	}
 	if (*operand->begin() == 'O') {
 	  fprintf(out_file, " disp64");
@@ -1987,7 +2027,7 @@ int main(int argc, char *argv[]) {
 
   print_common_decoding();
 
-  if (!disabled_actions[kInstructionName]) {
+  if (!disabled(Actions::kInstructionName)) {
     print_name_actions();
   }
 
