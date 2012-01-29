@@ -9,8 +9,10 @@ OUT_DIRS = $(OUT)/build \
 	   $(OUT)/test
 
 PYTHON2X=/usr/bin/python2.6
-CC = gcc -std=gnu99 -Wdeclaration-after-statement -Wall -pedantic -Wextra -Wno-long-long -Wswitch-enum -Wsign-compare -Wno-variadic-macros -Werror -O3 -m32
-CXX = g++ -std=c++0x -O3 -m32
+CC = gcc -std=gnu99 -Wdeclaration-after-statement -Wall -pedantic -Wextra \
+     -Wno-long-long -Wswitch-enum -Wsign-compare -Wno-variadic-macros -Werror -O3 \
+     -finline-limit=10000 -m32
+CXX = g++ -std=c++0x -O3 -finline-limit=10000 -m32
 CFLAGS = -g
 CXXFLAGS = -g
 LDFLAGS = -g
