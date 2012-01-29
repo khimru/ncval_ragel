@@ -117,7 +117,11 @@ found in the LICENSE file.
   std::map<std::string, size_t> instruction_names;
   struct Instruction {
     std::string name;
-    std::vector<std::string> operands;
+    struct Operand {
+      char source;
+      std::string size;
+    };
+    std::vector<Operand> operands;
     std::vector<std::string> opcodes;
 #if 0
     /* We need GCC 4.7 for the following */
@@ -218,8 +222,10 @@ found in the LICENSE file.
 	/* Line with just a whitespaces is ignored.  */
 	if (operation.size() != 0) {
 	  instruction_names[instruction.name = operation[0]] = 0;
-	  instruction.operands.insert(instruction.operands.begin(),
-					operation.rbegin(), operation.rend() - 1);
+	  for_each(operation.rbegin(), operation.rend() - 1,
+	    [&instruction](std::string &string) {
+	      instruction.operands.push_back({ string[0], string.substr(1) });
+	    });
 	  if (*it == ',') {
 	    ++it;
 	    instruction.opcodes = get_strings();
@@ -883,7 +889,7 @@ found in the LICENSE file.
       }
       /* If register is stored in opcode we need to expand opcode now.  */
       for (auto &operand : operands) {
-	if (operand[0] == 'r') {
+	if (operand.source == 'r') {
 	  auto opcode = opcodes.rbegin();
 	  for (; opcode != opcodes.rend(); ++opcode) {
 	    if (opcode->find('/') == opcode->npos) {
@@ -917,7 +923,7 @@ found in the LICENSE file.
 			 "instruction “%s”"), short_program_name, name.c_str());
 		  exit(1);
 	      }
-	      if (operand != "r7") rex.b = true;
+	      if (operand.size != "7") rex.b = true;
 	      break;
 	    }
 	  }
@@ -1040,24 +1046,23 @@ found in the LICENSE file.
 	  { "z",	InstructionClass::kData16DefaultRexW		}
 	};
 	InstructionClass operand_class;
-	auto operand_size = operand.substr(1);
-	auto it = classes_map.find(operand_size);
+	auto it = classes_map.find(operand.size);
 	if (it != classes_map.end()) {
 	  operand_class = it->second;
 	/* If it's 8bit register specified using ModRM then we mark it as size8
 	   to make it possible to use REX_NONE for “dil”/“sil”/“bpl”/“spl”.  */
-	} else if (operand_size == "b") {
-	  if ((operand[0] == 'E') ||
-	      (operand[0] == 'G') ||
-	      (operand[0] == 'M') ||
-	      (operand[0] == 'R')) {
+	} else if (operand.size == "b") {
+	  if ((operand.source == 'E') ||
+	      (operand.source == 'G') ||
+	      (operand.source == 'M') ||
+	      (operand.source == 'R')) {
 	    operand_class = InstructionClass::kSize8;
 	  } else {
 	    operand_class = InstructionClass::kUnknown;
 	  }
 	} else {
-	  fprintf(stderr, _("%s: unknown operand: “%s”\n"),
-	    short_program_name, operand.c_str());
+	  fprintf(stderr, _("%s: unknown operand: “%c%s”\n"),
+		      short_program_name, operand.source, operand.size.c_str());
 	  exit(1);
 	}
 	if ((operand_class == InstructionClass::kUnknown) ||
@@ -1164,10 +1169,12 @@ found in the LICENSE file.
 	      auto saved_operands = operands;
 	      for (auto &operand : operands) {
 		for (auto c : {'H', 'L', 'U', 'V', 'W'}) {
-		  if ((operand[0] == c) && (*(operand.rbegin()) == 'x') &&
-		      (((operand.length() > 2) && (operand[1] == 'p')) ||
-		       (operand.length() == 2))) {
-		    operand.resize(operand.length() - 1);
+		  if ((operand.source == c) &&
+		      (*(operand.size.rbegin()) == 'x') &&
+		      (((operand.size.length() > 1) &&
+			(operand.size[0] == 'p')) ||
+		       (operand.size.length() == 1))) {
+		    operand.size.resize(operand.size.length() - 1);
 		  }
 		}
 	      }
@@ -1195,7 +1202,7 @@ found in the LICENSE file.
     void print_one_size_definition(void) {
       bool modrm_memory = false;
       bool modrm_register = false;
-      char operand_mode;
+      char operand_source;
       for (auto &operand : operands) {
 	static std::map<char, std::pair<bool, bool> > operand_map {
 	  { 'E', { true,  true  } },
@@ -1206,18 +1213,18 @@ found in the LICENSE file.
 	  { 'U', { false, true  } },
 	  { 'W', { true,  true  } }
 	};
-	auto it = operand_map.find(operand[0]);
+	auto it = operand_map.find(operand.source);
 	if (it != operand_map.end()) {
 	  if ((modrm_memory || modrm_register) &&
 	      ((modrm_memory != it->second.first) ||
 	       (modrm_register != it->second.second))) {
-	    fprintf(stderr, _("%s: error - conflicting operand modes:"
-	       " “%c” and “%c”"), short_program_name, operand_mode, operand[0]);
+	    fprintf(stderr, _("%s: error - conflicting operand sources: “%c”"
+	      " and “%c”"), short_program_name, operand_source, operand.source);
 	    exit(1);
 	  }
 	  modrm_memory = it->second.first;
 	  modrm_register = it->second.second;
-	  operand_mode = operand[0];
+	  operand_source = operand.source;
 	}
       }
       if (modrm_memory || modrm_register) {
@@ -1287,7 +1294,7 @@ found in the LICENSE file.
 	    { 'V', "reg"	},
 	    { 'W', "rm"	}
 	  };
-	  auto it = operand_type.find(operand[0]);
+	  auto it = operand_type.find(operand.source);
 	  if (it != operand_type.end()) {
 	    fprintf(out_file, " @operand%zd_from_modrm_%s",
 				   &operand - &(*operands.begin()), it->second);
@@ -1350,7 +1357,7 @@ found in the LICENSE file.
 	      { 'V', "from_modrm_reg"	},
 	      { 'W', "rm"		}
             };
-	    auto it = operand_type.find(operand[0]);
+	    auto it = operand_type.find(operand.source);
 	    if (it != operand_type.end()) {
 	      fprintf(out_file, " @operand%zd_%s",
 				   &operand - &(*operands.begin()), it->second);
@@ -1389,7 +1396,7 @@ found in the LICENSE file.
     bool mod_reg_is_used() {
       for (auto &operand : operands) {
 	for (auto c : { 'C', 'G', 'P', 'V' }) {
-	  if (operand[0] == c) {
+	  if (operand.source == c) {
 	    return true;
 	  }
 	}
@@ -1400,7 +1407,7 @@ found in the LICENSE file.
     bool mod_rm_is_used() {
       for (auto &operand : operands) {
 	for (auto c : { 'E', 'M', 'N', 'Q', 'R', 'U', 'W' }) {
-	  if (operand[0] == c) {
+	  if (operand.source == c) {
 	    return true;
 	  }
 	}
@@ -1646,7 +1653,7 @@ found in the LICENSE file.
       }
       if (!disabled(Actions::kParseOperands)) {
 	for (auto &operand : operands) {
-	  if (operand[0] == 'r') {
+	  if (operand.source == 'r') {
 	    fprintf(out_file, " @operand%zd_from_opcode",
 					       &operand - &(*operands.begin()));
 	  }
@@ -1775,26 +1782,26 @@ found in the LICENSE file.
 	    { T { InstructionClass::kRexW,    ' ', "z"	  },	"32bit"	      }
 	  };
 	  auto it = operand_sizes.find(T {instruction_class,
-					  operand[0], operand.substr(1)});
+					  operand.source, operand.size});
 	  if (it == operand_sizes.end()) {
 	    it = operand_sizes.find(T {InstructionClass::kUnknown,
-				       operand[0], operand.substr(1)});
+				       operand.source, operand.size});
 	  }
 	  if (it == operand_sizes.end()) {
 	    it = operand_sizes.find(T {instruction_class,
-				       ' ', operand.substr(1)});
+				       ' ', operand.size});
 	  }
 	  if (it == operand_sizes.end()) {
 	    it = operand_sizes.find(T {instruction_class,
-				       operand[0], ""});
+				       operand.source, ""});
 	  }
 	  if (it == operand_sizes.end()) {
 	    it = operand_sizes.find(T {InstructionClass::kUnknown,
-				       ' ', operand.substr(1)});
+				       ' ', operand.size});
 	  }
 	  if (it == operand_sizes.end()) {
-	    fprintf(stderr, _("%s: error - can not determine operand size: %s"),
-					   short_program_name, operand.c_str());
+	    fprintf(stderr, _("%s: error - can not determine operand size: %c%s"
+		   ), short_program_name, operand.source, operand.size.c_str());
 	    exit(1);
 	  } else {
 	    fprintf(out_file, " @operand%zd_%s", &operand - &(*operands.begin()),
@@ -1816,7 +1823,7 @@ found in the LICENSE file.
 	    { 'X', "ds_rsi"		},
 	    { 'Y', "es_rdi"		}
 	  };
-	  auto it2 = operand_type.find(operand[0]);
+	  auto it2 = operand_type.find(operand.source);
 	  if (it2 != operand_type.end()) {
 	    fprintf(out_file, " @operand%zd_%s", &operand - &(*operands.begin()),
 								   it2->second);
@@ -1852,22 +1859,22 @@ found in the LICENSE file.
 	  { { InstructionClass::kData16,	"z"	},	"imm16"	},
 	  { { InstructionClass::kRexW,		"z"	},	"imm32"	}
 	};
-	if (*operand->begin() == 'i') {
+	if (operand->source == 'i') {
 	  auto it = immediate_sizes.find({instruction_class,
-					  operand->substr(1)});
+					  operand->size});
 	  if (it == immediate_sizes.end()) {
-	    fprintf(stderr, _("%s: error - can not determine immediate size:"
-				   " %s"), short_program_name, operand->c_str());
+	    fprintf(stderr, _("%s: error - can not determine immediate size: %c"
+	     "%s"), short_program_name, operand->source, operand->size.c_str());
 	    exit(1);
 	  }
 	  fprintf(out_file, " %sn2", it->second);
 	}
-	if (*operand->begin() == 'I') {
+	if (operand->source == 'I') {
 	  auto it = immediate_sizes.find({instruction_class,
-					  operand->substr(1)});
+					  operand->size});
 	  if (it == immediate_sizes.end()) {
-	    fprintf(stderr, _("%s: error - can not determine immediate size:"
-				   " %s"), short_program_name, operand->c_str());
+	    fprintf(stderr, _("%s: error - can not determine immediate size: %c"
+	     "%s"), short_program_name, operand->source, operand->size.c_str());
 	    exit(1);
 	  }
 	  fprintf(out_file, " %s", it->second);
@@ -1879,16 +1886,16 @@ found in the LICENSE file.
 	  { { InstructionClass::kData16,	"z"	},	"rel16"	},
 	  { { InstructionClass::kRexW,		"z"	},	"rel32"	},
 	};
-	if (*operand->begin() == 'J') {
-	  auto it = jump_sizes.find({instruction_class, operand->substr(1)});
+	if (operand->source == 'J') {
+	  auto it = jump_sizes.find({instruction_class, operand->size});
 	  if (it == immediate_sizes.end()) {
-	    fprintf(stderr, _("%s: error - can not determine jump size:"
-				   " %s"), short_program_name, operand->c_str());
+	    fprintf(stderr, _("%s: error - can not determine jump size: %c%s"),
+		    short_program_name, operand->source, operand->size.c_str());
 	    exit(1);
 	  }
 	  fprintf(out_file, " %s", it->second);
 	}
-	if (*operand->begin() == 'L') {
+	if (operand->source == 'L') {
 	  if (operands.size() == 4) {
 	    fprintf(out_file, " %s", chartest((c & 0x0f) == 0x00));
 	  }
@@ -1897,7 +1904,7 @@ found in the LICENSE file.
 						 operands.rend() - operand - 1);
 	  }
 	}
-	if (*operand->begin() == 'O') {
+	if (operand->source == 'O') {
 	  fprintf(out_file, " disp64");
 	}
       }
