@@ -18,6 +18,12 @@
 #undef FALSE
 #define FALSE   0
 
+/* Default is perfectly fine way of handling the unhandled cases.  */
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+#pragma GCC diagnostic error "-Wswitch"
+/* This may help with portability but makes code less readable.  */
+#pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
+
 typedef Elf64_Ehdr Elf_Ehdr;
 typedef Elf64_Shdr Elf_Shdr;
 
@@ -1157,11 +1163,10 @@ int DecodeFile(const char *filename, int repeat_count) {
 	}
 	CheckBounds(data, data_size,
 		    data + section->sh_offset, section->sh_size);
-	int rc = DecodeChunk(section->sh_addr,
-			     data + section->sh_offset, section->sh_size,
-			     ProcessInstruction, ProcessError, &state);
-	if (rc != 0) {
-	  return rc;
+	int res = DecodeChunk(data + section->sh_offset, section->sh_size,
+			      ProcessInstruction, ProcessError, &state);
+	if (res != 0) {
+	  return res;
 	} else if (state.fwait) {
 	  while (state.fwait < data + section->sh_offset + section->sh_size) {
 	    printf("%*x:\t9b                   \tfwait\n", state.width,

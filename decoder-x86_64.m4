@@ -165,7 +165,7 @@ static const uint8_t index_registers[] = {
 
 static const uint8_t one = 1;
 
-int DecodeChunk(uint32_t load_addr, uint8_t *data, size_t size,
+int DecodeChunk(uint8_t *data, size_t size,
 		process_instruction_func process_instruction,
 		process_error_func process_error, void *userdata) {
   const uint8_t *p = data;
