@@ -11,7 +11,6 @@ OUT_DIRS = $(OUT)/build \
 PYTHON2X=/usr/bin/python2.6
 CC = gcc -std=gnu99 -Wdeclaration-after-statement -Wall -pedantic -Wextra -Wno-long-long -Wswitch-enum -Wsign-compare -Wno-variadic-macros -Werror -O3 -m32
 CXX = g++ -std=c++0x -O3 -m32
-M4 = m4
 CFLAGS = -g
 CXXFLAGS = -g
 LDFLAGS = -g
@@ -44,12 +43,7 @@ one-instruction.rl: one-valid-instruction.rl
 one-valid-instruction-consts.c one-valid-instruction.rl: \
 							gen-decoder $(INST_DEFS)
 	./gen-decoder -o one-valid-instruction.rl $(INST_DEFS)
-.INTERMEDIATE: one-instruction.rl one-instruction.dot one-instruction.xml
-one-instruction.rl: one-instruction.m4 $(INST_DEFS) \
-  common.m4 common_decoding.m4 instruction_parts.m4 instructions.m4
-
-%.rl: %.m4
-	$(M4) < $< > $@
+.INTERMEDIATE: one-instruction.dot one-instruction.xml
 
 %.c: %.rl
 	ragel -G2 $<
