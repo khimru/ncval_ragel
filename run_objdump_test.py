@@ -43,10 +43,18 @@ class TestGenerator(threading.Thread):
     self.proc = subprocess.Popen(self.generator_command, stdout=subprocess.PIPE)
     while True:
       CV.acquire()
-      while len(self.generated_filenames) >= CAPACITY:
-        self.proc.send_signal(signal.SIGSTOP)
-        CV.wait()
-        self.proc.send_signal(signal.SIGCONT)
+      try:
+        while len(self.generated_filenames) >= CAPACITY:
+          self.proc.send_signal(signal.SIGSTOP)
+          CV.wait()
+          self.proc.send_signal(signal.SIGCONT)
+      except OSError, err:
+        # OS Error with errno == 3 (ESRCH) means "no such process". The process
+        # has exited, ignore the error.
+        if err.errno != 3:
+          print >> sys.stderr, ('error: Unknown OSError while trying to ' +
+              'stop the generator: {0}'.format(err))
+          os._exit(4)
       line = self.proc.stdout.readline()
       if line == '':
         self.is_eof = True
@@ -119,8 +127,8 @@ class Worker(threading.Thread):
     else:
       (child_pid, retcode) = os.wait()
     if retcode != 0:
-      print ('error: return code 0 expected from tester, ' +
-             'got {0} instead'.format(retcode))
+      print >> sys.stderr, ('error: return code 0 expected from tester, ' +
+          'got {0} instead'.format(retcode))
       self.ExitFail()
     print '{0}..done'.format(filename)
 
