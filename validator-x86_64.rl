@@ -30,7 +30,10 @@
       } else { \
         BitmapSetBit(jump_dests, jump_dest + 1); \
       } \
-    }
+    } \
+    operand0 = JMP_TO; \
+    base = REG_RIP; \
+    index = REG_NONE;
 
 %%{
   machine x86_64_decoder;
@@ -43,8 +46,8 @@
 	  ((index == REG_RDI) &&
 	   (restricted_register == kSandboxedRsiRestrictedRdi))) {
 	BitmapClearBit(valid_targets, begin - data);
-      } else if ((index != REG_NONE) && (index == REG_RIZ)) {
-	fprintf(stderr,"Improper sandboxing in instruction @%x", begin - data);
+      } else if ((index != REG_NONE) && (index != REG_RIZ)) {
+	fprintf(stderr,"Improper sandboxing in instruction %x", begin - data);
 	exit(1);
       }
     } else if ((index == REG_RIP) || (index == REG_RSP) ||
@@ -53,7 +56,7 @@
 	  ((base == REG_RDI) &&
 	   (restricted_register == kSandboxedRsiRestrictedRdi))) {
 	BitmapClearBit(valid_targets, begin - data);
-      } else if ((base != REG_NONE) && (base == REG_RIZ)) {
+      } else if ((base != REG_NONE) && (base != REG_RIZ)) {
 	fprintf(stderr,"Improper sandboxing in instruction @%x", begin - data);
 	exit(1);
       }
@@ -104,17 +107,9 @@
     if (restricted_register != kSandboxedRsiRestrictedRdi) {
       restricted_register = kNoRestrictedReg;
       for (i = 0; i < operands_count; ++i) {
-	if (operands[i].write) {
+	if (operands[i].write && operands[i].name <= REG_R15) {
 	  if (operands[i].type == OperandSandboxRestricted) {
-	    if (operands[i].name == REG_RBP) {
-	      printf("Incorrectly modified register %%rbp at the %x\n",
-								      p - data);
-	      exit(1);
-	    } else if (operands[i].name == REG_RSP) {
-	      printf("Incorrectly modified register %%rsp at the %x\n",
-								      p - data);
-	      exit(1);
-	    } else if (operands[i].name == REG_R15) {
+	    if (operands[i].name == REG_R15) {
 	      printf("Incorrectly modified register %%r15 at the %x\n",
 								      p - data);
 	      exit(1);
@@ -149,9 +144,15 @@
 
   # Remove special instructions which are only allowed in special cases.
   normal_instruction = (one_instruction - (
-    (0x4c 0x01 0xfd)	         | # add %r15,%rbp
-    (0x4c 0x01 0xfc)	         | # add %r15,%rsp
-    (data16? REX_WRXB 0x8d any*)   # lea ...
+    (0x4c 0x01 0xfd)		 | # add %r15,%rbp
+    (0x49 0x8d 0x2c 0x2f)	 | # lea (%r15,%rbp,1),%rbp
+    (0x4a 0x8d 0x6c 0x3d any)	 | # lea 0x0(%rbp,%r15,1),%rbp
+    (0x4c 0x01 0xfc)		 | # add %r15,%rsp
+    (0x4a 0x8d 0x24 0x3c)	 | # lea (%rsp,%r15,1),%rsp
+    (0x49 0x8d 0x34 0x37)	 | # lea (%r15,%rsi,1),%rsi
+    (0x49 0x8d 0x3c 0x3f)	 | # lea (%r15,%rdi,1),%rdi
+    (0x48 0x89 0xe5)		 | # mov %rsp,%rbp
+    (0x48 0x89 0xec)		   # mov %rbp,%rsp
   )) @process_normal_instruction;
 
   special_instruction =
@@ -171,14 +172,14 @@
 	 exit(1);
        }
        restricted_register = kNoRestrictedReg;
-    }
+    } |
     (0x49 0x8d 0x34 0x37) # lea (%r15,%rsi,1),%rsi
     @{ if (restricted_register == REG_RSI) {
 	 restricted_register = kSandboxedRsi;
        } else {
 	 restricted_register = kNoRestrictedReg;
        }
-    }
+    } |
     (0x49 0x8d 0x3c 0x3f) # lea (%r15,%rdi,1),%rdi
     @{ if (restricted_register == REG_RDI) {
 	 restricted_register = kSandboxedRdi;
@@ -187,29 +188,25 @@
        } else {
          restricted_register = kNoRestrictedReg;
        }
+    } |
+    (0x48 0x89 0xe5) # mov %rsp,%rbp
+    @{ if (restricted_register == REG_RSP) {
+	  printf("Incorrectly modified register %%rsp at the %x\n", p - data);
+	  exit(1);
+       }
+       restricted_register = kNoRestrictedReg;
+    } |
+    (0x48 0x89 0xec) # mov %rbp,%rsp
+    @{ if (restricted_register == REG_RBP) {
+	  printf("Incorrectly modified register %%rbp at the %x\n", p - data);
+	  exit(1);
+       }
+       restricted_register = kNoRestrictedReg;
     };
 
-  lea_instruction = (
-    (data16 rex_r? 0x8d @operands_count_is_2 @operand0_16bit @operand1_16bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_disp)) |
-    (data16 rex_r? 0x8d @operands_count_is_2 @operand0_16bit @operand1_16bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_rip)) |
-    (data16 rex_rx? 0x8d @operands_count_is_2 @operand0_16bit @operand1_16bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & single_register_memory)) |
-    (data16 rex_r? 0x8d @operands_count_is_2 @operand0_16bit @operand1_16bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_sib_pure_index)) |
-    (data16 rex_rx? 0x8d @operands_count_is_2 @operand0_16bit @operand1_16bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_sib_base_index)) |
-    (rex_r? 0x8d @operands_count_is_2 @operand0_32bit @operand1_32bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_disp)) |
-    (rex_r? 0x8d @operands_count_is_2 @operand0_32bit @operand1_32bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_rip)) |
-    (rex_rx? 0x8d @operands_count_is_2 @operand0_32bit @operand1_32bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & single_register_memory)) |
-    (rex_r? 0x8d @operands_count_is_2 @operand0_32bit @operand1_32bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_sib_pure_index)) |
-    (rex_rx? 0x8d @operands_count_is_2 @operand0_32bit @operand1_32bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_sib_base_index)) |
-    (REXW_R 0x8d @operands_count_is_2 @operand0_64bit @operand1_64bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_disp)) |
-    (REXW_R 0x8d @operands_count_is_2 @operand0_64bit @operand1_64bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_rip)) |
-    (REXW_RX 0x8d @operands_count_is_2 @operand0_64bit @operand1_64bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & single_register_memory)) |
-    (REXW_R 0x8d @operands_count_is_2 @operand0_64bit @operand1_64bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_sib_pure_index)) |
-    (REXW_RX 0x8d @operands_count_is_2 @operand0_64bit @operand1_64bit @operand0_write @operand1_unused (any @operand0_from_modrm_reg @operand1_rm . any* & operand_sib_base_index))
-  ) @process_normal_instruction;
-
-  main := ((normal_instruction | special_instruction |
-	    (lea_instruction - special_instruction))>{
+  main := ((normal_instruction | special_instruction) >{
 	begin = p;
+	BitmapSetBit(valid_targets, p - data);
 	rex_prefix = FALSE;
 	vex_prefix2 = 0xe0;
 	vex_prefix3 = 0x00;
@@ -361,7 +358,7 @@ int ValidateChunk(const uint8_t *data, size_t size,
     %% write exec;
 
     if (restricted_register == REG_RBP) {
-      printf("Incorrectly sandboxed %%rbp at the %x\n", p - data);
+      printf("Incorrectly sandboxed %%rbp at the %d%x\n", *data, p - data);
       exit(1);
     } else if (restricted_register == REG_RSP) {
       printf("Incorrectly sandboxed %%rbp at the %x\n", p - data);

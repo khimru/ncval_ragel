@@ -42,7 +42,7 @@ movq Eq Pq, rexw 0x0f 0x6e, Fn0000_0001_EDX_MMX
 movq Pq Eq, rexw 0x0f 0x7e, Fn0000_0001_EDX_MMX
 ######## MOVSX #################################################################
 movsbq Eb Gq, rexw 0x0f 0xbe
-movswq Ew Gq, rexw 0x0f 0xb7
+movswq Ew Gq, rexw 0x0f 0xbf
 ######## MOVZX #################################################################
 movzbq Eb Gq, rexw 0x0f 0xb6
 movzwq Ew Gq, rexw 0x0f 0xb7
@@ -55,7 +55,7 @@ popq\ \ \ %gs, 0x0f 0xa9
 ######## POPF/POPFD/POPFQ ######################################################
 popfq, 0x9d
 ######## PUSH ##################################################################
-push Eq, 0xff /6
+push =Eq, 0xff /6
 pushq\ \ %fs, 0x0f 0xa0
 pushq\ \ %gs, 0x0f 0xa8
 ######## PUSHF/PUSHFD/PUSHFQ ###################################################
