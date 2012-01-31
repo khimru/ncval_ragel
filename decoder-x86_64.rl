@@ -27,7 +27,7 @@
 
   include decode_x86_64 "decoder-x86_64-instruction.rl";
 
-  main := (valid_instruction
+  main := (one_instruction
     >{
 	begin = p;
 	disp_type = DISPNONE;
@@ -148,9 +148,7 @@ enum imm_mode {
   IMM64
 };
 
-static const uint8_t one = 1;
-
-int DecodeChunk(uint8_t *data, size_t size,
+int DecodeChunk(const uint8_t *data, size_t size,
 		process_instruction_func process_instruction,
 		process_error_func process_error, void *userdata) {
   const uint8_t *p = data;

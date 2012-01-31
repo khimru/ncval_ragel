@@ -31,22 +31,32 @@ $(OUT_DIRS):
 all: decoder-test-x86_64 validator-test-x86_64
 .INTERMEDIATE: decoder-test-x86_64.o decoder-x86_64.o
 decoder-test-x86_64: decoder-x86_64.o decoder-test-x86_64.o
+.INTERMEDIATE: validator-test-x86_64.o validator-x86_64.o
 validator-test-x86_64: validator-x86_64.o validator-test-x86_64.o
-.INTERMEDIATE: gen-decoder decoder-x86_64.c
+.INTERMEDIATE: gen-decoder decoder-x86_64.c validator-x86_64.c
 decoder-x86_64.c: decoder-x86_64-instruction-consts.c
 decoder-x86_64.c: decoder-x86_64-instruction.rl
 .INTERMEDIATE: decoder-x86_64-instruction.rl decoder-x86_64-instruction-consts.c
 decoder-x86_64-instruction-consts.c decoder-x86_64-instruction.rl: \
 							gen-decoder $(INST_DEFS)
 	./gen-decoder -o decoder-x86_64-instruction.rl $(INST_DEFS) \
-	  -d check_access,opcode,mark_data_fields
+	  -d check_access,opcode,parse_operands_states,mark_data_fields
+validator-x86_64.c: validator-x86_64-instruction-consts.c
+validator-x86_64.c: validator-x86_64-instruction.rl
+.INTERMEDIATE: validator-x86_64-instruction.rl
+.INTERMEDIATE: validator-x86_64-instruction-consts.c
+validator-x86_64-instruction-consts.c validator-x86_64-instruction.rl: \
+							gen-decoder $(INST_DEFS)
+	./gen-decoder -o validator-x86_64-instruction.rl $(INST_DEFS) \
+	  -d opcode,instruction_name,mark_data_fields,rel_operand_action
 one-instruction.rl: one-valid-instruction-consts.c
 one-instruction.rl: one-valid-instruction.rl
 .INTERMEDIATE: one-valid-instruction.rl one-valid-instruction-consts.c
 one-valid-instruction-consts.c one-valid-instruction.rl: \
 							gen-decoder $(INST_DEFS)
 	./gen-decoder -o one-valid-instruction.rl $(INST_DEFS) \
-	  -d check_access,rex_prefix,vex_prefix,opcode,parse_operands
+	  -d check_access,rex_prefix,vex_prefix,opcode,parse_operands \
+	  -d parse_operands_states
 .INTERMEDIATE: one-instruction.dot one-instruction.xml
 
 %.c: %.rl

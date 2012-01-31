@@ -34,6 +34,6 @@
 
   include decode_x86_64 "one-valid-instruction.rl";
 
-  main := valid_instruction;
+  main := one_instruction;
 
 }%%

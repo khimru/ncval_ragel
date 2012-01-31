@@ -41,7 +41,7 @@ enum operand_type {
   OperandDebugRegister,	  /* Operand is debug register: %drX.		      */
   OperandMMX,
   OperandXMM,
-  OperandYMM,
+  OperandYMM
 };
 
 enum register_name {
@@ -107,7 +107,7 @@ typedef void (*process_instruction_func) (const uint8_t *begin,
 
 typedef void (*process_error_func) (const uint8_t *ptr, void *userdata);
 
-int DecodeChunk(uint8_t *data, size_t size, 
+int DecodeChunk(const uint8_t *data, size_t size, 
 		process_instruction_func process_instruction,
 		process_error_func process_error, void *userdata);
 
