@@ -424,7 +424,7 @@ lfs Mp Gv, 0x0f 0xb4
 lgs Mp Gv, 0x0f 0xb5
 lss Mp Gv, 0x0f 0xb2
 ######## LEA ###################################################################
-lea 'Mv !Gv, 0x8d
+lea 'Mv !Gv, 0x8d, no_memory_access
 ######## LFENCE ################################################################
 lfence, 0x0f 0xae 0xe8, Fn0000_0001_EDX_SSE2
 ######## LLWPCB ################################################################
@@ -481,7 +481,7 @@ movs X Y, 0xa4, rep
 # and 64bit version can be found in x86-64-instructions.def.
 movsbw Eb Gw, data16 0x0f 0xbe
 movsbl Eb Gd, 0x0f 0xbe
-movswl Ew Gd, 0x0f 0xb7
+movswl Ew Gd, 0x0f 0xbf
 ######## MOVZX #################################################################
 # This is description according to AMD/Intel manual.
 # movsx Eb Gv, 0x0f 0xb6
@@ -498,7 +498,7 @@ mul E, 0xf6 /4
 neg E, 0xf6 /3, lock
 ######## NOP ###################################################################
 nop, 0x90
-nop Ev, 0x0f 0x1f /0
+nop 'Ev, 0x0f 0x1f /0, no_memory_access
 ######## NOT ###################################################################
 not E, 0xf6 /2, lock
 ######## OR ####################################################################
@@ -529,22 +529,22 @@ popcnt Ev Gv, 0xf3 0x0f 0xb8, Fn0000_0001_ECX_POPCNT
 ######## POPF/POPFD/POPFQ ######################################################
 popfw, data16 0x9d
 ######## PREFETCH/PREFETCHW ####################################################
-prefetch Mb, 0x0f 0x0d /0, Fn8000_0001_ECX_3DNowPrefetch
-prefetchw Mb, 0x0f 0x0d /1, Fn8000_0001_ECX_3DNowPrefetch
+prefetch Mb, 0x0f 0x0d /0, Fn8000_0001_ECX_3DNowPrefetch no_memory_access
+prefetchw Mb, 0x0f 0x0d /1, Fn8000_0001_ECX_3DNowPrefetch no_memory_access
 ######## PREFETCHlevel #########################################################
-prefetchnta Mb, 0x0f 0x18 /0
-prefetcht0 Mb, 0x0f 0x18 /1
-prefetcht1 Mb, 0x0f 0x18 /2
-prefetcht2 Mb, 0x0f 0x18 /3
+prefetchnta Mb, 0x0f 0x18 /0, no_memory_access
+prefetcht0 Mb, 0x0f 0x18 /1, no_memory_access
+prefetcht1 Mb, 0x0f 0x18 /2, no_memory_access
+prefetcht2 Mb, 0x0f 0x18 /3, no_memory_access
 ######## PUSH ##################################################################
 # “push” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
 # in the appropriate files.
-push Ew, 0x66 0xff /6
-push rr, 0x50
-push Iz, 0x68
-push Ib, 0x6a
+push =Ew, 0x66 0xff /6
+push =rr, 0x50
+push =Iz, 0x68
+push =Ib, 0x6a
 ######## PUSHF/PUSHFD/PUSHFQ ###################################################
 pushfw, data16 0x9c
 ######## RCL ###################################################################
@@ -626,7 +626,7 @@ stc, 0xf9
 ######## STD ###################################################################
 std, 0xfd
 ######## STOS/STOSB/STOSW/STOSD/STOSQ ##########################################
-stos a Y, 0xaa
+stos a Y, 0xaa, rep
 ######## SUB ###################################################################
 sub I a, 0x2c
 sub I E, 0x80 /5, lock

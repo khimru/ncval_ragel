@@ -48,9 +48,10 @@ validator-x86_64.c: validator-x86_64-instruction.rl
 validator-x86_64-instruction-consts.c validator-x86_64-instruction.rl: \
 							gen-decoder $(INST_DEFS)
 	./gen-decoder -o validator-x86_64-instruction.rl $(INST_DEFS) \
-	  -d opcode,instruction_name,mark_data_fields,rel_operand_action
-one-instruction.rl: one-valid-instruction-consts.c
-one-instruction.rl: one-valid-instruction.rl
+	  -d opcode,instruction_name,mark_data_fields,rel_operand_action \
+	  nops.def
+one-instruction.dot: one-valid-instruction-consts.c
+one-instruction.dot: one-valid-instruction.rl
 .INTERMEDIATE: one-valid-instruction.rl one-valid-instruction-consts.c
 one-valid-instruction-consts.c one-valid-instruction.rl: \
 							gen-decoder $(INST_DEFS)

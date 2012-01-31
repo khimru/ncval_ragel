@@ -212,7 +212,7 @@ found in the LICENSE file.
 		if (*++it == '(') {
 		  auto parenthesis = std::find_if(it, end, right_parenthesis);
 		  string.insert(string.end(), it, ++parenthesis);
-		  it = parenthesis;
+		  it = --parenthesis;
 		} else {
 		  string.push_back(*it);
 		}
@@ -837,15 +837,6 @@ found in the LICENSE file.
     index = REG_RIZ;
     scale = 0;
   }
-  action operand%1$d_ds_rbx {
-    operand%1$d = REG_DS_RBX;
-  }
-  action operand%1$d_ds_rsi {
-    operand%1$d = REG_DS_RSI;
-  }
-  action operand%1$d_es_rdi {
-    operand%1$d = REG_ES_RDI;
-  }
   action operand%1$d_from_opcode {
     operand%1$d = ((*p) & 0x7) |
 	       ((rex_prefix & 0x01) << 3) |
@@ -867,31 +858,25 @@ found in the LICENSE file.
   action operand%1$d_from_vex {
     operand%1$d = ((~vex_prefix3) & 0x78) >> 3;
   }
-  action operand%1$d_immediate {
-    operand%1$d = REG_IMM;
-  }
-  action operand%1$d_port_dx {
-    operand%1$d = REG_PORT_DX;
-  }
-  action operand%1$d_rax {
-    operand%1$d = REG_RAX;
-  }
-  action operand%1$d_rcx {
-    operand%1$d = REG_RCX;
-  }
-  action operand%1$d_rdx {
-    operand%1$d = REG_RDX;
-  }
-  action operand%1$d_rm {
-    operand%1$d = REG_RM;
-  }
-  action operand%1$d_second_immediate {
-    operand%1$d = REG_IMM2;
-  }
-  action operand%1$d_st {
-    operand%1$d = REG_ST;
-  }
 )END", i);
+	for (auto type : {
+	  T { "ds_rbx",			"REG_DS_RBX"	},
+	  T { "ds_rsi",			"REG_DS_RSI"	},
+	  T { "es_rdi",			"REG_ES_RDI"	},
+	  T { "immediate",		"REG_IMM"	},
+	  T { "second_immediate",	"REG_IMM"	},
+	  T { "port_dx",		"REG_PORT_DX"	},
+	  T { "rax",			"REG_RAX"	},
+	  T { "rcx",			"REG_RCX"	},
+	  T { "rdx",			"REG_RDX"	},
+	  T { "rm",			"REG_RM"	},
+	  T { "st",			"REG_ST"	}
+	} ) {
+	  fprintf(out_file, R"END(  action operand%1$d_%2$s {
+    operand%1$d = %3$s;
+  }
+)END", i, type.first, type.second);
+	}
       }
     }
     if (enabled(Actions::kParseOperandsStates)) {
@@ -1040,8 +1025,8 @@ found in the LICENSE file.
       /* Unknown: if all arguments are unknown the result is kDefault.  */
       kUnknown
     } instruction_class;
-    std::set<std::string> required_prefixes;
-    std::set<std::string> optional_prefixes;
+    std::multiset<std::string> required_prefixes;
+    std::multiset<std::string> optional_prefixes;
     struct {
       bool b : 1;
       bool x : 1;
@@ -1114,7 +1099,8 @@ found in the LICENSE file.
 	  if ((operand.source == 'E') ||
 	      (operand.source == 'G') ||
 	      (operand.source == 'M') ||
-	      (operand.source == 'R')) {
+	      (operand.source == 'R') ||
+	      (operand.source == 'r')) {
 	    operand_class = InstructionClass::kSize8;
 	  } else {
 	    operand_class = InstructionClass::kUnknown;
@@ -1374,7 +1360,7 @@ found in the LICENSE file.
     void print_one_size_definition_modrm_memory(void) {
       typedef std::tuple<const char *, bool, bool> T;
       for (auto mode : {
-        T { " operand_disp",		false,	false	},
+        T { " operand_disp",		false,	true	},
         T { " operand_rip",		false,	false	},
         T { " single_register_memory",	false,	true	},
         T { " operand_sib_pure_index",	true,	false	},
@@ -1386,7 +1372,7 @@ found in the LICENSE file.
 	}
 	if (mod_rm_is_used()) {
 	  rex.x = std::get<1>(mode);
-	  rex.x = std::get<2>(mode);
+	  rex.b = std::get<2>(mode);
 	}
 	print_legacy_prefixes();
 	print_rex_prefix();
@@ -1424,7 +1410,7 @@ found in the LICENSE file.
 	  }
 	}
 	fprintf(out_file, " . any* &%s", std::get<0>(mode));
-	if (enabled(Actions::kCheckAccess)) {
+	if (enabled(Actions::kCheckAccess) && !no_memory_access) {
 	  fprintf(out_file, " @check_access");
 	}
 	fprintf(out_file, ")");
