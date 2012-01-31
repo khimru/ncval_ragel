@@ -14,8 +14,21 @@
 # First column: instruction description.
 #   Includes name of the instruction and arguments.
 #
-#   Arguments consist of two parts: argument type and argument size.
+#   Arguments consist of four parts:
+#      1. Read/write attribute (optional).
+#      2. Argument type.
+#      3. Argument size.
+#      4. Implicit argument mark (optional).
 #
+#      Read/write attribute:
+#	': Instruction does not use this argument (lea or nop).
+#	=: Instruction reads from this argument.
+#	!: Instruction writes in this argument.
+#	&: Instruction reads this argument and writes the result to it.
+#	 By default one- and two-operand instructions are assumed to read all
+#	 operands and store result to the last one, while instructions with
+#	 three or more operands are assumed to read all operands except last one
+#	 which is used to store the result of the execution.
 #      Possible argument types:
 #	1: One (for instructions like “shr” or “rol”).
 #	a: Accumulator (%al/%ax/%eax/%rax depending on size).
@@ -86,7 +99,7 @@
 #	pd:   A double-precision (64-bit) floating-point vector operand (packed
 #	      double-precision).
 #	pdw:  Vector composed of 32-bit doublewords.
-#	pdwx:  Vector composed of 32-bit doublewords. L bit selects 256bit YMM
+#	pdwx: Vector composed of 32-bit doublewords. L bit selects 256bit YMM
 #	      registers.
 #	pdx:  A double-precision (64-bit) floating-point vector operand (packed
 #	      double-precision).  L bit selects 256bit YMM registers.
@@ -131,6 +144,8 @@
 #	y:    A doubleword or quadword depending on effective operand size.
 #	z:    A word if the effective operand size is 16 bits, or a doubleword
 #	      if the effective operand size is 32 or 64 bits.
+#      Implicit argument mark:
+#	*: This argument is implicit. It's not shown in the diassembly listing.
 ################################################################################
 # Second column: instruction opcodes.
 #   Includes all opcode bytes.  If first opcode bytes is 0x66/data16,
@@ -409,7 +424,7 @@ lfs Mp Gv, 0x0f 0xb4
 lgs Mp Gv, 0x0f 0xb5
 lss Mp Gv, 0x0f 0xb2
 ######## LEA ###################################################################
-lea Mv Gv, 0x8d
+lea 'Mv !Gv, 0x8d
 ######## LFENCE ################################################################
 lfence, 0x0f 0xae 0xe8, Fn0000_0001_EDX_SSE2
 ######## LLWPCB ################################################################

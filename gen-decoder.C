@@ -96,8 +96,10 @@ found in the LICENSE file.
     kInstructionName,
     kOpcode,
     kParseOperands,
+    kParseOperandsStates,
     kMarkDataFields,
-    kCheckAccess
+    kCheckAccess,
+    kRelOperandAction
   };
   const char* kDisablableActionsList[] = {
     "rex_prefix",
@@ -105,13 +107,15 @@ found in the LICENSE file.
     "instruction_name",
     "opcode",
     "parse_operands",
+    "parse_operands_states",
     "mark_data_fields",
-    "check_access"
+    "check_access",
+    "rel_operand_action"
   };
   bool disabled_actions[arraysize(kDisablableActionsList)];
 
-  bool disabled(Actions action) {
-    return disabled_actions[static_cast<int>(action)];
+  bool enabled(Actions action) {
+    return !disabled_actions[static_cast<int>(action)];
   }
 
   std::map<std::string, size_t> instruction_names;
@@ -120,6 +124,9 @@ found in the LICENSE file.
     struct Operand {
       char source;
       std::string size;
+      bool read;
+      bool write;
+      bool implicit;
     };
     std::vector<Operand> operands;
     std::vector<std::string> opcodes;
@@ -223,8 +230,36 @@ found in the LICENSE file.
 	if (operation.size() != 0) {
 	  instruction_names[instruction.name = operation[0]] = 0;
 	  for_each(operation.rbegin(), operation.rend() - 1,
-	    [&instruction](std::string &string) {
-	      instruction.operands.push_back({ string[0], string.substr(1) });
+	    [&instruction, &operation](std::string &str) {
+	      Instruction::Operand operand;
+	      switch (str[0]) {
+		case '\'':
+		  operand = {str[1], str.substr(2), false, false, false};
+		  break;
+		case '=':
+		  operand = {str[1], str.substr(2), true, false, false};
+		  break;
+		case '!':
+		  operand = {str[1], str.substr(2), false, true, false};
+		  break;
+		case '&':
+		  operand = {str[1], str.substr(2), true, true, false};
+		  break;
+		default:
+		  if (&str == &*operation.rbegin()) {
+		    if (operation.size() <= 3) {
+		      operand = {str[0], str.substr(1), true, true, false};
+		    } else {
+		      operand = {str[0], str.substr(1), false, true, false};
+		    }
+		  } else {
+		    operand = {str[0], str.substr(1), true, false, false};
+		  }
+	      }
+	      if (*(operand.size.rbegin()) == '*') {
+		operand.size.resize(operand.size.length() - 1);
+	      }
+	      instruction.operands.push_back(operand);
 	    });
 	  if (*it == ',') {
 	    ++it;
@@ -268,7 +303,7 @@ found in the LICENSE file.
   #define chartest(x) (chartest([=](int c) { return x; }).c_str())
 
   void print_consts(void)  {
-    if (!disabled(Actions::kInstructionName)) {
+    if (enabled(Actions::kInstructionName)) {
       std::vector<std::string> names;
       std::transform(instruction_names.begin(), instruction_names.end(),
 	std::back_inserter(names),
@@ -320,7 +355,7 @@ found in the LICENSE file.
       }
       fprintf(const_file, " */\n};\n");
     }
-    if (!disabled(Actions::kParseOperands)) {
+    if (enabled(Actions::kParseOperands)) {
       fprintf(const_file, R"END(static const uint8_t index_registers[] = {
   REG_RAX, REG_RCX, REG_RDX, REG_RBX,
   REG_RIZ, REG_RBP, REG_RSI, REG_RDI,
@@ -345,7 +380,8 @@ found in the LICENSE file.
   }
 
   void print_common_decoding(void) {
-    fprintf(out_file, R"END(  action rel8_operand {
+    if (enabled(Actions::kRelOperandAction)) {
+      fprintf(out_file, R"END(  action rel8_operand {
     operand0 = JMP_TO;
     base = REG_RIP;
     index = REG_NONE;
@@ -369,7 +405,9 @@ found in the LICENSE file.
     disp_type = DISP32;
     disp = p - 3;
   }
-  action branch_not_taken {
+)END");
+    }
+    fprintf(out_file, R"END(  action branch_not_taken {
     branch_taken = TRUE;
   }
   action branch_taken {
@@ -458,7 +496,7 @@ found in the LICENSE file.
     imm2 = p - 7;
   }
 )END");
-    if (!disabled(Actions::kParseOperands)) {
+    if (enabled(Actions::kParseOperands)) {
       fprintf(out_file, R"END(  action modrm_only_base {
     disp_type = DISPNONE;
     index = REG_NONE;
@@ -505,23 +543,23 @@ found in the LICENSE file.
   rel8 = any %s;
   rel16 = any{2} %s;
   rel32 = any{4} %s;
-)END", disabled(Actions::kMarkDataFields) ?
-	 "@rel8_operand" : ">rel8_operand_begin @rel8_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@rel16_operand" : ">rel16_operand_begin @rel16_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@rel32_operand" : ">rel32_operand_begin @rel32_operand_end");
+)END", enabled(Actions::kMarkDataFields) ?
+	 ">rel8_operand_begin @rel8_operand_end" : "@rel8_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">rel16_operand_begin @rel16_operand_end" : "@rel16_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">rel32_operand_begin @rel32_operand_end" : "@rel32_operand");
     fprintf(out_file, R"END(
   # Displacements.
   disp8		= any %s;
   disp32	= any{4} %s;
   disp64	= any{8} %s;
-)END", disabled(Actions::kMarkDataFields) ?
-	 "@disp8_operand" : ">disp8_operand_begin @disp8_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@disp32_operand" : ">disp32_operand_begin @disp32_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@disp64_operand" : ">disp64_operand_begin @disp64_operand_end");
+)END", enabled(Actions::kMarkDataFields) ?
+	 ">disp8_operand_begin @disp8_operand_end" : "@disp8_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">disp32_operand_begin @disp32_operand_end" : "@disp32_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">disp64_operand_begin @disp64_operand_end" : "@disp64_operand");
     fprintf(out_file, R"END(
   # Immediates.
   imm2 = %s @imm2_operand;
@@ -534,55 +572,55 @@ found in the LICENSE file.
   imm16n2 = any{2} %s;
   imm32n2 = any{4} %s;
   imm64n2 = any{8} %s;
-)END", disabled(Actions::kMarkDataFields) ?
-	 "@imm8_operand" : ">imm8_operand_begin @imm8_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@imm16_operand" : ">imm8_operand_begin @imm16_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@imm32_operand" : ">imm8_operand_begin @imm32_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@imm64_operand" : ">imm8_operand_begin @imm64_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@imm8_second_operand" : ">imm8_operand_begin @imm8_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@imm16_second_operand" : ">imm16_operand_begin @imm16_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@imm32_second_operand" : ">imm32_operand_begin @imm32_operand_end",
-       disabled(Actions::kMarkDataFields) ?
-	 "@imm64_second_operand" : ">imm64_operand_begin @imm64_operand_end");
+)END", enabled(Actions::kMarkDataFields) ?
+	 ">imm8_operand_begin @imm8_operand_end" : "@imm8_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">imm8_operand_begin @imm16_operand_end" : "@imm16_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">imm8_operand_begin @imm32_operand_end" : "@imm32_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">imm8_operand_begin @imm64_operand_end" : "@imm64_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">imm8_operand_begin @imm8_operand_end" : "@imm8_second_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">imm16_operand_begin @imm16_operand_end" : "@imm16_second_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">imm32_operand_begin @imm32_operand_end" : "@imm32_second_operand",
+       enabled(Actions::kMarkDataFields) ?
+	 ">imm64_operand_begin @imm64_operand_end" : "@imm64_second_operand");
     fprintf(out_file, R"END(
   # Different types of operands.
   operand_sib_base_index = (%2$s . %3$s%1$s) |
 			   (%4$s . any%1$s . disp8) |
 			   (%5$s . any%1$s . disp32);
-)END", disabled(Actions::kParseOperands) ? "" : " @modrm_parse_sib",
+)END", enabled(Actions::kParseOperands) ? " @modrm_parse_sib" : "",
        chartest((c & 0xC0) == 0    && (c & 0x07) == 0x04),
        chartest((c & 0x07) != 0x05),
        chartest((c & 0xC0) == 0x40 && (c & 0x07) == 0x04),
        chartest((c & 0xC0) == 0x80 && (c & 0x07) == 0x04));
     fprintf(out_file, R"END(  operand_sib_pure_index = %2$s . %3$s%1$s . disp32;
-)END", disabled(Actions::kParseOperands) ? "" : " @modrm_pure_index",
+)END", enabled(Actions::kParseOperands) ? " @modrm_pure_index" : "",
        chartest((c & 0xC0) == 0    && (c & 0x07) == 0x04),
        chartest((c & 0x07) == 0x05));
     fprintf(out_file, R"END(  operand_disp  = (%2$s%1$s . disp8) |
 		  (%3$s%1$s . disp32);
-)END", disabled(Actions::kParseOperands) ? "" : " @modrm_base_disp",
+)END", enabled(Actions::kParseOperands) ? " @modrm_base_disp" : "",
        chartest((c & 0xC0) == 0x40 && (c & 0x07) != 0x04),
        chartest((c & 0xC0) == 0x80 && (c & 0x07) != 0x04));
     fprintf(out_file, "  # It's pure disp32 in IA32 case, "
 	    R"END(but offset(%%rip) in x86-64 case.
   operand_rip = %2$s%1$s . disp32;
-)END", disabled(Actions::kParseOperands) ? "" : " @modrm_rip",
+)END", enabled(Actions::kParseOperands) ? " @modrm_rip" : "",
        chartest((c & 0xC0) == 0   && (c & 0x07) == 0x05));
     fprintf(out_file, R"END(  single_register_memory = %2$s%1$s;
-)END", disabled(Actions::kParseOperands) ? "" : " @modrm_only_base",
+)END", enabled(Actions::kParseOperands) ? " @modrm_only_base" : "",
        chartest((c & 0xC0) == 0   && (c & 0x07) != 0x04 &&
 				     (c & 0x07) != 0x05));
     fprintf(out_file, R"END(  modrm_memory = (operand_disp | operand_rip |
 		  operand_sib_base_index | operand_sib_pure_index |
 		  single_register_memory)%1$s;
   modrm_registers = %2$s;
-)END", disabled(Actions::kCheckAccess) ? "" : " @check_access",
+)END", enabled(Actions::kCheckAccess) ? " @check_access" : "",
        chartest((c & 0xC0) == 0xC0));
     fprintf(out_file, R"END(
   # Operations selected using opcode in ModR/M.
@@ -618,7 +656,7 @@ found in the LICENSE file.
   repnz = 0xf2 @repnz_prefix;
   repz = 0xf3 @repz_prefix;
 )END");
-    if (!disabled(Actions::kRexPrefix)) {
+    if (enabled(Actions::kRexPrefix)) {
       fprintf(out_file, R"END(
   # REX prefixes.
   action rex_prefix {
@@ -642,7 +680,7 @@ found in the LICENSE file.
   REX_WXB  = %14$s%1$s;
   REX_RXB  = %15$s%1$s;
   REX_WRXB = %16$s%1$s;
-)END", disabled(Actions::kRexPrefix) ? "" : " @rex_prefix",
+)END", enabled(Actions::kRexPrefix) ? " @rex_prefix" : "",
        chartest((c & 0xf7) == 0x40),
        chartest((c & 0xfb) == 0x40),
        chartest((c & 0xfd) == 0x40),
@@ -682,7 +720,7 @@ found in the LICENSE file.
   REXW_RB  = %6$s%1$s;
   REXW_XB  = %7$s%1$s;
   REXW_RXB = %8$s%1$s;
-)END", disabled(Actions::kRexPrefix) ? "" : " @rex_prefix",
+)END", enabled(Actions::kRexPrefix) ? " @rex_prefix" : "",
        chartest((c & 0xfb) == 0x48),
        chartest((c & 0xfd) == 0x48),
        chartest((c & 0xfe) == 0x48),
@@ -690,7 +728,7 @@ found in the LICENSE file.
        chartest((c & 0xfa) == 0x48),
        chartest((c & 0xfc) == 0x48),
        chartest((c & 0xf8) == 0x48));
-    if (!disabled(Actions::kVexPrefix)) {
+    if (enabled(Actions::kVexPrefix)) {
       fprintf(out_file, R"END(
   # VEX/XOP prefix.
   action vex_prefix2 {
@@ -720,7 +758,7 @@ found in the LICENSE file.
       T { "RXB",	0x00 }
     } ) {
       fprintf(out_file, R"END(  VEX_%2$s = %3$s%1$s;
-)END", disabled(Actions::kVexPrefix) ? "" : " @vex_prefix2",
+)END", enabled(Actions::kVexPrefix) ? " @vex_prefix2" : "",
        vex.first, chartest((c & vex.second) == vex.second));
     }
     for (auto vex : {
@@ -740,7 +778,7 @@ found in the LICENSE file.
       fprintf(out_file, R"END(  VEX_map%1$s = %2$s;
 )END", vex.first, chartest((c & 0x1f) == vex.second));
     }
-    if (!disabled(Actions::kOpcode)) {
+    if (enabled(Actions::kOpcode)) {
       fprintf(out_file, R"END(
   action begin_opcode {
     begin_opcode = p;
@@ -750,7 +788,7 @@ found in the LICENSE file.
   }
 )END");
     }
-    if (!disabled(Actions::kParseOperands)) {
+    if (enabled(Actions::kParseOperands)) {
       for (auto i = 0 ; i <= 5; ++i) {
 	fprintf(out_file, R"END(  action operands_count_is_%1$d {
     operands_count = %1$d;
@@ -852,6 +890,27 @@ found in the LICENSE file.
   }
   action operand%1$d_st {
     operand%1$d = REG_ST;
+  }
+)END", i);
+      }
+    }
+    if (enabled(Actions::kParseOperandsStates)) {
+      for (auto i = 0 ; i < 5; ++i) {
+	fprintf(out_file, R"END(  action operand%1$d_unused {
+    operand%1$d_read = false;
+    operand%1$d_write = false;
+  }
+  action operand%1$d_read {
+    operand%1$d_read = true;
+    operand%1$d_write = false;
+  }
+  action operand%1$d_write {
+    operand%1$d_read = false;
+    operand%1$d_write = true;
+  }
+  action operand%1$d_readwrite {
+    operand%1$d_read = true;
+    operand%1$d_write = true;
   }
 )END", i);
       }
@@ -1277,7 +1336,7 @@ found in the LICENSE file.
         print_opcode_recognition();
       }
       fprintf(out_file, " modrm_registers");
-      if (!disabled(Actions::kParseOperands)) {
+      if (enabled(Actions::kParseOperands)) {
         for (auto &operand : operands) {
 	  static const std::map<char, const char*> operand_type {
 	    { 'C', "reg"	},
@@ -1297,7 +1356,7 @@ found in the LICENSE file.
 	  auto it = operand_type.find(operand.source);
 	  if (it != operand_type.end()) {
 	    fprintf(out_file, " @operand%zd_from_modrm_%s",
-				   &operand - &(*operands.begin()), it->second);
+				     &operand - &*operands.begin(), it->second);
 	  }
 	}
       }
@@ -1340,7 +1399,7 @@ found in the LICENSE file.
 	} else {
 	  fprintf(out_file, " (any");
 	}
-	if (!disabled(Actions::kParseOperands)) {
+	if (enabled(Actions::kParseOperands)) {
 	  for (auto &operand : operands) {
 	    static const std::map<char, const char*> operand_type {
 	      { 'C', "from_modrm_reg"	},
@@ -1360,12 +1419,12 @@ found in the LICENSE file.
 	    auto it = operand_type.find(operand.source);
 	    if (it != operand_type.end()) {
 	      fprintf(out_file, " @operand%zd_%s",
-				   &operand - &(*operands.begin()), it->second);
+				     &operand - &*operands.begin(), it->second);
 	    }
 	  }
 	}
 	fprintf(out_file, " . any* &%s", std::get<0>(mode));
-	if (!disabled(Actions::kCheckAccess)) {
+	if (enabled(Actions::kCheckAccess)) {
 	  fprintf(out_file, " @check_access");
 	}
 	fprintf(out_file, ")");
@@ -1542,7 +1601,7 @@ found in the LICENSE file.
 	for (auto symbolic : { "cntl", "dest", "src1", "src" }) {
 	  for (auto it = third_byte.begin(); it != third_byte.end(); ++it) {
 	    if ((third_byte.end() - it) >= strlen(symbolic) &&
-	        !strncmp(&(*it), symbolic, strlen(symbolic))) {
+	        !strncmp(&*it, symbolic, strlen(symbolic))) {
 	      third_byte.replace(it, it + strlen(symbolic), "XXXX");
 	      break;
 	    }
@@ -1604,7 +1663,7 @@ found in the LICENSE file.
 	    }
 	  };
 	  print_third_byte();
-	  if (!disabled(Actions::kVexPrefix)) {
+	  if (enabled(Actions::kVexPrefix)) {
 	    fprintf(out_file, " @vex_prefix3");
 	  }
 	  if (c5_ok) {
@@ -1615,7 +1674,7 @@ found in the LICENSE file.
 	      third_byte[0] = '1';
 	    }
 	    print_third_byte();
-	    if (!disabled(Actions::kVexPrefix)) {
+	    if (enabled(Actions::kVexPrefix)) {
 	      fprintf(out_file, " @vex_prefix_short");
 	    }
 	    fprintf(out_file, "))");
@@ -1648,14 +1707,14 @@ found in the LICENSE file.
 	}
 	fprintf(out_file, ")");
       }
-      if (!disabled(Actions::kOpcode)) {
+      if (enabled(Actions::kOpcode)) {
 	fprintf(out_file, " >begin_opcode");
       }
-      if (!disabled(Actions::kParseOperands)) {
+      if (enabled(Actions::kParseOperands)) {
 	for (auto &operand : operands) {
 	  if (operand.source == 'r') {
 	    fprintf(out_file, " @operand%zd_from_opcode",
-					       &operand - &(*operands.begin()));
+						 &operand - &*operands.begin());
 	  }
 	}
       }
@@ -1671,7 +1730,7 @@ found in the LICENSE file.
 	  }
 	}
       }
-      if (!disabled(Actions::kOpcode)) {
+      if (enabled(Actions::kOpcode)) {
 	fprintf(out_file, " @end_opcode");
       }
       for (auto &prefix : required_prefixes) {
@@ -1698,10 +1757,10 @@ found in the LICENSE file.
 	  break;
 	}
       }
-      if (!disabled(Actions::kInstructionName)) {
+      if (enabled(Actions::kInstructionName)) {
 	fprintf(out_file, " @instruction_%s", c_identifier(name).c_str());
       }
-      if (!disabled(Actions::kParseOperands)) {
+      if (enabled(Actions::kParseOperands)) {
 	fprintf(out_file, " @operands_count_is_%zd", operands.size());
         for (auto &operand : operands) {
           typedef std::tuple<InstructionClass, char, std::string> T;
@@ -1804,7 +1863,7 @@ found in the LICENSE file.
 		   ), short_program_name, operand.source, operand.size.c_str());
 	    exit(1);
 	  } else {
-	    fprintf(out_file, " @operand%zd_%s", &operand - &(*operands.begin()),
+	    fprintf(out_file, " @operand%zd_%s", &operand - &*operands.begin(),
 								    it->second);
 	  }
 	  static std::map<char, const char*> operand_type {
@@ -1825,8 +1884,29 @@ found in the LICENSE file.
 	  };
 	  auto it2 = operand_type.find(operand.source);
 	  if (it2 != operand_type.end()) {
-	    fprintf(out_file, " @operand%zd_%s", &operand - &(*operands.begin()),
+	    fprintf(out_file, " @operand%zd_%s", &operand - &*operands.begin(),
 								   it2->second);
+	  }
+	}
+      }
+      if (enabled(Actions::kParseOperandsStates)) {
+	for (auto &operand : operands) {
+	  if (operand.read) {
+	    if (operand.write) {
+	      fprintf(out_file, " @operand%zd_readwrite",
+						 &operand - &*operands.begin());
+	    } else {
+	      fprintf(out_file, " @operand%zd_read",
+						 &operand - &*operands.begin());
+	    }
+	  } else {
+	    if (operand.write) {
+	      fprintf(out_file, " @operand%zd_write",
+						 &operand - &*operands.begin());
+	    } else {
+	      fprintf(out_file, " @operand%zd_unused",
+						 &operand - &*operands.begin());
+	    }
 	  }
 	}
       }
@@ -1899,7 +1979,7 @@ found in the LICENSE file.
 	  if (operands.size() == 4) {
 	    fprintf(out_file, " %s", chartest((c & 0x0f) == 0x00));
 	  }
-	  if (!disabled(Actions::kParseOperands)) {
+	  if (enabled(Actions::kParseOperands)) {
 	    fprintf(out_file, " @operand%zd_from_is4",
 						 operands.rend() - operand - 1);
 	  }
@@ -1922,7 +2002,7 @@ found in the LICENSE file.
     }
   };
 
-  void print_valid_instruction_definition(void) {
+  void print_one_instruction_definition(void) {
     for (auto &instruction : instructions) {
       MarkedInstruction(instruction).print_definition();
     }
@@ -2034,13 +2114,13 @@ int main(int argc, char *argv[]) {
 
   print_common_decoding();
 
-  if (!disabled(Actions::kInstructionName)) {
+  if (enabled(Actions::kInstructionName)) {
     print_name_actions();
   }
 
-  fprintf(out_file, "\n  valid_instruction =");
+  fprintf(out_file, "\n  one_instruction =");
 
-  print_valid_instruction_definition();
+  print_one_instruction_definition();
 
   fprintf(out_file, R"END();
 }%%%%
