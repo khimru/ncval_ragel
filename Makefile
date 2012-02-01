@@ -15,17 +15,17 @@ OBJD=$(OUT)/build/objs
 PYTHON2X=/usr/bin/python2.6
 CC = gcc -std=gnu99 -Wdeclaration-after-statement -Wall -pedantic -Wextra \
      -Wno-long-long -Wswitch-enum -Wsign-compare -Wno-variadic-macros -Werror \
-     -O3 -finline-limit=10000 -m64
-ifeq ($(shell if [ $$(g++ -dM -E -xc - < /dev/null | grep __GNUC_MINOR__ | \
-      ( read d g v ; echo $$v)) -lt 6 ] ; then echo getgcc ; fi), getgcc)
-GCC46_VER = 4.6.2
-CXX = $(GCC46_INSTALL_DIR)/bin/g++ -std=c++0x -O3 -finline-limit=10000 -m64
-CXX46 = $(GCC46_INSTALL_DIR)/bin/g++
-GCC46_INSTALL_DIR = $(OUT)/build/install-gcc-$(GCC46_VER)
-else
-CXX = g++ -std=c++0x -O3 -finline-limit=10000 -m64
+     -O3 -finline-limit=10000 -m32
+#ifeq ($(shell if [ $$(g++ -dM -E -xc - < /dev/null | grep __GNUC_MINOR__ | \
+#      ( read d g v ; echo $$v)) -lt 6 ] ; then echo getgcc ; fi), getgcc)
+#GCC46_VER = 4.6.2
+#CXX = $(GCC46_INSTALL_DIR)/bin/g++ -std=c++0x -O3 -finline-limit=10000 -m64
+#CXX46 = $(GCC46_INSTALL_DIR)/bin/g++
+#GCC46_INSTALL_DIR = $(OUT)/build/install-gcc-$(GCC46_VER)
+#else
+CXX = g++ -std=c++0x -O3 -finline-limit=10000 -m32
 CXX46 =
-endif
+#endif
 ifeq ($(shell ragel -v 2>/dev/null || true), )
 RAGEL_VER = ragel-6.7
 RAGEL = $(OUT)/build/build-$(RAGEL_VER)/ragel/ragel
@@ -85,7 +85,7 @@ $(OBJD)/decoder-x86_64-instruction-consts.c \
 $(OBJD)/validator-x86_64.c: $(OBJD)/validator-x86_64-instruction-consts.c
 $(OBJD)/validator-x86_64.c: $(OBJD)/validator-x86_64-instruction.rl
 $(OBJD)/validator-x86_64-instruction-consts.c \
-  $(OBJD)/validator-x86_64-instruction.rl: \
+  $(OBJD)/validator-x86_64-instruction.rl: $(GEN_DECODER) $(INST_DEFS)
 	$(GEN_DECODER) -o $(OBJD)/validator-x86_64-instruction.rl $(INST_DEFS) \
 	  -d opcode,instruction_name,mark_data_fields,rel_operand_action \
 	  nops.def
@@ -105,6 +105,9 @@ $(OBJD)/one-valid-instruction-consts.c \
 	  -d parse_operands_states
 
 $(OBJD)/decoder-test-x86_64.o: decoder-test-x86_64.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJD)/validator-test-x86_64.o: validator-test-x86_64.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # To test the decoder compare its output with output from objdump.  This
@@ -212,8 +215,8 @@ clean-all: clean
 	clean-tests:
 	rm -rf "$(OUT)"/test "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
 
-.PHONY: check
-check: outdirs $(BINUTILS_STAMP) $(OBJD)/one-instruction.dot \
+.PHONY: full-check
+full-check: outdirs $(BINUTILS_STAMP) $(OBJD)/one-instruction.dot \
     $(OBJD)/decoder-test-x86_64
 	$(PYTHON2X) parse_dfa.py <"$(OBJD)/one-instruction.dot" \
 	    > "$(OUT)/test/test_dfa_transitions.c"
@@ -229,3 +232,7 @@ check: outdirs $(BINUTILS_STAMP) $(OBJD)/one-instruction.dot \
 	  --tester=./decoder_test_one_file.sh \
 	  --nthreads=`cat /proc/cpuinfo | grep processor | wc -l` -- \
 	  "$(OUT)/test/test_dfa" "$(FAST_TMP_FOR_TEST)"
+
+.PHONY: check
+check: outdirs $(OBJD)/validator-test-x86_64
+	$(OBJD)/validator-test-x86_64 nacl_irt_x86_64.nexe
