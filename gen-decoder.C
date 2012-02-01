@@ -864,7 +864,7 @@ found in the LICENSE file.
 	  T { "ds_rsi",			"REG_DS_RSI"	},
 	  T { "es_rdi",			"REG_ES_RDI"	},
 	  T { "immediate",		"REG_IMM"	},
-	  T { "second_immediate",	"REG_IMM"	},
+	  T { "second_immediate",	"REG_IMM2"	},
 	  T { "port_dx",		"REG_PORT_DX"	},
 	  T { "rax",			"REG_RAX"	},
 	  T { "rcx",			"REG_RCX"	},
