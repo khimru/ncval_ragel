@@ -110,8 +110,8 @@ $(BINUTILS_TARBALL): | $(OUT_DIRS)
 	cd $(OUT)/tarballs && wget $(BINUTILS_URL_BASE)/$(BINUTILS_VER).tar.bz2
 
 $(BINUTILS_STAMP): $(BINUTILS_TARBALL) | $(OUT_DIRS)
-	rm -rf $(OBJD)/$(BINUTILS_VER)
-	cd $(OBJD) && tar jxf ../tarballs/$(BINUTILS_VER).tar.bz2
+	rm -rf $(OUT)/build/$(BINUTILS_VER)
+	cd $(OUT)/build && tar jxf ../tarballs/$(BINUTILS_VER).tar.bz2
 	rm -rf $(BINUTILS_BUILD_DIR)
 	mkdir -p $(BINUTILS_BUILD_DIR)
 	cd $(BINUTILS_BUILD_DIR) && \
