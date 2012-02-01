@@ -564,7 +564,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     /* This prefix is "rep" for "ins", "movs", and "outs", "repz" otherwise.  */
     if ((!strcmp(instruction_name, "ins")) ||
         (!strcmp(instruction_name, "movs")) ||
-        (!strcmp(instruction_name, "outs"))) {
+        (!strcmp(instruction_name, "outs")) ||
+        (!strcmp(instruction_name, "stos"))) {
       print_name("rep ");
     } else {
       print_name("repz ");
