@@ -46,12 +46,6 @@ $(OBJD)/%.c: %.rl
 $(OBJD)/%.c: $(OBJD)/%.rl
 	ragel -G2 $<
 
-$(OBJD)/%.dot: $(OBJD)/%.rl
-	ragel -V $< -o $@
-
-%.xml: %.rl
-	ragel -x $< -o $@
-
 # Decoder, validator, etc.
 $(OBJD)/decoder-test-x86_64: \
     $(OBJD)/decoder-x86_64.o $(OBJD)/decoder-test-x86_64.o
@@ -145,15 +139,7 @@ clean-all: clean
 	rm -rf "$(OUT)"/test "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
 
 .PHONY: check
-check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(OUT)/test
-	python dfa_possibilities.py one-instruction.xml > $(OUT)/test/list.s
-	$(GAS) --64 $(OUT)/test/list.s -o $(OUT)/test/list.o
-	$(OBJDUMP) -d $(OUT)/test/list.o > $(OUT)/test/objdump.txt
-	./decoder-test-x86_64 $(OUT)/test/list.o > $(OUT)/test/decoder.txt
-	diff -uNr $(OUT)/test/objdump.txt $(OUT)/test/decoder.txt
-
-.PHONY: check-n
-check-n: $(BINUTILS_STAMP) $(OBJD)/one-instruction.dot \
+check: $(BINUTILS_STAMP) $(OBJD)/one-instruction.dot \
     $(OBJD)/decoder-test-x86_64 | $(OUT)/test
 	$(PYTHON2X) parse_dfa.py <"$(OBJD)/one-instruction.dot" \
 	    > "$(OUT)/test/test_dfa_transitions.c"
