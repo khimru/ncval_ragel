@@ -47,9 +47,11 @@ INST_DEFS = general-purpose-instructions.def \
 FAST_TMP_FOR_TEST=/dev/shm
 
 # Default rule.
-all: $(OBJD)/decoder-test-x86_64 $(OBJD)/validator-test-x86_64
+all: outdirs $(OBJD)/decoder-test-x86_64 $(OBJD)/validator-test-x86_64
 
 # Create all prerequisite directories.
+.PHONY: outdirs
+outdirs: | $(OUT_DIRS)
 $(OUT_DIRS):
 	install -m 755 -d $@
 
@@ -211,8 +213,8 @@ clean-all: clean
 	rm -rf "$(OUT)"/test "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
 
 .PHONY: check
-check: $(BINUTILS_STAMP) $(OBJD)/one-instruction.dot \
-    $(OBJD)/decoder-test-x86_64 | $(OUT)/test
+check: outdirs $(BINUTILS_STAMP) $(OBJD)/one-instruction.dot \
+    $(OBJD)/decoder-test-x86_64
 	$(PYTHON2X) parse_dfa.py <"$(OBJD)/one-instruction.dot" \
 	    > "$(OUT)/test/test_dfa_transitions.c"
 	$(CC) $(CFLAGS) -c test_dfa.c -o "$(OUT)/test/test_dfa.o"
