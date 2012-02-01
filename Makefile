@@ -15,15 +15,15 @@ OBJD=$(OUT)/build/objs
 PYTHON2X=/usr/bin/python2.6
 CC = gcc -std=gnu99 -Wdeclaration-after-statement -Wall -pedantic -Wextra \
      -Wno-long-long -Wswitch-enum -Wsign-compare -Wno-variadic-macros -Werror \
-     -O3 -finline-limit=10000 -m64
+     -O3 -finline-limit=10000
 ifeq ($(shell if [ $$(g++ -dM -E -xc - < /dev/null | grep __GNUC_MINOR__ | \
       ( read d g v ; echo $$v)) -lt 6 ] ; then echo getgcc ; fi), getgcc)
 GCC46_VER = 4.6.2
-CXX = $(GCC46_INSTALL_DIR)/bin/g++ -std=c++0x -O3 -finline-limit=10000 -m64
+CXX = $(GCC46_INSTALL_DIR)/bin/g++ -std=c++0x -O3 -finline-limit=10000
 CXX46 = $(GCC46_INSTALL_DIR)/bin/g++
 GCC46_INSTALL_DIR = $(OUT)/build/install-gcc-$(GCC46_VER)
 else
-CXX = g++ -std=c++0x -O3 -finline-limit=10000 -m64
+CXX = g++ -std=c++0x -O3 -finline-limit=10000
 CXX46 =
 endif
 ifeq ($(shell ragel -v 2>/dev/null || true), )
@@ -85,7 +85,7 @@ $(OBJD)/decoder-x86_64-instruction-consts.c \
 $(OBJD)/validator-x86_64.c: $(OBJD)/validator-x86_64-instruction-consts.c
 $(OBJD)/validator-x86_64.c: $(OBJD)/validator-x86_64-instruction.rl
 $(OBJD)/validator-x86_64-instruction-consts.c \
-  $(OBJD)/validator-x86_64-instruction.rl: \
+  $(OBJD)/validator-x86_64-instruction.rl: $(GEN_DECODER) $(INST_DEFS)
 	$(GEN_DECODER) -o $(OBJD)/validator-x86_64-instruction.rl $(INST_DEFS) \
 	  -d opcode,instruction_name,mark_data_fields,rel_operand_action \
 	  nops.def
@@ -105,6 +105,9 @@ $(OBJD)/one-valid-instruction-consts.c \
 	  -d parse_operands_states
 
 $(OBJD)/decoder-test-x86_64.o: decoder-test-x86_64.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJD)/validator-test-x86_64.o: validator-test-x86_64.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # To test the decoder compare its output with output from objdump.  This
@@ -169,6 +172,13 @@ $(OUT)/build/build-$(RAGEL_VER)/ragel/ragel: $(RAGEL_TARBALL) | $(OUT_DIRS)
 GCC46_URL_BASE = http://commondatastorage.googleapis.com/nativeclient-mirror/toolchain/gcc/gcc-4.6.2
 GCC46_TARBALL_CORE = $(OUT)/tarballs/gcc-core-$(GCC46_VER).tar.bz2
 GCC46_TARBALL_GXX = $(OUT)/tarballs/gcc-g++-$(GCC46_VER).tar.bz2
+GCC46_URL_EXTRAS = https://src.chromium.org/viewvc/native_client/trunk/src/third_party
+GCC46_GMP_VER = gmp-5.0.2
+GCC46_MPFR_VER = mpfr-3.0.1
+GCC46_MPC_VER = mpc-0.9
+GCC46_GMP_TARBALL = $(OUT)/tarballs/$(GCC46_GMP_VER).tar.bz2
+GCC46_MPFR_TARBALL = $(OUT)/tarballs/$(GCC46_MPFR_VER).tar.bz2
+GCC46_MPC_TARBALL = $(OUT)/tarballs/$(GCC46_MPC_VER).tar.gz
 GCC46_BUILD_DIR = $(OUT)/build/build-gcc-$(GCC46_VER)
 
 $(GCC46_TARBALL_CORE): | $(OUT_DIRS)
@@ -179,12 +189,31 @@ $(GCC46_TARBALL_GXX): | $(OUT_DIRS)
 	rm -f $(GCC46_TARBALL_GXX)
 	cd $(OUT)/tarballs && wget $(GCC46_URL_BASE)/gcc-g++-$(GCC46_VER).tar.bz2
 
-$(GCC46_INSTALL_DIR)/bin/g++: $(GCC46_TARBALL_CORE) $(GCC46_TARBALL_GXX) | \
-                                                                     $(OUT_DIRS)
-	rm -rf $(OUT)/build/$(GCC46_VER)
+$(GCC46_GMP_TARBALL): | $(OUT_DIRS)
+	rm -f $(GCC46_GMP_TARBALL)
+	cd $(OUT)/tarballs && wget $(GCC46_URL_EXTRAS)/gmp/$(GCC46_GMP_VER).tar.bz2
+
+$(GCC46_MPFR_TARBALL): | $(OUT_DIRS)
+	rm -f $(GCC46_MPFR_TARBALL)
+	cd $(OUT)/tarballs && wget $(GCC46_URL_EXTRAS)/mpfr/$(GCC46_MPFR_VER).tar.bz2
+
+$(GCC46_MPC_TARBALL): | $(OUT_DIRS)
+	rm -f $(GCC46_MPC_TARBALL)
+	cd $(OUT)/tarballs && wget $(GCC46_URL_EXTRAS)/mpc/$(GCC46_MPC_VER).tar.gz
+
+$(GCC46_INSTALL_DIR)/bin/g++: $(GCC46_TARBALL_CORE) $(GCC46_TARBALL_GXX) \
+    $(GCC46_GMP_TARBALL) $(GCC46_MPFR_TARBALL) $(GCC46_MPC_TARBALL)| $(OUT_DIRS)
+	rm -rf $(OUT)/build/gcc-$(GCC46_VER)
 	cd $(OUT)/build && \
 	  tar jxf $(CURDIR)/$(OUT)/tarballs/gcc-core-$(GCC46_VER).tar.bz2 && \
-	  tar jxf $(CURDIR)/$(OUT)/tarballs/gcc-g++-$(GCC46_VER).tar.bz2
+	  tar jxf $(CURDIR)/$(OUT)/tarballs/gcc-g++-$(GCC46_VER).tar.bz2 && \
+	  cd gcc-$(GCC46_VER) && \
+	  tar jxf $(CURDIR)/$(OUT)/tarballs/$(GCC46_GMP_VER).tar.bz2 && \
+	  mv $(GCC46_GMP_VER) gmp && \
+	  tar jxf $(CURDIR)/$(OUT)/tarballs/$(GCC46_MPFR_VER).tar.bz2 && \
+	  mv $(GCC46_MPFR_VER) mpfr && \
+	  tar zxf $(CURDIR)/$(OUT)/tarballs/$(GCC46_MPC_VER).tar.gz && \
+	  mv $(GCC46_MPC_VER) mpc
 	rm -rf $(GCC46_BUILD_DIR)
 	mkdir -p $(GCC46_BUILD_DIR)
 	cd $(GCC46_BUILD_DIR) && \

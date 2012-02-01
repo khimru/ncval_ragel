@@ -94,9 +94,9 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   } else if (((struct DecodeState *)userdata)->fwait) {
     if ((begin[0] < 0xd8) || (begin[0] > 0xdf)) {
       while ((((struct DecodeState *)userdata)->fwait) < begin) {
-        printf("%*"PRIx64":\t                   \tfwait\n",
+        printf("%*zx:\t                   \tfwait\n",
           ((struct DecodeState *)userdata)->width,
-          (uint64_t)((((struct DecodeState *)userdata)->fwait++) -
+          ((((struct DecodeState *)userdata)->fwait++) -
             (((struct DecodeState *)userdata)->offset)));
       }
     } else {
@@ -104,8 +104,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     }
     ((struct DecodeState *)userdata)->fwait = FALSE;
   }
-  printf("%*"PRIx64":\t", ((struct DecodeState *)userdata)->width,
-      (uint64_t)(begin - (((struct DecodeState *)userdata)->offset)));
+  printf("%*zx:\t", ((struct DecodeState *)userdata)->width,
+                          (begin - (((struct DecodeState *)userdata)->offset)));
   for (p = begin; p < begin + 7; p++) {
     if (p >= end) {
       printf("   ");
@@ -1170,13 +1170,11 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       case REG_ES_RDI: printf("%%es:(%%rdi)"); break;
       case REG_DS_RSI: printf("%%ds:(%%rsi)"); break;
       case JMP_TO: if (instruction->operands[0].type == OperandSize16bit)
-          printf("0x%"PRIx64,
-                 (uint64_t) ((end + instruction->rm.offset -
-                     (((struct DecodeState *)userdata)->offset)) & 0xffff));
+          printf("0x%zx", ((end + instruction->rm.offset -
+                         (((struct DecodeState *)userdata)->offset)) & 0xffff));
         else
-          printf("0x%"PRIx64,
-                 (uint64_t) (end + instruction->rm.offset -
-                     (((struct DecodeState *)userdata)->offset)));
+          printf("0x%zx", (end + instruction->rm.offset -
+                                   (((struct DecodeState *)userdata)->offset)));
         break;
       case REG_RIP:
       case REG_RIZ:
@@ -1259,9 +1257,8 @@ int DecodeFile(const char *filename, int repeat_count) {
           return res;
         } else if (state.fwait) {
           while (state.fwait < data + section->sh_offset + section->sh_size) {
-            printf("%*"PRIx64":\t9b                   \tfwait\n",
-                   state.width,
-                   (uint64_t) (state.fwait++ - state.offset));
+            printf("%*zx:\t9b                   \tfwait\n",
+                                   state.width, (state.fwait++ - state.offset));
           }
         }
       }
