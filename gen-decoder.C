@@ -25,7 +25,7 @@ char (&ArraySizeHelper(T (&array)[N]))[N];
 #define arraysize(array) (sizeof(ArraySizeHelper(array)))
 
 char* _(const char *s) { return gettext(s); }
-constexpr const char* N_(const char *s) { return s; }
+const char* N_(const char *s) { return s; }
 
 namespace {
   const char* short_program_name;
