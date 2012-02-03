@@ -762,7 +762,7 @@ namespace {
 "");
     }
     typedef std::pair<const char *, int> T;
-    for (auto vex : {
+    static const T vex_fields[] = {
       T { "NONE",	0xe0 },
       T { "R",		0x60 },
       T { "X",		0xa0 },
@@ -771,12 +771,13 @@ namespace {
       T { "RB",		0x40 },
       T { "XB",		0x80 },
       T { "RXB",	0x00 }
-    } ) {
+    };
+    for (auto vex : vex_fields) {
       fprintf(out_file, "  VEX_%2$s = %3$s%1$s;\n"
 "", enabled(Actions::kVexPrefix) ? " @vex_prefix2" : "",
        vex.first, chartest((c & vex.second) == vex.second));
     }
-    for (auto vex : {
+    static const T vex_map[] = {
       T { "01",		1	},
       T { "02",		2	},
       T { "03",		3	},
@@ -789,7 +790,8 @@ namespace {
       T { "01000",	8	},
       T { "01001",	9	},
       T { "01010",	10	},
-    } ) {
+    };
+    for (auto vex : vex_map) {
       fprintf(out_file, "  VEX_map%1$s = %2$s;\n"
 "", vex.first, chartest((c & 0x1f) == vex.second));
     }
@@ -812,7 +814,7 @@ namespace {
       }
       for (auto i = 0 ; i < 5; ++i) {
 	typedef std::pair<const char *, const char *> T;
-	for (auto size : {
+	static const T sizes[] = {
 	  T { "2bit",			"Size2bit"			},
 	  T { "8bit",			"Size8bit"			},
 	  T { "16bit",			"Size16bit"			},
@@ -840,7 +842,8 @@ namespace {
 	  T { "creg",			"ControlRegister"		},
 	  T { "dreg",			"DebugRegister"			},
 	  T { "selector",		"Selector"			}
-	} ) {
+	};
+	for (auto size : sizes) {
 	  fprintf(out_file, "  action operand%1$d_%2$s {\n"
 "    operand%1$d_type = Operand%3$s;\n"
 "  }\n"
@@ -874,7 +877,7 @@ namespace {
 "    operand%1$d = ((~vex_prefix3) & 0x78) >> 3;\n"
 "  }\n"
 "", i);
-	for (auto type : {
+	static const T types[] = {
 	  T { "ds_rbx",			"REG_DS_RBX"	},
 	  T { "ds_rsi",			"REG_DS_RSI"	},
 	  T { "es_rdi",			"REG_ES_RDI"	},
@@ -886,7 +889,8 @@ namespace {
 	  T { "rdx",			"REG_RDX"	},
 	  T { "rm",			"REG_RM"	},
 	  T { "st",			"REG_ST"	}
-	} ) {
+	};
+	for (auto type : types) {
 	  fprintf(out_file, "  action operand%1$d_%2$s {\n"
 "    operand%1$d = %3$s;\n"
 "  }\n"
@@ -970,7 +974,8 @@ namespace {
 		case '8':
 		  (*opcode) = "(";
 		  opcode->append(saved_opcode);
-		  for (auto c : {'9', 'a', 'b', 'c', 'd', 'e', 'f'}) {
+		  static const char cc[] = {'9', 'a', 'b', 'c', 'd', 'e', 'f'};
+		  for (auto c : cc) {
 		    opcode->push_back('|');
 		    (*(saved_opcode.rbegin())) = c;
 		    opcode->append(saved_opcode);
@@ -1228,7 +1233,8 @@ namespace {
 	      opcode[Lbit] = '0';
 	      auto saved_operands = operands;
 	      for (auto &operand : operands) {
-		for (auto c : {'H', 'L', 'U', 'V', 'W'}) {
+		static const char cc[] = {'H', 'L', 'U', 'V', 'W'};
+		for (auto c : cc) {
 		  if ((operand.source == c) &&
 		      (*(operand.size.rbegin()) == 'x') &&
 		      (((operand.size.length() > 1) &&
@@ -1374,13 +1380,14 @@ namespace {
 
     void print_one_size_definition_modrm_memory(void) {
       typedef std::tuple<const char *, bool, bool> T;
-      for (auto mode : {
+      static const T modes[] = {
         T { " operand_disp",		false,	true	},
         T { " operand_rip",		false,	false	},
         T { " single_register_memory",	false,	true	},
         T { " operand_sib_pure_index",	true,	false	},
         T { " operand_sib_base_index",	true,	true	}
-      }) {
+      };
+      for (auto mode : modes) {
 	print_operator_delimeter();
 	if (mod_reg_is_used()) {
 	  rex.r = true;
@@ -1455,7 +1462,8 @@ namespace {
 
     bool mod_reg_is_used() {
       for (auto &operand : operands) {
-	for (auto c : { 'C', 'G', 'P', 'V' }) {
+	static const char cc[] = { 'C', 'G', 'P', 'V' };
+	for (auto c : cc) {
 	  if (operand.source == c) {
 	    return true;
 	  }
@@ -1466,7 +1474,8 @@ namespace {
 
     bool mod_rm_is_used() {
       for (auto &operand : operands) {
-	for (auto c : { 'E', 'M', 'N', 'Q', 'R', 'U', 'W' }) {
+	static const char cc[] = { 'E', 'M', 'N', 'Q', 'R', 'U', 'W' };
+	for (auto c : cc) {
 	  if (operand.source == c) {
 	    return true;
 	  }
@@ -1599,7 +1608,8 @@ namespace {
 	    !regex_match(third_byte.begin(), third_byte.end(),
 							    third_byte_check)) {
 #else
-	for (auto symbolic : { "cntl", "dest", "src1", "src" }) {
+	static const char* symbolic_names[] = { "cntl", "dest", "src1", "src" };
+	for (auto symbolic : symbolic_names) {
 	  for (auto it = third_byte.begin(); it != third_byte.end(); ++it) {
 	    if ((third_byte.end() - it) >= strlen(symbolic) &&
 	        !strncmp(&*it, symbolic, strlen(symbolic))) {
