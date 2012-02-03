@@ -286,12 +286,25 @@ found in the LICENSE file.
     }
   }
 
+#if (__GNUC__ < 5) && (__GNUC_MINOR__ < 6)
+#define USE_LAMBDA_IN_CHARTEST 1
+#else
+#define USE_LAMBDA_IN_CHARTEST 0
+#endif
+#if USE_LAMBDA_IN_CHARTEST
   template<typename func>
   std::string chartest(func f) {
+#else
+  std::string chartest(std::vector<bool> v) {
+#endif
     std::string result;
     auto delimeter = "( ";
     for (int c = 0x00; c <= 0xff; ++c) {
+#if USE_LAMBDA_IN_CHARTEST
       if (f(c)) {
+#else
+      if (v[c]) {
+#endif
         char buf[10];
         sprintf(buf, "%s0x%02x", delimeter, c);
         result += buf;
@@ -300,7 +313,49 @@ found in the LICENSE file.
     }
     return result + " )";
   }
+#if USE_LAMBDA_IN_CHARTEST
   #define chartest(x) (chartest([=](int c) { return x; }).c_str())
+#else
+  struct comparator {
+    const std::vector<bool> &v;
+    const int n;
+    comparator(const std::vector<bool> &v_, const int n_) : v(v_), n(n_) { }
+    #define operator(x) \
+      const std::vector<bool> operator x (int m) { \
+        std::vector<bool> r(256, false); \
+        for (int c = 0x00; c <= 0xff; ++c) { \
+          if (v[c]) { \
+            r[c] = (c & n) x m; \
+          } \
+        } \
+        return r; \
+      }
+    operator(==)
+    operator(!=)
+    operator(<=)
+    operator(>=)
+    operator(<)
+    operator(>)
+    #undef operator
+  };
+  comparator operator& (const std::vector<bool> &v, int n) {
+    return comparator(v, n);
+  }
+  #define operator(x) \
+    const std::vector<bool> operator x (const std::vector<bool> &v1, \
+                                        const std::vector<bool> &v2) { \
+      std::vector<bool> r(256); \
+      for (int c = 0x00; c <= 0xff; ++c) { \
+        r[c] = (v1[c] x v2[c]); \
+      } \
+      return r; \
+    }
+  operator(&&)
+  operator(||)
+  #undef operator
+  #define chartest(x) (chartest(x).c_str())
+  std::vector<bool> c(256, true);
+#endif
 
   void print_consts(void)  {
     if (enabled(Actions::kInstructionName)) {
