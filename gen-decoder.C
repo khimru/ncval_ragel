@@ -31,11 +31,11 @@ namespace {
   const char* short_program_name;
 
   const struct option kProgramOptions[] = {
-    {"disable",	required_argument,	nullptr,	'd'},
-    {"output",	required_argument,	nullptr,	'o'},
-    {"help",	no_argument,		nullptr,	'h'},
-    {"version",	no_argument,		nullptr,	'v'},
-    {nullptr,	0,			nullptr,	0}
+    {"disable",	required_argument,	NULL,	'd'},
+    {"output",	required_argument,	NULL,	'o'},
+    {"help",	no_argument,		NULL,	'h'},
+    {"version",	no_argument,		NULL,	'v'},
+    {NULL,	0,			NULL,	0}
   };
 
   const char kVersion[] = "0.0";
@@ -2031,7 +2031,7 @@ int main(int argc, char *argv[]) {
       case 'd': {
 	for (auto action_to_disable = strtok(optarg, ",");
 	     action_to_disable;
-	     action_to_disable = strtok(nullptr, ",")) {
+	     action_to_disable = strtok(NULL, ",")) {
 	  auto action_number = std::find_if(
 	    std::begin(kDisablableActionsList),
 	    std::end(kDisablableActionsList),
