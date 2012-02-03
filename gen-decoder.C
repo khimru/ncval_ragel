@@ -178,18 +178,45 @@ namespace {
     return file_content;
   }
 
+  bool eol(char c) {
+    return c == '\n';
+  }
+
+  bool right_parenthesis(char c) {
+    return c == ')';
+  }
+
+  bool whitespace(char c) {
+    return c == ' ' || c == '\t';
+  }
+
+  std::vector<std::string> get_strings(std::string::const_iterator &it,
+                                       std::string::const_iterator end) {
+    std::vector<std::string> strings;
+    std::string string;
+    while ((it = std::find_if_not(it, end, whitespace)) < end && *it != ',') {
+      for (; it < end && *it != ',' && !whitespace(*it); ++it) {
+        if (*it != '\\') {
+          string.push_back(*it);
+        } else {
+          if (*++it == '(') {
+            auto parenthesis = std::find_if(it, end, right_parenthesis);
+            string.insert(string.end(), it, ++parenthesis);
+            it = --parenthesis;
+          } else {
+            string.push_back(*it);
+          }
+        }
+      }
+      strings.push_back(string);
+      string.clear();
+    }
+    return strings;
+  }
+
   void load_instructions(const char *filename) {
     const auto file_content = read_file(filename);
     auto it = file_content.begin();
-    auto eol = [](decltype(*it) c) {
-      return c == '\n';
-    };
-    auto whitespace = [](decltype(*it) c) {
-      return c == ' ' || c == '\t';
-    };
-    auto right_parenthesis = [](decltype(*it) c) {
-      return c == ')';
-    };
     while (it != file_content.end()) {
       it = std::find_if_not(it, file_content.end(), eol);
       if (it == file_content.end()) {
@@ -200,32 +227,9 @@ namespace {
 	it = std::find_if(it, file_content.end(), eol);
       } else {
 	auto end = std::find_if(it, file_content.end(), eol);
-	auto get_strings = [=, &it](void) {
-	  std::vector<std::string> strings;
-	  std::string string;
-	  while ((it = std::find_if_not(it, end, whitespace)) < end &&
-								   *it != ',') {
-	    for (; it < end && *it != ',' && !whitespace(*it); ++it) {
-	      if (*it != '\\') {
-		string.push_back(*it);
-	      } else {
-		if (*++it == '(') {
-		  auto parenthesis = std::find_if(it, end, right_parenthesis);
-		  string.insert(string.end(), it, ++parenthesis);
-		  it = --parenthesis;
-		} else {
-		  string.push_back(*it);
-		}
-	      }
-	    }
-	    strings.push_back(string);
-	    string.clear();
-	  }
-	  return strings;
-	};
 	/* Note: initialization list makes sure flags are toggled to zero.  */
 	Instruction instruction { };
-	auto operation = get_strings();
+	auto operation = get_strings(it, end);
 	/* Line with just a whitespaces is ignored.  */
 	if (operation.size() != 0) {
 	  instruction_names[instruction.name = operation[0]] = 0;
@@ -263,10 +267,10 @@ namespace {
 	    });
 	  if (*it == ',') {
 	    ++it;
-	    instruction.opcodes = get_strings();
+	    instruction.opcodes = get_strings(it, end);
 	    if (*it == ',') {
 	      ++it;
-	      for (auto &flag : get_strings()) {
+	      for (auto &flag : get_strings(it, end)) {
 		#define INSTRUCTION_FLAG(x) \
 		  if (flag == #x) {instruction.x = true;} else
 		#include "gen-decoder-flags.C"
