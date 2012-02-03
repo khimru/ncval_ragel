@@ -214,6 +214,47 @@ namespace {
     return strings;
   }
 
+  struct extract_operand {
+    Instruction &instruction;
+    std::vector<std::string> &operation;
+
+    extract_operand(Instruction &i, std::vector<std::string> &o)
+      : instruction(i), operation(o) {
+    }
+
+    void operator()(std::string &str) {
+      Instruction::Operand operand;
+      switch (str[0]) {
+        case '\'':
+          operand = {str[1], str.substr(2), false, false, false};
+          break;
+        case '=':
+          operand = {str[1], str.substr(2), true, false, false};
+          break;
+        case '!':
+          operand = {str[1], str.substr(2), false, true, false};
+          break;
+        case '&':
+          operand = {str[1], str.substr(2), true, true, false};
+          break;
+        default:
+          if (&str == &*operation.rbegin()) {
+            if (operation.size() <= 3) {
+              operand = {str[0], str.substr(1), true, true, false};
+            } else {
+              operand = {str[0], str.substr(1), false, true, false};
+            }
+          } else {
+            operand = {str[0], str.substr(1), true, false, false};
+          }
+      }
+      if (*(operand.size.rbegin()) == '*') {
+        operand.size.resize(operand.size.length() - 1);
+      }
+      instruction.operands.push_back(operand);
+    }
+  };
+
   void load_instructions(const char *filename) {
     const auto file_content = read_file(filename);
     auto it = file_content.begin();
@@ -234,37 +275,7 @@ namespace {
 	if (operation.size() != 0) {
 	  instruction_names[instruction.name = operation[0]] = 0;
 	  for_each(operation.rbegin(), operation.rend() - 1,
-	    [&instruction, &operation](std::string &str) {
-	      Instruction::Operand operand;
-	      switch (str[0]) {
-		case '\'':
-		  operand = {str[1], str.substr(2), false, false, false};
-		  break;
-		case '=':
-		  operand = {str[1], str.substr(2), true, false, false};
-		  break;
-		case '!':
-		  operand = {str[1], str.substr(2), false, true, false};
-		  break;
-		case '&':
-		  operand = {str[1], str.substr(2), true, true, false};
-		  break;
-		default:
-		  if (&str == &*operation.rbegin()) {
-		    if (operation.size() <= 3) {
-		      operand = {str[0], str.substr(1), true, true, false};
-		    } else {
-		      operand = {str[0], str.substr(1), false, true, false};
-		    }
-		  } else {
-		    operand = {str[0], str.substr(1), true, false, false};
-		  }
-	      }
-	      if (*(operand.size.rbegin()) == '*') {
-		operand.size.resize(operand.size.length() - 1);
-	      }
-	      instruction.operands.push_back(operand);
-	    });
+	    extract_operand(instruction, operation));
 	  if (*it == ',') {
 	    ++it;
 	    instruction.opcodes = get_strings(it, end);
