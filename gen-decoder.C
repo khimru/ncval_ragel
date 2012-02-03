@@ -281,7 +281,9 @@ namespace {
 	    instruction.opcodes = get_strings(it, end);
 	    if (*it == ',') {
 	      ++it;
-	      for (auto &flag : get_strings(it, end)) {
+	      auto flags = get_strings(it, end);
+	      for (auto flag_it = flags.begin(); flag_it != flags.end(); ++flag_it) {
+	        auto &flag = *flag_it;
 		#define INSTRUCTION_FLAG(x) \
 		  if (flag == #x) {instruction.x = true;} else
 		#include "gen-decoder-flags.C"
@@ -326,7 +328,8 @@ namespace {
       std::sort(names.begin(), names.end(), [](std::string x, std::string y) {
         return (x.size() > y.size()) || ((x.size() == y.size()) && x < y);
       });
-      for (auto &name : names) {
+      for (auto name_it = names.begin(); name_it != names.end(); ++name_it) {
+        auto &name = *name_it;
 	if (instruction_names[name] == 0) {
 	  for (decltype(name.length()) p = 1; p < name.length(); ++p) {
 	    auto it = instruction_names.find(std::string(name, p));
@@ -337,13 +340,15 @@ namespace {
 	}
       }
       size_t offset = 0;
-      for (auto &pair : instruction_names) {
+      for (auto pair_it = instruction_names.begin(); pair_it != instruction_names.end(); ++pair_it) {
+        auto &pair = *pair_it;
 	if (pair.second != 1) {
 	  pair.second = offset;
 	  offset += pair.first.length() + 1;
 	}
       }
-      for (auto &name : names) {
+      for (auto name_it = names.begin(); name_it != names.end(); ++name_it) {
+        auto &name = *name_it;
 	auto offset = instruction_names[name];
 	if (offset != 1) {
 	  for (decltype(name.length()) p = 1; p < name.length(); ++p) {
@@ -356,10 +361,12 @@ namespace {
       }
       offset = 0;
       auto delimeter = "static const char instruction_names[] = {\n  ";
-      for (auto &pair : instruction_names) {
+      for (auto pair_it = instruction_names.begin(); pair_it != instruction_names.end(); ++pair_it) {
+        auto &pair = *pair_it;
 	if (pair.second == offset) {
 	  fprintf(const_file, "%s", delimeter);
-	  for (auto &c : pair.first) {
+	  for (auto c_it = pair.first.begin(); c_it != pair.first.end(); ++c_it) {
+	    auto &c = *c_it;
 	    fprintf(const_file, "0x%02x, ", static_cast<int>(c));
 	  }
 	  fprintf(const_file, "\'\\0\',  /* ");
@@ -383,7 +390,8 @@ namespace {
 
   std::string c_identifier(std::string text) {
     std::string name;
-    for (auto c : text) {
+    for (auto c_it = text.begin(); c_it != text.end(); ++c_it) {
+      auto c = *c_it;
       if (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') ||
 	  ('0' <= c && c <= '9')) {
 	name.push_back(c);
@@ -772,7 +780,8 @@ namespace {
       T { "XB",		0x80 },
       T { "RXB",	0x00 }
     };
-    for (auto vex : vex_fields) {
+    for (int vex_it = 0; vex_it < arraysize(vex_fields); ++vex_it) {
+      auto vex = vex_fields[vex_it];
       fprintf(out_file, "  VEX_%2$s = %3$s%1$s;\n"
 "", enabled(Actions::kVexPrefix) ? " @vex_prefix2" : "",
        vex.first, chartest((c & vex.second) == vex.second));
@@ -791,7 +800,8 @@ namespace {
       T { "01001",	9	},
       T { "01010",	10	},
     };
-    for (auto vex : vex_map) {
+    for (int vex_it = 0; vex_it < arraysize(vex_map); ++vex_it) {
+      auto vex = vex_map[vex_it];
       fprintf(out_file, "  VEX_map%1$s = %2$s;\n"
 "", vex.first, chartest((c & 0x1f) == vex.second));
     }
@@ -843,7 +853,8 @@ namespace {
 	  T { "dreg",			"DebugRegister"			},
 	  T { "selector",		"Selector"			}
 	};
-	for (auto size : sizes) {
+	for (int size_it = 0; size_it < arraysize(sizes); ++size_it) {
+	  auto size = sizes[size_it];
 	  fprintf(out_file, "  action operand%1$d_%2$s {\n"
 "    operand%1$d_type = Operand%3$s;\n"
 "  }\n"
@@ -890,7 +901,8 @@ namespace {
 	  T { "rm",			"REG_RM"	},
 	  T { "st",			"REG_ST"	}
 	};
-	for (auto type : types) {
+	for (int type_it = 0; type_it < arraysize(types); ++type_it) {
+	  auto type = types[type_it];
 	  fprintf(out_file, "  action operand%1$d_%2$s {\n"
 "    operand%1$d = %3$s;\n"
 "  }\n"
@@ -922,7 +934,8 @@ namespace {
   }
 
   void print_name_actions(void) {
-    for (auto &pair : instruction_names) {
+    for (auto pair_it = instruction_names.begin(); pair_it != instruction_names.end(); ++pair_it) {
+      auto &pair = *pair_it;
       fprintf(out_file, "  action instruction_%s"
 	" { instruction_name = instruction_names + %zd; }\n",
 				 c_identifier(pair.first).c_str(), pair.second);
@@ -941,7 +954,8 @@ namespace {
       if (rep) {
 	optional_prefixes.insert("rep");
       }
-      for (auto opcode : opcodes) {
+      for (auto opcode_it = opcodes.begin(); opcode_it != opcodes.end(); ++opcode_it) {
+        auto opcode = *opcode_it;
 	if (opcode == "/") {
 	  opcode_in_imm = true;
 	  break;
@@ -951,7 +965,8 @@ namespace {
 	}
       }
       /* If register is stored in opcode we need to expand opcode now.  */
-      for (auto &operand : operands) {
+      for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+        auto &operand = *operand_it;
 	if (operand.source == 'r') {
 	  auto opcode = opcodes.rbegin();
 	  for (; opcode != opcodes.rend(); ++opcode) {
@@ -975,7 +990,8 @@ namespace {
 		  (*opcode) = "(";
 		  opcode->append(saved_opcode);
 		  static const char cc[] = {'9', 'a', 'b', 'c', 'd', 'e', 'f'};
-		  for (auto c : cc) {
+		  for (int c_it = 0; c_it < arraysize(cc); ++c_it) {
+		    auto c = cc[c_it];
 		    opcode->push_back('|');
 		    (*(saved_opcode.rbegin())) = c;
 		    opcode->append(saved_opcode);
@@ -1059,7 +1075,8 @@ namespace {
     static InstructionClass get_instruction_class(
 					       const Instruction &instruction) {
       InstructionClass instruction_class = InstructionClass::kUnknown;
-      for (auto &operand : instruction.operands) {
+      for (auto operand_it = instruction.operands.begin(); operand_it != instruction.operands.end(); ++operand_it) {
+        auto &operand = *operand_it;
 	static const std::map<std::string, InstructionClass> classes_map {
 	  /* “size8” is special “prefix” not included in AMD manual:  w bit in
 	     opcode switches between 8bit and 16/32/64 bit versions.  M is just
@@ -1220,7 +1237,8 @@ namespace {
 	  exit(1);
 	case InstructionClass::kLSetUnset:
 	case InstructionClass::kLSetUnsetDefaultRexW:
-	  for (auto &opcode : opcodes) {
+	  for (auto opcode_it = opcodes.begin(); opcode_it != opcodes.end(); ++opcode_it) {
+	    auto &opcode = *opcode_it;
 	    auto Lbit = opcode.find(".L.");
 	    if (Lbit != opcode.npos) {
 	      opcode[++Lbit] = '1';
@@ -1232,9 +1250,11 @@ namespace {
 	      }
 	      opcode[Lbit] = '0';
 	      auto saved_operands = operands;
-	      for (auto &operand : operands) {
+	      for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+	        auto &operand = *operand_it;
 		static const char cc[] = {'H', 'L', 'U', 'V', 'W'};
-		for (auto c : cc) {
+		for (int c_it = 0; c_it < arraysize(cc); ++c_it) {
+		  auto c = cc[c_it];
 		  if ((operand.source == c) &&
 		      (*(operand.size.rbegin()) == 'x') &&
 		      (((operand.size.length() > 1) &&
@@ -1269,7 +1289,8 @@ namespace {
       bool modrm_memory = false;
       bool modrm_register = false;
       char operand_source;
-      for (auto &operand : operands) {
+      for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+        auto &operand = *operand_it;
 	static std::map<char, std::pair<bool, bool> > operand_map {
 	  { 'E', { true,  true  } },
 	  { 'M', { true,  false } },
@@ -1344,7 +1365,8 @@ namespace {
       }
       fprintf(out_file, " modrm_registers");
       if (enabled(Actions::kParseOperands)) {
-        for (auto &operand : operands) {
+        for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+          auto &operand = *operand_it;
 	  static const std::map<char, const char*> operand_type {
 	    { 'C', "reg"	},
 	    { 'D', "reg"	},
@@ -1387,7 +1409,8 @@ namespace {
         T { " operand_sib_pure_index",	true,	false	},
         T { " operand_sib_base_index",	true,	true	}
       };
-      for (auto mode : modes) {
+      for (int mode_it = 0; mode_it < arraysize(modes); ++mode_it) {
+        auto mode = modes[mode_it];
 	print_operator_delimeter();
 	if (mod_reg_is_used()) {
 	  rex.r = true;
@@ -1408,7 +1431,8 @@ namespace {
 	  fprintf(out_file, " (any");
 	}
 	if (enabled(Actions::kParseOperands)) {
-	  for (auto &operand : operands) {
+	  for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+	    auto &operand = *operand_it;
 	    static const std::map<char, const char*> operand_type {
 	      { 'C', "from_modrm_reg"	},
 	      { 'D', "from_modrm_reg"	},
@@ -1461,9 +1485,11 @@ namespace {
     }
 
     bool mod_reg_is_used() {
-      for (auto &operand : operands) {
+      for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+        auto &operand = *operand_it;
 	static const char cc[] = { 'C', 'G', 'P', 'V' };
-	for (auto c : cc) {
+	for (int c_it = 0; c_it < arraysize(cc); ++c_it) {
+	  auto c = cc[c_it];
 	  if (operand.source == c) {
 	    return true;
 	  }
@@ -1473,9 +1499,11 @@ namespace {
     }
 
     bool mod_rm_is_used() {
-      for (auto &operand : operands) {
+      for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+        auto &operand = *operand_it;
 	static const char cc[] = { 'E', 'M', 'N', 'Q', 'R', 'U', 'W' };
-	for (auto c : cc) {
+	for (int c_it = 0; c_it < arraysize(cc); ++c_it) {
+	  auto c = cc[c_it];
 	  if (operand.source == c) {
 	    return true;
 	  }
@@ -1514,7 +1542,8 @@ namespace {
 	      fprintf(out_file, "%s", delimeter);
 	      delimeter = " | ";
 	      auto delimeter = '(';
-	      for (auto &prefix : permutations) {
+	      for (auto prefix_it = permutations.begin(); prefix_it != permutations.end(); ++prefix_it) {
+	        auto &prefix = *prefix_it;
 	        fprintf(out_file, "%c%s", delimeter, prefix.c_str());
 	        delimeter = ' ';
 	      }
@@ -1609,7 +1638,8 @@ namespace {
 							    third_byte_check)) {
 #else
 	static const char* symbolic_names[] = { "cntl", "dest", "src1", "src" };
-	for (auto symbolic : symbolic_names) {
+	for (int symbolic_it = 0; symbolic_it < arraysize(symbolic_names); ++symbolic_it) {
+	  auto symbolic = symbolic_names[symbolic_it];
 	  for (auto it = third_byte.begin(); it != third_byte.end(); ++it) {
 	    if ((third_byte.end() - it) >= strlen(symbolic) &&
 	        !strncmp(&*it, symbolic, strlen(symbolic))) {
@@ -1634,7 +1664,8 @@ namespace {
 	auto third_byte_ok = (arraysize(third_byte_check) ==
 							   third_byte.length());
 	if (third_byte_ok) {
-	  for (auto &set : third_byte_check) {
+	  for (int set_it = 0; set_it < arraysize(third_byte_check); ++set_it) {
+	    auto &set = third_byte_check[set_it];
 	    if (set.find(third_byte[&set - third_byte_check]) == set.end()) {
 	      third_byte_ok = false;
 	      break;
@@ -1660,13 +1691,15 @@ namespace {
 	      std::set<decltype(byte)> bytes { byte };
 	      for (auto i = 7, p = 1; i>=0; --i, p <<= 1) {
 		if (third_byte[i] == 'X') {
-		  for (auto &byte : bytes) {
+		  for (auto byte_it = bytes.begin(); byte_it != bytes.end(); ++byte_it) {
+		    auto &byte = *byte_it;
 		    bytes.insert(byte & ~p);
 		  }
 	        }
 	      }
 	      auto delimeter = "(";
-	      for (auto &byte : bytes) {
+	      for (auto byte_it = bytes.begin(); byte_it != bytes.end(); ++byte_it) {
+	        auto &byte = *byte_it;
 	        fprintf(out_file, "%s0x%02x", delimeter, byte);
 	        delimeter = " | ";
 	      }
@@ -1708,7 +1741,8 @@ namespace {
 	}
       } else {
 	auto delimeter = '(';
-	for (auto &opcode : opcodes) {
+	for (auto opcode_it = opcodes.begin(); opcode_it != opcodes.end(); ++opcode_it) {
+	  auto &opcode = *opcode_it;
 	  if (opcode.find('/') == opcode.npos) {
 	    fprintf(out_file, "%c%s", delimeter, opcode.c_str());
 	    delimeter = ' ';
@@ -1722,7 +1756,8 @@ namespace {
 	fprintf(out_file, " >begin_opcode");
       }
       if (enabled(Actions::kParseOperands)) {
-	for (auto &operand : operands) {
+	for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+	  auto &operand = *operand_it;
 	  if (operand.source == 'r') {
 	    fprintf(out_file, " @operand%zd_from_opcode",
 						 &operand - &*operands.begin());
@@ -1744,25 +1779,29 @@ namespace {
       if (enabled(Actions::kOpcode)) {
 	fprintf(out_file, " @end_opcode");
       }
-      for (auto &prefix : required_prefixes) {
+      for (auto prefix_it = required_prefixes.begin(); prefix_it != required_prefixes.end(); ++prefix_it) {
+        auto &prefix = *prefix_it;
 	if (prefix == "0x66") {
 	  fprintf(out_file, " @not_data16_prefix");
 	  break;
 	}
       }
-      for (auto &prefix : required_prefixes) {
+      for (auto prefix_it = required_prefixes.begin(); prefix_it != required_prefixes.end(); ++prefix_it) {
+        auto &prefix = *prefix_it;
 	if (prefix == "0xf0") {
 	  fprintf(out_file, " @not_lock_prefix");
 	  break;
 	}
       }
-      for (auto &prefix : required_prefixes) {
+      for (auto prefix_it = required_prefixes.begin(); prefix_it != required_prefixes.end(); ++prefix_it) {
+        auto &prefix = *prefix_it;
 	if (prefix == "0xf2") {
 	  fprintf(out_file, " @not_repnz_prefix");
 	  break;
 	}
       }
-      for (auto &prefix : required_prefixes) {
+      for (auto prefix_it = required_prefixes.begin(); prefix_it != required_prefixes.end(); ++prefix_it) {
+        auto &prefix = *prefix_it;
 	if (prefix == "0xf3") {
 	  fprintf(out_file, " @not_repz_prefix");
 	  break;
@@ -1773,7 +1812,8 @@ namespace {
       }
       if (enabled(Actions::kParseOperands)) {
 	fprintf(out_file, " @operands_count_is_%zd", operands.size());
-        for (auto &operand : operands) {
+        for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+          auto &operand = *operand_it;
           typedef std::tuple<InstructionClass, char, std::string> T;
           static const std::map<T, const char*> operand_sizes {
 	    { T { InstructionClass::kDefault, ' ', ""	  },	"32bit"	      },
@@ -1901,7 +1941,8 @@ namespace {
 	}
       }
       if (enabled(Actions::kParseOperandsStates)) {
-	for (auto &operand : operands) {
+	for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+	  auto &operand = *operand_it;
 	  if (operand.read) {
 	    if (operand.write) {
 	      fprintf(out_file, " @operand%zd_readwrite",
@@ -2003,7 +2044,8 @@ namespace {
 
     void print_immediate_opcode(void) {
       auto print_opcode = false;
-      for (auto &opcode : opcodes) {
+      for (auto opcode_it = opcodes.begin(); opcode_it != opcodes.end(); ++opcode_it) {
+        auto &opcode = *opcode_it;
 	if (opcode == "/") {
 	  print_opcode = true;
 	} else if (print_opcode) {
@@ -2014,7 +2056,8 @@ namespace {
   };
 
   void print_one_instruction_definition(void) {
-    for (auto &instruction : instructions) {
+    for (auto instruction_it = instructions.begin(); instruction_it != instructions.end(); ++instruction_it) {
+      auto &instruction = *instruction_it;
       MarkedInstruction(instruction).print_definition();
     }
   }
