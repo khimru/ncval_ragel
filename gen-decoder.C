@@ -2122,10 +2122,11 @@ int main(int argc, char *argv[]) {
 	     action_to_disable = strtok(NULL, ",")) {
 	  compare_action compare_with_action_to_disable(action_to_disable);
 	  auto action_number = std::find_if(
-	    std::begin(kDisablableActionsList),
-	    std::end(kDisablableActionsList),
+	    kDisablableActionsList,
+	    kDisablableActionsList + arraysize(kDisablableActionsList),
 	    compare_with_action_to_disable);
-	  if (action_number != std::end(kDisablableActionsList)) {
+	  if (action_number !=
+              kDisablableActionsList + arraysize(kDisablableActionsList)) {
 	    disabled_actions[action_number - kDisablableActionsList] = true;
 	  } else {
 	    fprintf(stderr, _("%s: action “%s” is unknown\n"),
