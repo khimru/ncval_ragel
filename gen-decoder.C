@@ -31,6 +31,7 @@ namespace {
   const char* short_program_name;
 
   const struct option kProgramOptions[] = {
+    {"mode",	required_argument,	NULL,	'm'},
     {"disable",	required_argument,	NULL,	'd'},
     {"output",	required_argument,	NULL,	'o'},
     {"help",	no_argument,		NULL,	'h'},
@@ -47,6 +48,7 @@ namespace {
 "Mandatory arguments to long options are mandatory for short options too.\n"
 "\n"
 "Options list:\n"
+"  -m, --mode=mode            CPU mode: ia32 for IA32, amd64 for x86-64\n"
 "  -d, --disable=action_list  disable actions from the comma-separated list\n"
 "  -o, --output=FILE          write result to FILE instead of standard output\n"
 "  -h, --help                 display this help and exit\n"
@@ -82,7 +84,11 @@ namespace {
 "                         xxxXX_operand_begin and xxxXX_operand_end\n"
 "   check_access        this will check memory access (actions is not generated\n"
 "                         by %1$s, you need to define it in your program)\n"
-"");
+"\n"
+"   rel_operand_action  generate rel_operand action references, but not actions\n"
+"                         themselves - in you need non-standard definition\n"
+"\n"
+"   nacl-forbidden      don't generate instructions forbidden for nacl\n");
 
   const char*const kVersionHelp = N_("%1$s %2$s\n"
 "Copyright (c) 2012 The Native Client Authors. All rights reserved.\n"
@@ -99,7 +105,8 @@ namespace {
     kParseOperandsStates,
     kMarkDataFields,
     kCheckAccess,
-    kRelOperandAction
+    kRelOperandAction,
+    kNaClForbidden
   };
   const char* kDisablableActionsList[] = {
     "rex_prefix",
@@ -110,7 +117,8 @@ namespace {
     "parse_operands_states",
     "mark_data_fields",
     "check_access",
-    "rel_operand_action"
+    "rel_operand_action",
+    "nacl-forbidden"
   };
   bool disabled_actions[arraysize(kDisablableActionsList)];
 
@@ -144,6 +152,8 @@ namespace {
 
   FILE *out_file = stdout;
   FILE *const_file = stdout;
+
+  auto amd64_mode = true;
 
   std::string read_file(const char *filename) {
     std::string file_content;
@@ -276,6 +286,7 @@ namespace {
 	  instruction_names[instruction.name = operation[0]] = 0;
 	  for_each(operation.rbegin(), operation.rend() - 1,
 	    extract_operand(instruction, operation));
+	  auto enabled_instruction = true;
 	  if (*it == ',') {
 	    ++it;
 	    instruction.opcodes = get_strings(it, end);
@@ -288,7 +299,32 @@ namespace {
 		  if (flag == #x) {instruction.x = true;} else
 		#include "gen-decoder-flags.C"
 		#undef INSTRUCTION_FLAG
-		{
+		if (flag == "ia32") {
+		  if (amd64_mode) {
+		    enabled_instruction = false;
+		    break;
+		  }
+		} else if (flag == "amd64") {
+		  if (!amd64_mode) {
+		    enabled_instruction = false;
+		    break;
+		  }
+		} else if (flag == "nacl-ia32-forbidden") {
+		  if (!amd64_mode && !enabled(Actions::kNaClForbidden)) {
+		    enabled_instruction = false;
+		    break;
+		  }
+		} else if (flag == "nacl-amd64-forbidden") {
+		  if (amd64_mode && !enabled(Actions::kNaClForbidden)) {
+		    enabled_instruction = false;
+		    break;
+		  }
+		} else if (flag == "nacl-forbidden") {
+		  if (!enabled(Actions::kNaClForbidden)) {
+		    enabled_instruction = false;
+		    break;
+		  }
+		} else {
 		  fprintf(stderr, _("%s: unknown flag: “%s”\n"),
 		    short_program_name, flag.c_str());
 		  exit(1);
@@ -296,14 +332,16 @@ namespace {
 	      }
 	    }
 	  }
-	  instructions.push_back(instruction);
+	  if (enabled_instruction) {
+	    instructions.push_back(instruction);
+	  }
 	}
 	it = std::find_if(it, file_content.end(), eol);
       }
     }
   }
 
-#if (__GNUC__ < 5) && (__GNUC_MINOR__ < 6)
+#if (__GNUC__ >= 5) || (__GNUC_MINOR__ >= 6)
 #define USE_LAMBDA_IN_CHARTEST 1
 #else
 #define USE_LAMBDA_IN_CHARTEST 0
@@ -2078,13 +2116,15 @@ namespace {
 	static const std::map<std::pair<InstructionClass, std::string>,
 	     const char *> jump_sizes {
 	  { { InstructionClass::kDefault,	"b"	},	"rel8"	},
+	  { { InstructionClass::kDefault,	"d"	},	"rel32"	},
+	  { { InstructionClass::kDefault,	"w"	},	"rel16"	},
 	  { { InstructionClass::kDefault,	"z"	},	"rel32"	},
 	  { { InstructionClass::kData16,	"z"	},	"rel16"	},
 	  { { InstructionClass::kRexW,		"z"	},	"rel32"	},
 	};
 	if (operand->source == 'J') {
 	  auto it = jump_sizes.find({instruction_class, operand->size});
-	  if (it == immediate_sizes.end()) {
+	  if (it == jump_sizes.end()) {
 	    fprintf(stderr, _("%s: error - can not determine jump size: %c%s"),
 		    short_program_name, operand->source, operand->size.c_str());
 	    exit(1);
@@ -2188,6 +2228,18 @@ int main(int argc, char *argv[]) {
 	      short_program_name, action_to_disable);
 	    return 1;
 	  }
+	}
+	break;
+      }
+      case 'm': {
+	if (optarg == "ia32") {
+	  amd64_mode = false;
+	} else if (optarg == "amd64") {
+	  amd64_mode = true;
+	} else {
+	  fprintf(stderr, _("%s: mode “%s” is unknown\n"),
+	    short_program_name, optarg);
+	  return 1;
 	}
 	break;
       }

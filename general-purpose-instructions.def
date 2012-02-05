@@ -6,9 +6,6 @@
 #				Volume 3: General-Purpose and System Instruction
 #				Chapter 3: General-Purpose Instruction Reference
 ################################################################################
-# Note: all 32bit exclusive instructions are in x86-32-instructions.def
-#       all 64bit exclusive instructions are in x86-64-instructions.def
-################################################################################
 # File format: three rows separated by commas.  Line describes one instruction.
 ################################################################################
 # First column: instruction description.
@@ -168,6 +165,8 @@
 #	condrep: prefixes “repnz” and “repz” are allowed for the instruction
 #	lock: prefix “lock” is allowed for the instruction
 #	rep: prefix “rep” is allowed for the instruction (it's alias of “repz”)
+#	no_memory_access: command does not access memory in detectable way: lea,
+#	  nop, prefetch* instructions…
 #
 #     Possible CPUID values:
 #	Fn0000_0001_ECX_AES: Fn0000_0001_ECX[AES]
@@ -267,36 +266,42 @@ bsr Ev Gv, 0x0f 0xbd
 ######## BSWAP #################################################################
 bswap ry, 0x0f 0xc8
 ######## BT ####################################################################
-bt Gv Ev, 0x0f 0xa3
-bt Ib Ev, 0x0f 0xba /4
+bt Gv Ev, 0x0f 0xa3, nacl-forbidden
+bt Ib Ev, 0x0f 0xba /4, nacl-ia32-forbidden
 ######## BTC ###################################################################
-btc Gv Ev, 0x0f 0xbb
-btc Ib Ev, 0x0f 0xba /7
+btc Gv Ev, 0x0f 0xbb, nacl-forbidden
+btc Ib Ev, 0x0f 0xba /7, nacl-ia32-forbidden
 ######## BTR ###################################################################
-btr Gv Ev, 0x0f 0xb3
-btr Ib Ev, 0x0f 0xba /6
+btr Gv Ev, 0x0f 0xb3, nacl-forbidden
+btr Ib Ev, 0x0f 0xba /6, nacl-ia32-forbidden
 ######## BTS ###################################################################
-bts Gv Ev, 0x0f 0xab
-bts Ib Ev, 0x0f 0xba /5
+bts Gv Ev, 0x0f 0xab, nacl-forbidden
+bts Ib Ev, 0x0f 0xba /5, nacl-ia32-forbidden
 ######## CALL (Near) ###########################################################
 call Jz, 0xe8
 # “call” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
-# in the appropriate files.
-callw Ew, 0x66 0xff /2
+# separately.
+callw Ew, 0x66 0xff /2, nacl-forbidden
+call Ed, 0xff /2, ia32 nacl-forbidden
+callq Eq, 0xff /2, amd64 nacl-forbidden
 ######## CALL (Far) ############################################################
 # “lcall” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
-# in the appropriate files.
-lcallw Mp, 0x66 0xff /3
+# separately.
+lcallw Mp, 0x66 0xff /3, nacl-forbidden
+lcall Mp, 0xff /3, ia32 nacl-forbidden
+lcallq Mp, 0xff /3, amd64 nacl-forbidden
 ######## CBW/CWDE/CDQE #########################################################
 cbtw, data16 0x98
 cwtl, 0x98
+cltq, REXW_NONE 0x98, amd64
 ######## CWD/CDQ/CQO ###########################################################
 cltd, 0x99
 cwtd, data16 0x99
+cqto, REXW_NONE 0x99, amd64
 ######## CLC ###################################################################
 clc, 0xf8
 ######## CLD ###################################################################
@@ -323,17 +328,18 @@ cmovo Ev Gv, 0x0f 0x40, Fn0000_0001_EDX_CMOV
 cmovp Ev Gv, 0x0f 0x4a, Fn0000_0001_EDX_CMOV
 cmovs Ev Gv, 0x0f 0x48, Fn0000_0001_EDX_CMOV
 ######## CMP ###################################################################
-cmp I a, 0x3c
-cmp I E, 0x80 /7
-cmp Ib Ev, 0x83 /7
-cmp G E, 0x38
-cmp E G, 0x3a
+cmp I =a, 0x3c
+cmp I =E, 0x80 /7
+cmp Ib =Ev, 0x83 /7
+cmp G =E, 0x38
+cmp E =G, 0x3a
 ######## CMPS/CMPSB/CMPSW/CMPSD/CMPSQ ##########################################
-cmps Y X, 0xa6, condrep
+cmps Y X, 0xa6, condrep nacl-forbidden
 ######## CMPXCHG ###############################################################
 cmpxchg G E, 0x0f 0xb0, lock
 ######## CMPXCHG8B/CMPXCHG16B ##################################################
 cmpxchg8b Mq, 0x0f 0xc7 /1, lock Fn0000_0001_EDX_CMPXCHG8B
+cmpxchg16b Mo, rexw 0x0f 0xc7 /1, amd64 lock Fn0000_0001_ECX_CMPXCHG16B
 ######## CPUID #################################################################
 cpuid, 0x0f 0xa2
 ######## CRC32 #################################################################
@@ -343,7 +349,7 @@ dec E, 0xfe /1, lock
 ######## DIV ###################################################################
 div E, 0xf6 /6
 ######## ENTER #################################################################
-enter iw Ib, 0xc8
+enter iw =Ib, 0xc8
 ######## IDIV ##################################################################
 idiv E, 0xf6 /7
 ######## IMUL ##################################################################
@@ -352,64 +358,91 @@ imul Ev Gv, 0x0f 0xaf
 imul Ib Ev Gv, 0x6b
 imul Iz Ev Gv, 0x69
 ######## IN ####################################################################
-in Ib ab, 0xe4
-in Ib az, 0xe5
-in ob ab, 0xec
-in oz az, 0xed
+in Ib ab, 0xe4, nacl-forbidden
+in Ib az, 0xe5, nacl-forbidden
+in ob ab, 0xec, nacl-forbidden
+in oz az, 0xed, nacl-forbidden
 ######## INC ###################################################################
 inc E, 0xfe /0, lock
 ######## INS/INSB/INSW/INSD ####################################################
-ins ob Yb, 0x6c, rep
-ins oz Yz, 0x6d, rep
+ins ob Yb, 0x6c, rep nacl-forbidden
+ins oz Yz, 0x6d, rep nacl-forbidden
 ######## INT ###################################################################
-int Ib, 0xcd
+int =Ib, 0xcd, nacl-forbidden
+######## JCXZ/JECXZ/JRCXZ ######################################################
+jecxz Jb, 0xe3, ia32 nacl-forbidden
+jrcxz Jb, 0xe3, amd64 nacl-forbidden
 ######## Jcc ###################################################################
 ja Jb, 0x77
-ja Jz, 0x0f 0x87
+ja Jw, data16 0x0f 0x87, nacl-forbidden
+ja Jd, 0x0f 0x87
 jae Jb, 0x73
-jae Jz, 0x0f 0x83
+jae Jw, data16 0x0f 0x83, nacl-forbidden
+jae Jd, 0x0f 0x83
 jbe Jb, 0x76
-jbe Jz, 0x0f 0x86
+jbe Jw, data16 0x0f 0x86, nacl-forbidden
+jbe Jd, 0x0f 0x86
 jb Jb, 0x72
-jb Jz, 0x0f 0x82
+jb Jw, data16 0x0f 0x82, nacl-forbidden
+jb Jd, 0x0f 0x82
 je Jb, 0x74
-je Jz, 0x0f 0x84
+je Jw, data16 0x0f 0x84, nacl-forbidden
+je Jd, 0x0f 0x84
 jg Jb, 0x7f
-jg Jz, 0x0f 0x8f
+jg Jw, data16 0x0f 0x8f, nacl-forbidden
+jg Jd, 0x0f 0x8f
 jge Jb, 0x7d
-jge Jz, 0x0f 0x8d
+jge Jw, data16 0x0f 0x8d, nacl-forbidden
+jge Jd, 0x0f 0x8d
 jle Jb, 0x7e
-jle Jz, 0x0f 0x8e
+jle Jw, data16 0x0f 0x8e, nacl-forbidden
+jle Jd, 0x0f 0x8e
 jl Jb, 0x7c
-jl Jz, 0x0f 0x8c
+jl Jw, data16 0x0f 0x8c, nacl-forbidden
+jl Jd, 0x0f 0x8c
 jne Jb, 0x75
-jne Jz, 0x0f 0x85
+jne Jw, data16 0x0f 0x85, nacl-forbidden
+jne Jd, 0x0f 0x85
 jno Jb, 0x71
-jno Jz, 0x0f 0x81
+jno Jw, data16 0x0f 0x81, nacl-forbidden
+jno Jd, 0x0f 0x81
 jnp Jb, 0x7b
-jnp Jz, 0x0f 0x8b
+jnp Jw, data16 0x0f 0x8b, nacl-forbidden
+jnp Jd, 0x0f 0x8b
 jns Jb, 0x79
-jns Jz, 0x0f 0x89
+jns Jw, data16 0x0f 0x89, nacl-forbidden
+jns Jd, 0x0f 0x89
 jo Jb, 0x70
-jo Jz, 0x0f 0x80
+jo Jw, data16 0x0f 0x80, nacl-forbidden
+jo Jd, 0x0f 0x80
 jp Jb, 0x7a
-jp Jz, 0x0f 0x8a
+jp Jw, data16 0x0f 0x8a, nacl-forbidden
+jp Jd, 0x0f 0x8a
 js Jb, 0x78
-js Jz, 0x0f 0x88
+js Jw, data16 0x0f 0x88, nacl-forbidden
+js Jd, 0x0f 0x88
 ######## JMP (Near) ############################################################
 jmp Jz, 0xe9
 jmp Jb, 0xeb
 # “jmp” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
-# in the appropriate files.
-jmpw Ew, 0x66 0xff /4
+# separately.
+jmpw Ew, 0x66 0xff /4, nacl-forbidden
+jmp Ed, 0xff /4, ia32 nacl-forbidden
+jmpq Eq, 0xff /4, amd64 nacl-forbidden
 ######## JMP (Far) #############################################################
 # “ljmp” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
-# in the appropriate files.
-ljmpw Mp, 0x66 0xff /5
+# separately.
+ljmpw Mp, 0x66 0xff /5, nacl-forbidden
+ljmp Mp, 0xff /5, ia32 nacl-forbidden
+ljmpq Mp, 0xff /5, amd64 nacl-forbidden
+######## LAHF ##################################################################
+# LAHF is always awailable in 16bit/32bit mode, but not always in 64bit mode
+lahf, 0x9f, ia32
+lahf, 0x9f, amd64 Fn8000_0001_ECX_LahfSahf
 ######## LDS/LES/LFS/LGS/LSS (AMD version) #####################################
 # AMD manual says “executing LFS, LGS, or LSS with a 64-bit operand size only
 # loads a 32-bit general purpose register and the specified segment register”.
@@ -425,16 +458,19 @@ lgs Mp Gv, 0x0f 0xb5
 lss Mp Gv, 0x0f 0xb2
 ######## LEA ###################################################################
 lea 'Mv !Gv, 0x8d, no_memory_access
+######## LEAVE #################################################################
+leave, 0xc9, ia32 nacl-forbidden
+leaveq, 0xc9, amd64 nacl-forbidden
 ######## LFENCE ################################################################
 lfence, 0x0f 0xae 0xe8, Fn0000_0001_EDX_SSE2
 ######## LLWPCB ################################################################
 llwpcb Ry, 0x8f RXB.09 W.1111.0.00 0x12 /0, Fn8000_0001_ECX_LWP
 ######## LODS/LODSB/LODSW/LODSD/LODSQ ##########################################
-lods X a, 0xac
+lods X a, 0xac, nacl-forbidden
 ######## LOOP/LOOPE/LOOPNE/LOOPNZ/LOOPZ ########################################
-loop Jb, 0xe2
-loope Jb, 0xe1
-loopne Jb, 0xe0
+loop Jb, 0xe2, nacl-forbidden
+loope Jb, 0xe1, nacl-forbidden
+loopne Jb, 0xe0, nacl-forbidden
 ######## LWPINS ################################################################
 lwpins Id Ed By, 0x8f RXB.0A W.src1.0.00 0x12 /0, Fn8000_0001_ECX_LWP
 ######## LWPVAL ################################################################
@@ -452,6 +488,14 @@ mov Ew Sw, 0x8e /s
 mov Ib rb, 0xb0
 mov Iv rv, 0xb8
 mov I E, 0xc6 /0
+mov Ob ab, 0xa0, ia32
+mov Ov av, 0xa1, ia32
+mov ab Ob, 0xa2, ia32
+mov av Ov, 0xa3, ia32
+movabs Ob ab, 0xa0, amd64 nacl-forbidden
+movabs Ov av, 0xa1, amd64 nacl-forbidden
+movabs ab Ob, 0xa2, amd64 nacl-forbidden
+movabs av Ov, 0xa3, amd64 nacl-forbidden
 ######## MOVD ##################################################################
 # This is description according to AMD/Intel manual.
 # movd Ey Vy, 0x66 0x0f 0x6e, Fn0000_0001_EDX_SSE2
@@ -459,11 +503,15 @@ mov I E, 0xc6 /0
 # movd Ey Py, 0x0f 0x6e, Fn0000_0001_EDX_MMX
 # movd Py Ey, 0x0f 0x7e, Fn0000_0001_EDX_MMX
 # Objdump names 64bit version not “movd” but movq”.  We describe 32bit version
-# here and 64bit version can be found in x86-64-instructions.def.
+# and 64bit version separately.
 movd Ed Vq, 0x66 0x0f 0x6e, Fn0000_0001_EDX_SSE2
 movd Vq Ed, 0x66 0x0f 0x7e, Fn0000_0001_EDX_SSE2
 movd Ed Pq, 0x0f 0x6e, Fn0000_0001_EDX_MMX
 movd Pq Ed, 0x0f 0x7e, Fn0000_0001_EDX_MMX
+movq Eq Vq, 0x66 rexw 0x0f 0x6e, amd64 Fn0000_0001_EDX_SSE2
+movq Vq Eq, 0x66 rexw 0x0f 0x7e, amd64 Fn0000_0001_EDX_SSE2
+movq Eq Pq, rexw 0x0f 0x6e, amd64 Fn0000_0001_EDX_MMX
+movq Pq Eq, rexw 0x0f 0x7e, amd64 Fn0000_0001_EDX_MMX
 ######## MOVMSKPD ##############################################################
 movmskpd Upd Gd, 0x66 0x0f 0x50, Fn0000_0001_EDX_SSE2
 ######## MOVMSKPS ##############################################################
@@ -471,27 +519,33 @@ movmskps Ups Gd, 0x0f 0x50, Fn0000_0001_EDX_SSE1
 ######## MOVNTI ################################################################
 movnti Gy My, 0x0f 0xc3, Fn0000_0001_EDX_SSE2
 ######## MOVS/MOVSB/MOVSW/MOVSD/MOVSQ ##########################################
-movs X Y, 0xa4, rep
+movs X Y, 0xa4, rep nacl-forbidden
 ######## MOVSX #################################################################
 # This is description according to AMD/Intel manual.
 # movsx Eb Gv, 0x0f 0xbe
 # movsx Ew Gy, 0x0f 0xbf
 # Objdump has different names for this instrustion: “movsbw”, “movsbl”, “movsbq”,
-# “movswl”, “movswq” depending on operand size.  We describe 32bit versions here
-# and 64bit version can be found in x86-64-instructions.def.
+# “movswl”, “movswq” depending on operand size.  We describe 32bit versions and
+# 64bit version separately.
 movsbw Eb Gw, data16 0x0f 0xbe
 movsbl Eb Gd, 0x0f 0xbe
 movswl Ew Gd, 0x0f 0xbf
+movsbq Eb Gq, rexw 0x0f 0xbe, amd64
+movswq Ew Gq, rexw 0x0f 0xbf, amd64
+######## MOVSXD ################################################################
+movslq Ed Gv, 0x63, amd64
 ######## MOVZX #################################################################
 # This is description according to AMD/Intel manual.
 # movsx Eb Gv, 0x0f 0xb6
 # movsx Ew Gy, 0x0f 0xb7
 # Objdump has different names for this instrustion: “movzbw”, “movzbl”, “movzbq”,
-# “movzwl”, “movzwq” depending on operand size.  We describe 32bit versions here
-# and 64bit version can be found in x86-64-instructions.def.
+# “movzwl”, “movzwq” depending on operand size.  We describe 32bit versions and
+# 64bit version separately.
 movzbw Eb Gw, data16 0x0f 0xb6
 movzbl Eb Gd, 0x0f 0xb6
 movzwl Ew Gd, 0x0f 0xb7
+movzbq Eb Gq, rexw 0x0f 0xb6, amd64
+movzwq Ew Gq, rexw 0x0f 0xb7, amd64
 ######## MUL ###################################################################
 mul E, 0xf6 /4
 ######## NEG ###################################################################
@@ -508,26 +562,34 @@ or Ib Ev, 0x83 /1, lock
 or G E, 0x08, lock
 or E G, 0x0a, lock
 ######## OUT ###################################################################
-out ab Ib, 0xe6
-out az Ib, 0xe7
-out ab ob, 0xee
-out az oz, 0xef
+out ab =Ib, 0xe6, nacl-forbidden
+out az =Ib, 0xe7, nacl-forbidden
+out ab =ob, 0xee, nacl-forbidden
+out az =oz, 0xef, nacl-forbidden
 ######## OUTS/OUTSB/OUTSW/OUTSD ################################################
-outs Xb ob, 0x6e, rep
-outs Xz oz, 0x6f, rep
+outs Xb =ob, 0x6e, rep nacl-forbidden
+outs Xz =oz, 0x6f, rep nacl-forbidden
 ######## PAUSE #################################################################
 pause, 0xf3 0x90
 ######## POP ###################################################################
 # “pop” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
-# in the appropriate files.
+# separately.
 pop Ew, 0x66 0x8f /0
+pop Ed, 0x8f /0, ia32
+pop Eq, 0x8f /0, amd64
 pop rr, 0x58
+pop\ \ \ \ %fs, 0x0f 0xa1, ia32 nacl-forbidden
+pop\ \ \ \ %gs, 0x0f 0xa9, ia32 nacl-forbidden
+popq\ \ \ %fs, 0x0f 0xa1, amd64 nacl-forbidden
+popq\ \ \ %gs, 0x0f 0xa9, amd64 nacl-forbidden
 ######## POPCNT ################################################################
 popcnt Ev Gv, 0xf3 0x0f 0xb8, Fn0000_0001_ECX_POPCNT
 ######## POPF/POPFD/POPFQ ######################################################
 popfw, data16 0x9d
+popf, 0x9d, ia32 nacl-forbidden
+popfq, 0x9d, amd64 nacl-forbidden
 ######## PREFETCH/PREFETCHW ####################################################
 prefetch Mb, 0x0f 0x0d /0, Fn8000_0001_ECX_3DNowPrefetch no_memory_access
 prefetchw Mb, 0x0f 0x0d /1, Fn8000_0001_ECX_3DNowPrefetch no_memory_access
@@ -540,13 +602,23 @@ prefetcht2 Mb, 0x0f 0x18 /3, no_memory_access
 # “push” does not require rex prefix and always uses 64bit addresses in x86-64
 # mode unless data16 prefix is used.  We use simple solution: 16bit call is
 # declared as common for 32bit/64bit mode and 32bit/64bit versions are described
-# in the appropriate files.
-push =Ew, 0x66 0xff /6
+# separately.
+# 16bit push is forbidden in x86-64 NaCl, but surprisingly is not forbidden in
+# 32bit NaCl.
+push =Ew, 0x66 0xff /6, nacl-amd64-forbidden
+push =Ed, 0xff /6, ia32
+push =Eq, 0xff /6, amd64
 push =rr, 0x50
 push =Iz, 0x68
 push =Ib, 0x6a
+push\ \ \ %fs, 0x0f 0xa0, ia32 nacl-forbidden
+push\ \ \ %gs, 0x0f 0xa8, ia32 nacl-forbidden
+pushq\ \ %fs, 0x0f 0xa0, amd64 nacl-forbidden
+pushq\ \ %gs, 0x0f 0xa8, amd64 nacl-forbidden
 ######## PUSHF/PUSHFD/PUSHFQ ###################################################
 pushfw, data16 0x9c
+pushf, 0x9c, ia32 nacl-forbidden
+pushfq, 0x9c, amd64 nacl-forbidden
 ######## RCL ###################################################################
 rcl E, 0xd0 /2
 rcl cb E, 0xd2 /2
@@ -556,10 +628,12 @@ rcr E, 0xd0 /3
 rcr cb E, 0xd2 /3
 rcr Ib E, 0xc0 /3
 ######## RET (Near) ############################################################
-ret Iw, 0xc2
+ret =Iw, 0xc2, nacl-forbidden
+ret, 0xc3, rep ia32 nacl-forbidden
+retq, 0xc3, rep amd64 nacl-forbidden
 ######## RET (Far) #############################################################
 lret, 0xcb
-lret Iw, 0xca
+lret =Iw, 0xca
 ######## ROL ###################################################################
 rol E, 0xd0 /0
 rol cb E, 0xd2 /0
@@ -568,6 +642,10 @@ rol Ib E, 0xc0 /0
 ror Ib E, 0xc0 /1
 ror E, 0xd0 /1
 ror cb E, 0xd2 /1
+######## SAHF ##################################################################
+# SAHF is always awailable in 16bit/32bit mode, but not always in 64bit mode
+sahf, 0x9e, ia32
+sahf, 0x9e, amd64 Fn8000_0001_ECX_LahfSahf
 ######## SAL ###################################################################
 # AMD manual claims this opcode works identically to shl.  Intel manual
 # says it's reserved.  Objdump does not like it.
@@ -589,7 +667,7 @@ sbb Ib Ev, 0x83 /3, lock
 sbb G E, 0x18, lock
 sbb E G, 0x1a, lock
 ######## SCAS/SCASB/SCASW/SCASD/SCASQ ##########################################
-scas Y a, 0xae
+scas Y a, 0xae, nacl-forbidden
 ######## SETcc #################################################################
 seta Eb, 0x0f 0x97, Fn0000_0001_EDX_CMOV
 setae Eb, 0x0f 0x93, Fn0000_0001_EDX_CMOV
@@ -626,7 +704,7 @@ stc, 0xf9
 ######## STD ###################################################################
 std, 0xfd
 ######## STOS/STOSB/STOSW/STOSD/STOSQ ##########################################
-stos a Y, 0xaa, rep
+stos a Y, 0xaa, rep nacl-forbidden
 ######## SUB ###################################################################
 sub I a, 0x2c
 sub I E, 0x80 /5, lock
