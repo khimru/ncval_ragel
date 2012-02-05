@@ -319,15 +319,21 @@ namespace {
   }
   #define chartest(x) (chartest([=](int c) { return x; }).c_str())
 
+  const std::string& select_name(std::map<std::string, size_t>::value_type& p) {
+    return p.first;
+  }
+
+  bool compare_names(const std::string& x, const std::string& y) {
+    return (x.size() > y.size()) || ((x.size() == y.size()) && x < y);
+  }
+
   void print_consts(void)  {
     if (enabled(Actions::kInstructionName)) {
       std::vector<std::string> names;
       std::transform(instruction_names.begin(), instruction_names.end(),
 	std::back_inserter(names),
-	[](decltype(*instruction_names.begin()) pair) { return pair.first; });
-      std::sort(names.begin(), names.end(), [](std::string x, std::string y) {
-        return (x.size() > y.size()) || ((x.size() == y.size()) && x < y);
-      });
+	select_name);
+      std::sort(names.begin(), names.end(), compare_names);
       for (auto name_it = names.begin(); name_it != names.end(); ++name_it) {
         auto &name = *name_it;
 	if (instruction_names[name] == 0) {
@@ -1173,19 +1179,21 @@ namespace {
       }
     }
 
+    void print_one_size_definition_data16(void) {
+      auto saved_prefixes = required_prefixes;
+      required_prefixes.insert("data16");
+      print_one_size_definition();
+      required_prefixes = saved_prefixes;
+    }
+
+    void print_one_size_definition_rexw(void) {
+      auto saved_rex = rex;
+      rex.w = true;
+      print_one_size_definition();
+      rex = saved_rex;
+    }
+
     void print_definition(void) {
-      auto print_one_size_definition_data16 = [this] (void) {
-        auto saved_prefixes = required_prefixes;
-	required_prefixes.insert("data16");
-	print_one_size_definition();
-	required_prefixes = saved_prefixes;
-      };
-      auto print_one_size_definition_rexw = [this] (void) {
-	auto saved_rex = rex;
-	rex.w = true;
-	print_one_size_definition();
-	rex = saved_rex;
-      };
       switch (auto saved_class = instruction_class) {
 	case InstructionClass::kDefault:
 	case InstructionClass::kSize8:
@@ -1596,6 +1604,36 @@ namespace {
       }
     }
 
+    void print_third_byte(const std::string& third_byte) const {
+      auto byte = 0;
+      for (auto i = 7, p = 1; i>=0; --i, p <<= 1) {
+        if (third_byte[i] == '1' || third_byte[i] == 'X' ||
+            ((third_byte[i] == 'W') && rex.w)) {
+          byte |= p;
+        }
+      }
+      if (third_byte.find('X') == third_byte.npos) {
+        fprintf(out_file, "0x%02x", byte);
+      } else {
+        std::set<decltype(byte)> bytes { byte };
+        for (auto i = 7, p = 1; i>=0; --i, p <<= 1) {
+          if (third_byte[i] == 'X') {
+            for (auto byte_it = bytes.begin(); byte_it != bytes.end(); ++byte_it) {
+              auto &byte = *byte_it;
+              bytes.insert(byte & ~p);
+            }
+          }
+        }
+        auto delimeter = "(";
+        for (auto byte_it = bytes.begin(); byte_it != bytes.end(); ++byte_it) {
+          auto &byte = *byte_it;
+          fprintf(out_file, "%s0x%02x", delimeter, byte);
+          delimeter = " | ";
+        }
+        fprintf(out_file, ")");
+      }
+    }
+
     void print_opcode_nomodrm(void) {
       if ((opcodes.size() == 1) ||
 	  ((opcodes.size() == 2) &&
@@ -1677,36 +1715,7 @@ namespace {
 	  third_byte.erase(1, 1);
 	  third_byte.erase(5, 1);
 	  third_byte.erase(6, 1);
-	  auto print_third_byte = [this, &third_byte] (void) {
-	    auto byte = 0;
-	    for (auto i = 7, p = 1; i>=0; --i, p <<= 1) {
-	      if (third_byte[i] == '1' || third_byte[i] == 'X' ||
-		  ((third_byte[i] == 'W') && rex.w)) {
-		byte |= p;
-	      }
-	    }
-	    if (third_byte.find('X') == third_byte.npos) {
-	      fprintf(out_file, "0x%02x", byte);
-	    } else {
-	      std::set<decltype(byte)> bytes { byte };
-	      for (auto i = 7, p = 1; i>=0; --i, p <<= 1) {
-		if (third_byte[i] == 'X') {
-		  for (auto byte_it = bytes.begin(); byte_it != bytes.end(); ++byte_it) {
-		    auto &byte = *byte_it;
-		    bytes.insert(byte & ~p);
-		  }
-	        }
-	      }
-	      auto delimeter = "(";
-	      for (auto byte_it = bytes.begin(); byte_it != bytes.end(); ++byte_it) {
-	        auto &byte = *byte_it;
-	        fprintf(out_file, "%s0x%02x", delimeter, byte);
-	        delimeter = " | ";
-	      }
-	      fprintf(out_file, ")");
-	    }
-	  };
-	  print_third_byte();
+	  print_third_byte(third_byte);
 	  if (enabled(Actions::kVexPrefix)) {
 	    fprintf(out_file, " @vex_prefix3");
 	  }
@@ -1717,7 +1726,7 @@ namespace {
 	    } else {
 	      third_byte[0] = '1';
 	    }
-	    print_third_byte();
+	    print_third_byte(third_byte);
 	    if (enabled(Actions::kVexPrefix)) {
 	      fprintf(out_file, " @vex_prefix_short");
 	    }
@@ -2067,6 +2076,17 @@ namespace {
 #endif
 }
 
+struct compare_action {
+  const char* action;
+
+  compare_action(const char* y) : action(y) {
+  }
+
+  bool operator()(const char* x) const {
+    return !strcmp(x, action);
+  }
+};
+
 int main(int argc, char *argv[]) {
   setlocale(LC_ALL, "");
   bindtextdomain("ncval", ".");
@@ -2100,10 +2120,11 @@ int main(int argc, char *argv[]) {
 	for (auto action_to_disable = strtok(optarg, ",");
 	     action_to_disable;
 	     action_to_disable = strtok(NULL, ",")) {
+	  compare_action compare_with_action_to_disable(action_to_disable);
 	  auto action_number = std::find_if(
 	    std::begin(kDisablableActionsList),
 	    std::end(kDisablableActionsList),
-	    [=](const char* x) { return !strcmp(x, action_to_disable); });
+	    compare_with_action_to_disable);
 	  if (action_number != std::end(kDisablableActionsList)) {
 	    disabled_actions[action_number - kDisablableActionsList] = true;
 	  } else {
