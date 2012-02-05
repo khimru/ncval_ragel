@@ -1049,7 +1049,7 @@ namespace {
       }
     }
 
-    enum class InstructionClass {
+    enum InstructionClass {
       kDefault,
       /* The same as kDefault, but to make “dil”/“sil”/“bpl”/“spl” accesible
 	 pure REX (hex 0x40) is allowed.  */
