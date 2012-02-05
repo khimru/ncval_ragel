@@ -155,7 +155,9 @@ extractps Ib Vps Md, 0x66 0x0f 0x3a 0x17, Fn0000_0001_ECX_SSE41
 extractps Ib Vps Ry, 0x66 0x0f 0x3a 0x17, Fn0000_0001_ECX_SSE41
 vextractps Ib Vps Mss, 0xc4 RXB.00011 x.1111.0.01 0x17, Fn0000_0001_ECX_AVX
 ######## EXTRQ #################################################################
-extrq ib Ib Uq, 0x66 0x0f 0x78 /0, Fn8000_0001_ECX_SSE4A
+# This instruction is perfectly safe but it's disallowed because xed does not
+# know it
+extrq ib Ib Uq, 0x66 0x0f 0x78 /0, nacl-forbidden Fn8000_0001_ECX_SSE4A
 extrq Uq Vq, 0x66 0x0f 0x79, Fn8000_0001_ECX_SSE4A
 ######## HADDPD/VHADDPD ########################################################
 haddpd Wpd Vpd, 0x66 0x0f 0x7c, Fn0000_0001_ECX_SSE3
@@ -228,11 +230,15 @@ vmovaps Vpsx Wpsx, 0xc4 RXB.00001 x.1111.L.00 0x29, Fn0000_0001_ECX_AVX
 #  vmovd Ey Vo, 0xc4 RXB.00001 W.1111.0.01 0x6e, Fn0000_0001_ECX_AVX
 #  vmovd Vo Ey, 0xc4 RXB.00001 W.1111.1.01 0x7e, Fn0000_0001_ECX_AVX
 # Objdump names 64bit version not “movd” but “movq”.  We describe 32bit version
-# here and 64bit version can be found in x86-64-instructions.def.
+# and 64bit version separately.
 movd Ed Vq, 0x66 0x0f 0x6e, Fn0000_0001_EDX_SSE2
 movd Vq Ed, 0x66 0x0f 0x7e, Fn0000_0001_EDX_SSE2
+movq Eq Vq, 0x66 rexw 0x0f 0x6e, amd64 Fn0000_0001_EDX_SSE2
+movq Vq Eq, 0x66 rexw 0x0f 0x7e, amd64 Fn0000_0001_EDX_SSE2
 vmovd Ed Vo, 0xc4 RXB.00001 0.1111.0.01 0x6e, Fn0000_0001_ECX_AVX
 vmovd Vo Ed, 0xc4 RXB.00001 0.1111.1.01 0x7e, Fn0000_0001_ECX_AVX
+vmovq Eq Vo, 0xc4 RXB.00001 1.1111.0.01 0x6e, amd64 Fn0000_0001_ECX_AVX
+vmovq Vo Eq, 0xc4 RXB.00001 1.1111.1.01 0x7e, amd64 Fn0000_0001_ECX_AVX
 ######## MOVDDUP/VMOVDDUP ######################################################
 movddup Wsd Vsd, 0xf2 0x0f 0x12, Fn0000_0001_ECX_SSE3
 vmovddup Wsd Vo, 0xc4 RXB.00001 x.1111.0.11 0x12, Fn0000_0001_ECX_AVX
@@ -477,6 +483,9 @@ vpextrb Ib Vpb Rd, 0xc4 RXB.00011 x.1111.0.01 0x14 /r, Fn0000_0001_ECX_AVX
 ######## PEXTRD/VPEXTRD ########################################################
 pextrd Ib Vpk Ed, 0x66 0x0f 0x3a 0x16 /r, Fn0000_0001_ECX_SSE41
 vpextrd Ib Vpj Ed, 0xc4 RXB.00011 0.1111.0.01 0x16, Fn0000_0001_ECX_AVX
+######## PEXTRQ/VPEXTRQ ########################################################
+pextrq Ib Vpq Eq, 0x66 rexw 0x0f 0x3a 0x16, amd64 Fn0000_0001_ECX_SSE41
+vpextrq Ib Vpqw Eq, 0xc4 RXB.00011 1.1111.0.01 0x16, amd64 Fn0000_0001_ECX_AVX
 ######## PEXTRW/VPEXTRW ########################################################
 # This is description according to AMD/Intel manual.
 #  pextrw Ib Udq Gy, 0x66 0x0f 0xc5, Fn0000_0001_EDX_SSE2
@@ -521,6 +530,9 @@ vpinsrb Ib Rd Hpb Vpb, 0xc4 RXB.00011 x.1111.0.01 0x20 /r, Fn0000_0001_ECX_AVX
 ######## PINSRD/VPINSRD ########################################################
 pinsrd Ib Ed Vpj, 0x66 0x0f 0x3a 0x22, Fn0000_0001_ECX_SSE41
 vpinsrd Ib Ed Hpdw Vpdw, 0xc4 RXB.00011 0.1111.0.01 0x22, Fn0000_0001_ECX_AVX
+######## PINSRQ/VPINSRQ ########################################################
+pinsrq Ib Eq Vpq, 0x66 rexw 0x0f 0x3a 0x22, amd64 Fn0000_0001_ECX_SSE41
+vpinsrq Ib Eq Ho Vo, 0xc4 RXB.00011 1.1111.0.01 0x22, amd64 Fn0000_0001_ECX_AVX
 ######## PINSRW/VPINSRW ########################################################
 # This is description according to AMD/Intel manual.
 #  pinsrw Ib Ew Vdq, 0x66 0x0f 0xc4, Fn0000_0001_EDX_SSE1

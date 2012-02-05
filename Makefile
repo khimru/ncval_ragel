@@ -18,17 +18,17 @@ CXXFLAGS = -g
 LDFLAGS = -g
 INST_DEFS = general-purpose-instructions.def \
 	    system-instructions.def \
-	    x86-64-instructions.def \
 	    x87-instructions.def \
 	    mmx-instructions.def \
 	    xmm-instructions.def
 
 FAST_TMP_FOR_TEST=/dev/shm
 
+all: $(OUT_DIRS) decoder-test-x86_64 validator-test-x86_64
+
 $(OUT_DIRS):
 	install -m 755 -d $@
 
-all: decoder-test-x86_64 validator-test-x86_64
 .INTERMEDIATE: decoder-test-x86_64.o decoder-x86_64.o
 decoder-test-x86_64: decoder-x86_64.o decoder-test-x86_64.o
 .INTERMEDIATE: validator-test-x86_64.o validator-x86_64.o
@@ -49,9 +49,9 @@ validator-x86_64-instruction-consts.c validator-x86_64-instruction.rl: \
 							gen-decoder $(INST_DEFS)
 	./gen-decoder -o validator-x86_64-instruction.rl $(INST_DEFS) \
 	  -d opcode,instruction_name,mark_data_fields,rel_operand_action \
-	  nops.def
-one-instruction.dot: one-valid-instruction-consts.c
-one-instruction.dot: one-valid-instruction.rl
+	  -d nacl-forbidden nops.def
+one-instruction.rl: one-valid-instruction-consts.c
+one-instruction.rl: one-valid-instruction.rl
 .INTERMEDIATE: one-valid-instruction.rl one-valid-instruction-consts.c
 one-valid-instruction-consts.c one-valid-instruction.rl: \
 							gen-decoder $(INST_DEFS)
@@ -113,15 +113,7 @@ clean-tests:
 	rm -rf "$(OUT)"/test "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
 
 .PHONY: check
-check: $(BINUTILS_STAMP) one-instruction.xml decoder-test-x86_64 | $(OUT)/test
-	python dfa_possibilities.py one-instruction.xml > $(OUT)/test/list.s
-	$(GAS) --64 $(OUT)/test/list.s -o $(OUT)/test/list.o
-	$(OBJDUMP) -d $(OUT)/test/list.o > $(OUT)/test/objdump.txt
-	./decoder-test-x86_64 $(OUT)/test/list.o > $(OUT)/test/decoder.txt
-	diff -uNr $(OUT)/test/objdump.txt $(OUT)/test/decoder.txt
-
-.PHONY: check-n
-check-n: $(BINUTILS_STAMP) one-instruction.dot decoder-test-x86_64 | $(OUT)/test
+check: $(BINUTILS_STAMP) one-instruction.dot decoder-test-x86_64 | $(OUT)/test
 	$(PYTHON2X) parse_dfa.py <one-instruction.dot \
 	    > "$(OUT)/test/test_dfa_transitions.c"
 	$(CC) $(CFLAGS) -c test_dfa.c -o "$(OUT)/test/test_dfa.o"

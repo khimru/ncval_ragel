@@ -31,6 +31,7 @@ namespace {
   const char* short_program_name;
 
   const struct option kProgramOptions[] = {
+    {"mode",	required_argument,	nullptr,	'm'},
     {"disable",	required_argument,	nullptr,	'd'},
     {"output",	required_argument,	nullptr,	'o'},
     {"help",	no_argument,		nullptr,	'h'},
@@ -47,6 +48,7 @@ Creates ragel machine which recognizes instructions listed in given files.
 Mandatory arguments to long options are mandatory for short options too.
 
 Options list:
+  -m, --mode=mode            CPU mode: ia32 for IA32, amd64 for x86-64
   -d, --disable=action_list  disable actions from the comma-separated list
   -o, --output=FILE          write result to FILE instead of standard output
   -h, --help                 display this help and exit
@@ -82,6 +84,11 @@ where they are insered:
                          xxxXX_operand_begin and xxxXX_operand_end
    check_access        this will check memory access (actions is not generated
                          by %1$s, you need to define it in your program)
+
+   rel_operand_action  generate rel_operand action references, but not actions
+                         themselves - in you need non-standard definition
+
+   nacl-forbidden      don't generate instructions forbidden for nacl
 )END");
 
   const char*const kVersionHelp = N_(R"END(%1$s %2$s
@@ -99,7 +106,8 @@ found in the LICENSE file.
     kParseOperandsStates,
     kMarkDataFields,
     kCheckAccess,
-    kRelOperandAction
+    kRelOperandAction,
+    kNaClForbidden
   };
   const char* kDisablableActionsList[] = {
     "rex_prefix",
@@ -110,7 +118,8 @@ found in the LICENSE file.
     "parse_operands_states",
     "mark_data_fields",
     "check_access",
-    "rel_operand_action"
+    "rel_operand_action",
+    "nacl-forbidden"
   };
   bool disabled_actions[arraysize(kDisablableActionsList)];
 
@@ -144,6 +153,8 @@ found in the LICENSE file.
 
   FILE *out_file = stdout;
   FILE *const_file = stdout;
+
+  auto amd64_mode = true;
 
   std::string read_file(const char *filename) {
     std::string file_content;
@@ -261,6 +272,7 @@ found in the LICENSE file.
 	      }
 	      instruction.operands.push_back(operand);
 	    });
+	  auto enabled_instruction = true;
 	  if (*it == ',') {
 	    ++it;
 	    instruction.opcodes = get_strings();
@@ -271,7 +283,32 @@ found in the LICENSE file.
 		  if (flag == #x) {instruction.x = true;} else
 		#include "gen-decoder-flags.C"
 		#undef INSTRUCTION_FLAG
-		{
+		if (flag == "ia32") {
+		  if (amd64_mode) {
+		    enabled_instruction = false;
+		    break;
+		  }
+		} else if (flag == "amd64") {
+		  if (!amd64_mode) {
+		    enabled_instruction = false;
+		    break;
+		  }
+		} else if (flag == "nacl-ia32-forbidden") {
+		  if (!amd64_mode && !enabled(Actions::kNaClForbidden)) {
+		    enabled_instruction = false;
+		    break;
+		  }
+		} else if (flag == "nacl-amd64-forbidden") {
+		  if (amd64_mode && !enabled(Actions::kNaClForbidden)) {
+		    enabled_instruction = false;
+		    break;
+		  }
+		} else if (flag == "nacl-forbidden") {
+		  if (!enabled(Actions::kNaClForbidden)) {
+		    enabled_instruction = false;
+		    break;
+		  }
+		} else {
 		  fprintf(stderr, _("%s: unknown flag: “%s”\n"),
 		    short_program_name, flag.c_str());
 		  exit(1);
@@ -279,7 +316,9 @@ found in the LICENSE file.
 	      }
 	    }
 	  }
-	  instructions.push_back(instruction);
+	  if (enabled_instruction) {
+	    instructions.push_back(instruction);
+	  }
 	}
 	it = std::find_if(it, file_content.end(), eol);
       }
@@ -1948,13 +1987,15 @@ found in the LICENSE file.
 	static const std::map<std::pair<InstructionClass, std::string>,
 	     const char *> jump_sizes {
 	  { { InstructionClass::kDefault,	"b"	},	"rel8"	},
+	  { { InstructionClass::kDefault,	"d"	},	"rel32"	},
+	  { { InstructionClass::kDefault,	"w"	},	"rel16"	},
 	  { { InstructionClass::kDefault,	"z"	},	"rel32"	},
 	  { { InstructionClass::kData16,	"z"	},	"rel16"	},
 	  { { InstructionClass::kRexW,		"z"	},	"rel32"	},
 	};
 	if (operand->source == 'J') {
 	  auto it = jump_sizes.find({instruction_class, operand->size});
-	  if (it == immediate_sizes.end()) {
+	  if (it == jump_sizes.end()) {
 	    fprintf(stderr, _("%s: error - can not determine jump size: %c%s"),
 		    short_program_name, operand->source, operand->size.c_str());
 	    exit(1);
@@ -2043,6 +2084,18 @@ int main(int argc, char *argv[]) {
 	      short_program_name, action_to_disable);
 	    return 1;
 	  }
+	}
+	break;
+      }
+      case 'm': {
+	if (optarg == "ia32") {
+	  amd64_mode = false;
+	} else if (optarg == "amd64") {
+	  amd64_mode = true;
+	} else {
+	  fprintf(stderr, _("%s: mode “%s” is unknown\n"),
+	    short_program_name, optarg);
+	  return 1;
 	}
 	break;
       }

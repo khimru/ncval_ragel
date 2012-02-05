@@ -29,9 +29,9 @@ frstor Msr, 0xdd /4, Fn0000_0001_EDX_X87
 fnsave Msr, 0xdd /6, Fn0000_0001_EDX_X87
 fsave Msr, 0x9b 0xdd /6, Fn0000_0001_EDX_X87
 ######## FXRSTOR ###############################################################
-fxrstor Msx, 0x0f 0xae /1, Fn0000_0001_ECX_XSAVE
+fxrstor Msx, 0x0f 0xae /1, nacl-forbidden Fn0000_0001_ECX_XSAVE
 ######## FXSAVE ################################################################
-fxsave Msx, 0x0f 0xae /0, Fn0000_0001_ECX_XSAVE
+fxsave Msx, 0x0f 0xae /0, nacl-forbidden Fn0000_0001_ECX_XSAVE
 ######## MASKMOVQ ##############################################################
 maskmovq Nq Pq, 0x0f 0xf7, Fn8000_0001_EDX_MmxExt
 ######## MOVD ##################################################################
@@ -39,9 +39,11 @@ maskmovq Nq Pq, 0x0f 0xf7, Fn8000_0001_EDX_MmxExt
 # movd Ey Py, 0x0f 0x6e, Fn0000_0001_EDX_MMX
 # movd Py Ey, 0x0f 0x7e, Fn0000_0001_EDX_MMX
 # Objdump names 64bit version not “movd” but movq”.  We describe 32bit version
-# here and 64bit version can be found in x86-64-instructions.def.
+# and 64bit separately.
 movd Ed Pq, 0x0f 0x6e, Fn0000_0001_EDX_MMX
 movd Pq Ed, 0x0f 0x7e, Fn0000_0001_EDX_MMX
+movq Eq Pq, rexw 0x0f 0x6e, amd64 Fn0000_0001_EDX_MMX
+movq Pq Eq, rexw 0x0f 0x7e, amd64 Fn0000_0001_EDX_MMX
 ######## MOVDQ2Q ###############################################################
 movdq2q Uq Pq, 0xf2 0x0f 0xd6, Fn0000_0001_EDX_SSE2
 ######## MOVQ2DQ ###############################################################
