@@ -1300,13 +1300,13 @@ namespace {
       for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
         auto &operand = *operand_it;
 	static std::map<char, std::pair<bool, bool> > operand_map {
-	  { 'E', { true,  true  } },
-	  { 'M', { true,  false } },
-	  { 'N', { false, true  } },
-	  { 'Q', { true,  true  } },
-	  { 'R', { false, true  } },
-	  { 'U', { false, true  } },
-	  { 'W', { true,  true  } }
+	  { 'E', std::make_pair(true,  true ) },
+	  { 'M', std::make_pair(true,  false) },
+	  { 'N', std::make_pair(false, true ) },
+	  { 'Q', std::make_pair(true,  true ) },
+	  { 'R', std::make_pair(false, true ) },
+	  { 'U', std::make_pair(false, true ) },
+	  { 'W', std::make_pair(true,  true ) }
 	};
 	auto it = operand_map.find(operand.source);
 	if (it != operand_map.end()) {
