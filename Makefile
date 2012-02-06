@@ -140,6 +140,7 @@ clean-all: clean
 .PHONY: clean-tests
 	clean-tests:
 	rm -rf "$(OUT)"/test "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
+	rm -f dfa_ncval
 
 # The target for all short-running tests.
 .PHONY: check
@@ -154,6 +155,7 @@ check-irt: outdirs $(OBJD)/validator-test-x86_64
 check-as-alt-validator: $(OBJD)/validator-test-x86_64
 	ln -sfn $(OBJD)/validator-test-x86_64 dfa_ncval
 	$(PYTHON2X) validator_test.py
+	rm -f dfa_ncval
 
 # Checks that all byte sequences accepted by the DFA are decoded identically to
 # the objdump. A long-running test.
