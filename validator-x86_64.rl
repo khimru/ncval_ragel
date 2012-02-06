@@ -277,8 +277,11 @@
     } |
     (0xae		       | # scas   %ds:(%rsi),%al
      (data16|REXW_NONE)? 0xaf  | # scas   %ds:(%rsi),%ax/%eax/%rax
-     0xaa		       | # stos   %al,%es:(%rdi)
-     (data16|REXW_NONE)? 0xab)	 # stos   %ax/%eax/%rax,%es:(%rdi)
+     (rep? 0xaa)	       | # stos   %al,%es:(%rdi)
+     (data16 |
+      rep data16 |
+      data16 rep) 0xab	       | # stos   %ax,%es:(%rdi)
+      rep? REXW_NONE? 0xab)	 # stos   %eax/%rax,%es:(%rdi)
     @{ if (restricted_register != kSandboxedRdi &&
 	   restricted_register != kSandboxedRsiSandboxedRdi) {
 	 printf("Incorrectly sandboxed %%rdi at the %zx\n", p - data);
