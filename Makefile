@@ -138,7 +138,7 @@ clean-all: clean
 
 # Clean side effects created while running tests.
 .PHONY: clean-tests
-	clean-tests:
+clean-tests:
 	rm -rf "$(OUT)"/test "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
 	rm -f dfa_ncval
 
