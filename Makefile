@@ -16,24 +16,8 @@ PYTHON2X=/usr/bin/python2.6
 CC = gcc -std=gnu99 -Wdeclaration-after-statement -Wall -pedantic -Wextra \
      -Wno-long-long -Wswitch-enum -Wsign-compare -Wno-variadic-macros -Werror \
      -O3 -finline-limit=10000
-ifeq ($(shell if [ $$(g++ -dM -E -xc - < /dev/null | grep __GNUC_MINOR__ | \
-      ( read d g v ; echo $$v)) -lt 4 ] ; then echo getgcc ; fi), getgcc)
-GCC46_VER = 4.6.2
-CXX = $(GCC46_INSTALL_DIR)/bin/g++ -std=c++0x -O3 -finline-limit=10000
-CXX46 = $(GCC46_INSTALL_DIR)/bin/g++
-GCC46_INSTALL_DIR = $(OUT)/build/install-gcc-$(GCC46_VER)
-else
 CXX = g++ -std=c++0x -O3 -finline-limit=10000
-CXX46 =
-endif
-ifeq ($(shell ragel -v 2>/dev/null || true), )
-RAGEL_VER = ragel-6.7
-RAGEL = $(OUT)/build/build-$(RAGEL_VER)/ragel/ragel
-RAGELDEP = $(OUT)/build/build-$(RAGEL_VER)/ragel/ragel
-else
 RAGEL = ragel
-RAGELDEP =
-endif
 CFLAGS = -g
 CXXFLAGS = -g
 LDFLAGS = -g
@@ -58,10 +42,10 @@ $(OUT_DIRS):
 $(OBJD)/%.o: $(OBJD)/%.c
 	$(CC) $(CFLAGS) -I. -I$(OBJD) -c $< -o $@
 
-$(OBJD)/%.c: %.rl $(RAGELDEP)
+$(OBJD)/%.c: %.rl
 	$(RAGEL) -G2 -I$(OBJD) $< -o $@
 
-$(OBJD)/%.c: $(OBJD)/%.rl $(RAGELDEP)
+$(OBJD)/%.c: $(OBJD)/%.rl
 	$(TAGEL) -G2 $<
 
 # Decoder, validator, etc.
@@ -71,7 +55,7 @@ $(OBJD)/validator-test-x86_64: \
     $(OBJD)/validator-x86_64.o $(OBJD)/validator-test-x86_64.o
 
 GEN_DECODER=$(OBJD)/gen-decoder
-$(GEN_DECODER): gen-decoder.C $(CXX46)
+$(GEN_DECODER): gen-decoder.C
 	$(CXX) $(CXXFLAGS) $< -o $(GEN_DECODER)
 
 $(OBJD)/decoder-x86_64.c: $(OBJD)/decoder-x86_64-instruction-consts.c
@@ -93,7 +77,7 @@ $(OBJD)/validator-x86_64-instruction-consts.c \
 #   one-instruction.dot: the description of the DFA that accepts all instruction
 #     the decoder is able to decode.
 #   decoder-test-x86-64: the decoder that follows the objdump format
-$(OBJD)/one-instruction.dot: one-instruction.rl $(RAGELDEP) \
+$(OBJD)/one-instruction.dot: one-instruction.rl \
   $(OBJD)/one-valid-instruction-consts.c $(OBJD)/one-valid-instruction.rl
 	$(RAGEL) -V -I$(OBJD) $< -o $@
 
