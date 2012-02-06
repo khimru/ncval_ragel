@@ -45,9 +45,6 @@ $(OBJD)/%.o: $(OBJD)/%.c
 $(OBJD)/%.c: %.rl
 	$(RAGEL) -G2 -I$(OBJD) $< -o $@
 
-$(OBJD)/%.c: $(OBJD)/%.rl
-	$(TAGEL) -G2 $<
-
 # Decoder, validator, etc.
 $(OBJD)/decoder-test-x86_64: \
     $(OBJD)/decoder-x86_64.o $(OBJD)/decoder-test-x86_64.o
