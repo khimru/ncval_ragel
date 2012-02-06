@@ -141,8 +141,19 @@ clean-all: clean
 	clean-tests:
 	rm -rf "$(OUT)"/test "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
 
+# The target for all short-running tests.
 .PHONY: check
-check: outdirs $(BINUTILS_STAMP) $(OBJD)/one-instruction.dot \
+check: check-irt
+
+# Checks that the IRT is not rejected by the validator.
+.PHONY: check-irt
+check-irt: outdirs $(OBJD)/validator-test-x86_64
+	$(OBJD)/validator-test-x86_64 nacl_irt_x86_64.nexe
+
+# Checks that all byte sequences accepted by the DFA are decoded identically to
+# the objdump. A long-running test.
+.PHONY: check-decoder
+check-decoder: outdirs $(BINUTILS_STAMP) $(OBJD)/one-instruction.dot \
     $(OBJD)/decoder-test-x86_64
 	$(PYTHON2X) parse_dfa.py <"$(OBJD)/one-instruction.dot" \
 	    > "$(OUT)/test/test_dfa_transitions.c"
