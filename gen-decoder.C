@@ -553,15 +553,13 @@ namespace {
 "  action not_data16_prefix {\n"
 "    data16_prefix = FALSE;\n"
 "  }\n"
-"  action not_lock_prefix {\n"
-"    /* HACK: lock-as-no-lock is used only in “mov %%cr8+,%%eXX” to make it\n"
-"	     possible to specify “%%cr8”, …, “%%cr15” in 32bit mode.  It can\n"
-"	     be used the same way in 64bit mode,  but there “real” rex prefix\n"
-"	     can be used, too - and takes precencence, if used.  */\n"
-"    if (!rex_prefix) {\n"
-"      rex_prefix = 0x44;\n"
-"      lock_prefix = FALSE;\n"
-"    }\n"
+"  action not_lock_prefix0 {\n"
+"    operand0 |= 0x08;\n"
+"    lock_prefix = FALSE;\n"
+"  }\n"
+"  action not_lock_prefix1 {\n"
+"    operand1 |= 0x08;\n"
+"    lock_prefix = FALSE;\n"
 "  }\n"
 "  action not_repnz_prefix {\n"
 "    repnz_prefix = FALSE;\n"
@@ -1588,7 +1586,11 @@ namespace {
     bool mod_reg_is_used() {
       for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
         auto &operand = *operand_it;
-	static const char cc[] = { 'C', 'G', 'P', 'V' };
+	if (operand.source == 'C' &&
+	    required_prefixes.find("0xf0") == required_prefixes.end()) {
+	  return true;
+	}
+	static const char cc[] = { 'G', 'P', 'V' };
 	for (int c_it = 0; c_it < arraysize(cc); ++c_it) {
 	  auto c = cc[c_it];
 	  if (operand.source == c) {
@@ -1638,7 +1640,7 @@ namespace {
 	    delimeter = " | ";
 	  } else {
 	    std::vector<std::string> permutations(prefixes.begin(),
-						  prefixes.end());
+								prefixes.end());
 	    do {
 	      fprintf(out_file, "%s", delimeter);
 	      delimeter = " | ";
@@ -1650,7 +1652,7 @@ namespace {
 	      }
 	      fprintf(out_file, ")");
 	    } while (next_permutation(permutations.begin(),
-				      permutations.end()));
+							   permutations.end()));
 	  }
 	}
 	if (opt_start) {
@@ -1885,13 +1887,6 @@ namespace {
         auto &prefix = *prefix_it;
 	if (prefix == "0x66") {
 	  fprintf(out_file, " @not_data16_prefix");
-	  break;
-	}
-      }
-      for (auto prefix_it = required_prefixes.begin(); prefix_it != required_prefixes.end(); ++prefix_it) {
-        auto &prefix = *prefix_it;
-	if (prefix == "0xf0") {
-	  fprintf(out_file, " @not_lock_prefix");
 	  break;
 	}
       }
@@ -2142,6 +2137,20 @@ namespace {
 	}
 	if (operand->source == 'O') {
 	  fprintf(out_file, " disp64");
+	}
+      }
+      for (auto prefix_it = required_prefixes.begin(); prefix_it != required_prefixes.end(); ++prefix_it) {
+	auto &prefix = *prefix_it;
+	if (prefix == "0xf0") {
+	  for (auto operand_it = operands.begin(); operand_it != operands.end(); ++operand_it) {
+	    auto &operand = *operand_it;
+	    if (operand.source == 'C') {
+	      fprintf(out_file, " @not_lock_prefix%zd",
+						 &operand - &*operands.begin());
+	      break;
+	    }
+	  }
+	  break;
 	}
       }
     }

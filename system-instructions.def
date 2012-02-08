@@ -48,13 +48,13 @@ ltr Ew, 0x0f 0x00 /3
 ######## MONITOR ###############################################################
 monitor ar cr dr, 0x0f 0x01 0xc8, Fn0000_0001_ECX_Monitor
 ######## MOV (CRn) #############################################################
-mov Rr Cr, 0x0f 0x22
-mov Cr Rr, 0x0f 0x20
-mov Rr Cr, 0xf0 0x0f 0x22
-mov Cr Rr, 0xf0 0x0f 0x20
+mov Rr Cr, 0x0f 0x22, nacl-forbidden
+mov Cr Rr, 0x0f 0x20, nacl-forbidden
+mov Rr Cr, 0xf0 0x0f 0x22, nacl-forbidden Fn8000_0001_ECX_AltMovCr8
+mov Cr Rr, 0xf0 0x0f 0x20, nacl-forbidden Fn8000_0001_ECX_AltMovCr8
 ######## MOV (DRn) #############################################################
-mov Dr Rr, 0x0f 0x21
-mov Rr Dr, 0x0f 0x23
+mov Dr Rr, 0x0f 0x21, nacl-forbidden
+mov Rr Dr, 0x0f 0x23, nacl-forbidden
 ######## MWAIT #################################################################
 mwait ar cr, 0x0f 0x01 0xc9, Fn0000_0001_ECX_Monitor
 ######## RDMSR #################################################################
