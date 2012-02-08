@@ -109,6 +109,18 @@ $(OBJD)/decoder-test-x86_64.o: decoder-test-x86_64.c
 $(OBJD)/validator-test-x86_64.o: validator-test-x86_64.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(OBJD)/validator-x86_64.o: $(OBJD)/validator-x86_64.c
+	if [ -e nacl_irt_x86_64.nexe ]; then \
+	  $(CC) $(CFLAGS) -I. -I$(OBJD) -fprofile-generate -c $< -o $@-pf && \
+	  $(CC) $(CFLAGS) -fprofile-generate $@-pf validator-test-x86_64.c \
+	    -o $(OBJD)/ncval_train && \
+	  $(OBJD)/ncval_train nacl_irt_x86_64.nexe && \
+	  rm validator-test-x86_64.gcda && \
+	  $(CC) $(CFLAGS) -I. -I$(OBJD) -fprofile-use -c $< -o $@ ; \
+	else \
+	  $(CC) $(CFLAGS) -I. -I$(OBJD) -c $< -o $@ ; \
+	fi
+
 # To test the decoder compare its output with output from objdump.  This
 # allows to match instruction opcode, length and operands.
 #
