@@ -470,15 +470,11 @@ found in the LICENSE file.
   action not_data16_prefix {
     data16_prefix = FALSE;
   }
-  action not_lock_prefix {
-    /* HACK: lock-as-no-lock is used only in “mov %%cr8+,%%eXX” to make it
-	     possible to specify “%%cr8”, …, “%%cr15” in 32bit mode.  It can
-	     be used the same way in 64bit mode,  but there “real” rex prefix
-	     can be used, too - and takes precencence, if used.  */
-    if (!rex_prefix) {
-      rex_prefix = 0x44;
-      lock_prefix = FALSE;
-    }
+  action not_lock_prefix0 {
+    operand0 |= 0x08;
+  }
+  action not_lock_prefix1 {
+    operand0 |= 0x08;
   }
   action not_repnz_prefix {
     repnz_prefix = FALSE;
@@ -1763,20 +1759,10 @@ found in the LICENSE file.
 	  fprintf(out_file, " @not_data16_prefix");
 	  break;
 	}
-      }
-      for (auto &prefix : required_prefixes) {
-	if (prefix == "0xf0") {
-	  fprintf(out_file, " @not_lock_prefix");
-	  break;
-	}
-      }
-      for (auto &prefix : required_prefixes) {
 	if (prefix == "0xf2") {
 	  fprintf(out_file, " @not_repnz_prefix");
 	  break;
 	}
-      }
-      for (auto &prefix : required_prefixes) {
 	if (prefix == "0xf3") {
 	  fprintf(out_file, " @not_repz_prefix");
 	  break;
@@ -2013,6 +1999,18 @@ found in the LICENSE file.
 	}
 	if (operand->source == 'O') {
 	  fprintf(out_file, " disp64");
+	}
+      }
+      for (auto &prefix : required_prefixes) {
+	if (prefix == "0xf0") {
+	  for (auto &operand : operands) {
+	    if (operand.source == 'C') {
+	      fprintf(out_file, " @not_lock_prefix%d",
+						 &operand - &*operands.begin());
+	      break;
+	    }
+	  }
+	  break;
 	}
       }
     }
