@@ -112,7 +112,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   }
   printf("%*x:\t", ((struct DecodeState *)userdata)->width,
 		   begin - (((struct DecodeState *)userdata)->offset));
-  for (p = begin; p < begin + 7; p++) {
+  for (p = begin; p < begin + 7; ++p) {
     if (p >= end) {
       printf("   ");
     } else {
@@ -135,7 +135,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case 0x06: instruction_name = "cmpnlepd"; break;
 	case 0x07: instruction_name = "cmpordpd"; break;
       }
-      operands_count--;
+      --operands_count;
     }
   }
   /* “vcmppd” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x1f. */
@@ -175,7 +175,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case 0x1e: instruction_name = "vcmpgt_oqpd"; break;
 	case 0x1f: instruction_name = "vcmptrue_uspd"; break;
       }
-      operands_count--;
+      --operands_count;
     }
   }
   /* “cmpps” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x7. */
@@ -191,7 +191,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case 0x06: instruction_name = "cmpnleps"; break;
 	case 0x07: instruction_name = "cmpordps"; break;
       }
-      operands_count--;
+      --operands_count;
     }
   }
   /* “vcmpps” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x1f. */
@@ -231,7 +231,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case 0x1e: instruction_name = "vcmpgt_oqps"; break;
 	case 0x1f: instruction_name = "vcmptrue_usps"; break;
       }
-      operands_count--;
+      --operands_count;
     }
   }
   /* “cmpsd” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x7. */
@@ -247,7 +247,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case 0x06: instruction_name = "cmpnlesd"; break;
 	case 0x07: instruction_name = "cmpordsd"; break;
       }
-      operands_count--;
+      --operands_count;
     }
   }
   /* “vcmpsd” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x1f. */
@@ -287,7 +287,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case 0x1e: instruction_name = "vcmpgt_oqsd"; break;
 	case 0x1f: instruction_name = "vcmptrue_ussd"; break;
       }
-      operands_count--;
+      --operands_count;
     }
   }
   /* “cmpss” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x7. */
@@ -303,7 +303,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case 0x06: instruction_name = "cmpnless"; break;
 	case 0x07: instruction_name = "cmpordss"; break;
       }
-      operands_count--;
+      --operands_count;
     }
   }
   /* “vcmpss” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x1f. */
@@ -343,7 +343,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case 0x1e: instruction_name = "vcmpgt_oqss"; break;
 	case 0x1f: instruction_name = "vcmptrue_usss"; break;
       }
-      operands_count--;
+      --operands_count;
     }
   }
   /* “pclmulqdq” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x3. */
@@ -355,7 +355,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case 0x02: instruction_name = "pclmullqhqdq"; break;
 	case 0x03: instruction_name = "pclmulhqhqdq"; break;
       }
-      operands_count--;
+      --operands_count;
     }
   }
   /* “vpclmulqdq” has two-operand mnemonic names for “imm8” equal to 0x0, … 0x3. */
@@ -367,12 +367,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case 0x02: instruction_name = "vpclmullqhqdq"; break;
 	case 0x03: instruction_name = "vpclmulhqhqdq"; break;
       }
-      operands_count--;
+      --operands_count;
     }
   }
   if (operands_count > 0) {
     show_name_suffix = TRUE;
-    for (i=operands_count-1;i>=0;i--) {
+    for (i=operands_count-1; i>=0; --i) {
       if (instruction->operands[i].name == JMP_TO) {
         /* Most control flow instructions never use suffixes, but “call” and
            “jmp” do... unless byte offset is used.  */
@@ -451,27 +451,30 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       if ((instruction->operands[i].name >= REG_R8) &&
 	  (instruction->operands[i].name <= REG_R15) &&
 	  (instruction->operands[i].type != OperandMMX)) {
-	rex_bits++;
+	++rex_bits;
 	/* HACK: objdump mistakenly allows “lock” with “mov %crX,%rXX” only in
 	   32bit mode.  It's perfectly valid in 64bit mode, too, so instead of
 	   changing the decoder we fix it here.  */
 	if (instruction->operands[i].type == OperandControlRegister) {
 	  if ((*begin == 0xf0) && !(instruction->prefix.lock)) {
 	    print_name("lock ");
-	    instruction->operands[i].name -= 8;
+	    if (!(instruction->prefix.rex & 0x04)) {
+	      instruction->operands[i].name -= 8;
+	      --rex_bits;
+	    }
 	  }
 	}
       } else if (instruction->operands[i].name == REG_RM) {
 	if ((instruction->rm.base >= REG_R8) &&
 	    (instruction->rm.base <= REG_R15)) {
-	  rex_bits++;
+	  ++rex_bits;
 	} else if ((instruction->rm.base == REG_NONE) ||
 		   (instruction->rm.base == REG_RIP)) {
-	  maybe_rex_bits++;
+	  ++maybe_rex_bits;
 	}
 	if ((instruction->rm.index >= REG_R8) &&
 	    (instruction->rm.index <= REG_R15)) {
-	  rex_bits++;
+	  ++rex_bits;
 	}
       }
     }
@@ -679,7 +682,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       print_name("ll");
     } else {
       printf("%c", show_name_suffix);
-      shown_name++;
+      ++shown_name;
     }
   }
   if (!strcmp(instruction_name, "mov")) {
@@ -697,13 +700,13 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       strcmp(instruction_name, "pushq  %gs")) {
     while (shown_name < 6) {
       printf(" ");
-      shown_name++;
+      ++shown_name;
     }
     if (operands_count == 0) {
       printf(" ");
     }
   }
-  for (i=operands_count-1;i>=0;i--) {
+  for (i=operands_count-1; i>=0; --i) {
     printf("%c", delimeter);
     if ((!strcmp(instruction_name, "callw")) ||
 	(!strcmp(instruction_name, "callq")) ||
@@ -1120,7 +1123,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   while (begin < end) {
     printf("%*x:\t", ((struct DecodeState *)userdata)->width,
 		     begin - (((struct DecodeState *)userdata)->offset));
-    for (p = begin; p < begin + 7; p++) {
+    for (p = begin; p < begin + 7; ++p) {
       if (p >= end) {
 	printf("\n");
 	return;
@@ -1146,7 +1149,7 @@ int DecodeFile(const char *filename, int repeat_count) {
   ReadFile(filename, &data, &data_size);
 
   int count;
-  for (count = 0; count < repeat_count; count++) {
+  for (count = 0; count < repeat_count; ++count) {
     Elf_Ehdr *header;
     int index;
 
@@ -1154,7 +1157,7 @@ int DecodeFile(const char *filename, int repeat_count) {
     CheckBounds(data, data_size, header, sizeof(*header));
     assert(memcmp(header->e_ident, ELFMAG, strlen(ELFMAG)) == 0);
 
-    for (index = 0; index < header->e_shnum; index++) {
+    for (index = 0; index < header->e_shnum; ++index) {
       Elf_Shdr *section = (Elf_Shdr *) (data + header->e_shoff +
 					header->e_shentsize * index);
       CheckBounds(data, data_size, section, sizeof(*section));
@@ -1194,11 +1197,12 @@ int main(int argc, char **argv) {
   int index, initial_index = 1, repeat_count = 1;
   if (argc == 1) {
     printf("%s: no input files\n", argv[0]);
+    exit(1);
   }
   if (!strcmp(argv[1],"--repeat"))
     repeat_count = atoi(argv[2]),
     initial_index += 2;
-  for (index = initial_index; index < argc; index++) {
+  for (index = initial_index; index < argc; ++index) {
     const char *filename = argv[index];
     int rc = DecodeFile(filename, repeat_count);
     if (rc != 0) {

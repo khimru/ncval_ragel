@@ -4,6 +4,11 @@
  * found in the LICENSE file.
  */
 
+/*
+ * Note: if you are not familiar with C++11 please at least read “Elements of
+ * Modern C++ Style”: http://herbsutter.com/elements-of-modern-c-style/
+ */
+
 #include <fcntl.h>
 #include <getopt.h>
 #include <libgen.h>
@@ -20,9 +25,9 @@
 #include <tuple>
 #include <vector>
 
-template <typename T, size_t N>
-char (&ArraySizeHelper(T (&array)[N]))[N];
-#define arraysize(array) (sizeof(ArraySizeHelper(array)))
+template<class _Tp, size_t _Nm>
+constexpr inline size_t
+arraysize(_Tp (&__arr)[_Nm]) { return _Nm; }
 
 char* _(const char *s) { return gettext(s); }
 constexpr const char* N_(const char *s) { return s; }
@@ -191,7 +196,7 @@ found in the LICENSE file.
 
   void load_instructions(const char *filename) {
     const auto file_content = read_file(filename);
-    auto it = file_content.begin();
+    auto it = begin(file_content);
     auto eol = [](decltype(*it) c) {
       return c == '\n';
     };
@@ -201,28 +206,28 @@ found in the LICENSE file.
     auto right_parenthesis = [](decltype(*it) c) {
       return c == ')';
     };
-    while (it != file_content.end()) {
-      it = std::find_if_not(it, file_content.end(), eol);
-      if (it == file_content.end()) {
+    while (it != end(file_content)) {
+      it = std::find_if_not(it, end(file_content), eol);
+      if (it == end(file_content)) {
 	return;
       }
       /* If line starts with “#” then it's a comment. */
       if (*it == '#') {
-	it = std::find_if(it, file_content.end(), eol);
+	it = std::find_if(it, end(file_content), eol);
       } else {
-	auto end = std::find_if(it, file_content.end(), eol);
+	auto line_end = std::find_if(it, end(file_content), eol);
 	auto get_strings = [=, &it](void) {
 	  std::vector<std::string> strings;
 	  std::string string;
-	  while ((it = std::find_if_not(it, end, whitespace)) < end &&
+	  while ((it = std::find_if_not(it, line_end, whitespace)) < line_end &&
 								   *it != ',') {
-	    for (; it < end && *it != ',' && !whitespace(*it); ++it) {
+	    for (; it < line_end && *it != ',' && !whitespace(*it); ++it) {
 	      if (*it != '\\') {
 		string.push_back(*it);
 	      } else {
 		if (*++it == '(') {
-		  auto parenthesis = std::find_if(it, end, right_parenthesis);
-		  string.insert(string.end(), it, ++parenthesis);
+		  auto parenthesis = std::find_if(it, line_end, right_parenthesis);
+		  string.insert(end(string), it, ++parenthesis);
 		  it = --parenthesis;
 		} else {
 		  string.push_back(*it);
@@ -344,17 +349,17 @@ found in the LICENSE file.
   void print_consts(void)  {
     if (enabled(Actions::kInstructionName)) {
       std::vector<std::string> names;
-      std::transform(instruction_names.begin(), instruction_names.end(),
+      std::transform(begin(instruction_names), end(instruction_names),
 	std::back_inserter(names),
-	[](decltype(*instruction_names.begin()) pair) { return pair.first; });
-      std::sort(names.begin(), names.end(), [](std::string x, std::string y) {
+	[](decltype(*begin(instruction_names)) pair) { return pair.first; });
+      std::sort(begin(names), end(names), [](std::string x, std::string y) {
         return (x.size() > y.size()) || ((x.size() == y.size()) && x < y);
       });
       for (auto &name : names) {
 	if (instruction_names[name] == 0) {
 	  for (decltype(name.length()) p = 1; p < name.length(); ++p) {
 	    auto it = instruction_names.find(std::string(name, p));
-	    if (it != instruction_names.end()) {
+	    if (it != end(instruction_names)) {
 	      it->second = 1;
 	    }
 	  }
@@ -372,7 +377,7 @@ found in the LICENSE file.
 	if (offset != 1) {
 	  for (decltype(name.length()) p = 1; p < name.length(); ++p) {
 	    auto it = instruction_names.find(std::string(name, p));
-	    if ((it != instruction_names.end()) && (it->second == 1)) {
+	    if ((it != end(instruction_names)) && (it->second == 1)) {
 	      it->second = offset + p;
 	    }
 	  }
@@ -472,9 +477,11 @@ found in the LICENSE file.
   }
   action not_lock_prefix0 {
     operand0 |= 0x08;
+    lock_prefix = FALSE;
   }
   action not_lock_prefix1 {
-    operand0 |= 0x08;
+    operand1 |= 0x08;
+    lock_prefix = FALSE;
   }
   action not_repnz_prefix {
     repnz_prefix = FALSE;
@@ -1022,8 +1029,8 @@ found in the LICENSE file.
 	"0xf3", "repz",
 	"rexw"
       };
-      while (opcode_prefixes.find(*opcodes.begin()) != opcode_prefixes.end()) {
-	if ((*opcodes.begin()) == "rexw") {
+      while (opcode_prefixes.find(*begin(opcodes)) != end(opcode_prefixes)) {
+	if ((*begin(opcodes)) == "rexw") {
 	  if (!rex.w && instruction_class == InstructionClass::kDefault) {
 	    instruction_class = InstructionClass::kRexW;
 	    rex.w = true;
@@ -1036,9 +1043,9 @@ found in the LICENSE file.
 	    exit(1);
 	  }
 	} else {
-	  required_prefixes.insert(*opcodes.begin());
+	  required_prefixes.insert(*begin(opcodes));
 	}
-	opcodes.erase(opcodes.begin());
+	opcodes.erase(begin(opcodes));
       }
     }
 
@@ -1126,7 +1133,7 @@ found in the LICENSE file.
 	};
 	InstructionClass operand_class;
 	auto it = classes_map.find(operand.size);
-	if (it != classes_map.end()) {
+	if (it != end(classes_map)) {
 	  operand_class = it->second;
 	/* If it's 8bit register specified using ModRM then we mark it as size8
 	   to make it possible to use REX_NONE for “dil”/“sil”/“bpl”/“spl”.  */
@@ -1294,7 +1301,7 @@ found in the LICENSE file.
 	  { 'W', { true,  true  } }
 	};
 	auto it = operand_map.find(operand.source);
-	if (it != operand_map.end()) {
+	if (it != end(operand_map)) {
 	  if ((modrm_memory || modrm_register) &&
 	      ((modrm_memory != it->second.first) ||
 	       (modrm_register != it->second.second))) {
@@ -1375,9 +1382,9 @@ found in the LICENSE file.
 	    { 'W', "rm"	}
 	  };
 	  auto it = operand_type.find(operand.source);
-	  if (it != operand_type.end()) {
+	  if (it != end(operand_type)) {
 	    fprintf(out_file, " @operand%zd_from_modrm_%s",
-				     &operand - &*operands.begin(), it->second);
+				      &operand - &*begin(operands), it->second);
 	  }
 	}
       }
@@ -1438,9 +1445,9 @@ found in the LICENSE file.
 	      { 'W', "rm"		}
             };
 	    auto it = operand_type.find(operand.source);
-	    if (it != operand_type.end()) {
+	    if (it != end(operand_type)) {
 	      fprintf(out_file, " @operand%zd_%s",
-				     &operand - &*operands.begin(), it->second);
+				      &operand - &*begin(operands), it->second);
 	    }
 	  }
 	}
@@ -1475,7 +1482,11 @@ found in the LICENSE file.
 
     bool mod_reg_is_used() {
       for (auto &operand : operands) {
-	for (auto c : { 'C', 'G', 'P', 'V' }) {
+	if (operand.source == 'C' &&
+	    required_prefixes.find("0xf0") == end(required_prefixes)) {
+	  return true;
+	}
+	for (auto c : { 'G', 'P', 'V' }) {
 	  if (operand.source == c) {
 	    return true;
 	  }
@@ -1498,10 +1509,10 @@ found in the LICENSE file.
     void print_legacy_prefixes(void) {
       if ((required_prefixes.size() == 1) &&
 	  (optional_prefixes.size() == 0)) {
-	fprintf(out_file, "%s ", required_prefixes.begin()->c_str());
+	fprintf(out_file, "%s ", begin(required_prefixes)->c_str());
       } else if ((required_prefixes.size() == 0) &&
 		 (optional_prefixes.size() == 1)) {
-	fprintf(out_file, "%s? ", optional_prefixes.begin()->c_str());
+	fprintf(out_file, "%s? ", begin(optional_prefixes)->c_str());
       } else if ((optional_prefixes.size() > 0) ||
 		 (required_prefixes.size() > 0)) {
 	auto delimeter = "(";
@@ -1509,18 +1520,18 @@ found in the LICENSE file.
 	auto opt_end = 1 << optional_prefixes.size();
 	for (auto opt = opt_start; opt < opt_end; ++opt) {
 	  auto prefixes = required_prefixes;
-	  auto it = optional_prefixes.begin();
+	  auto it = begin(optional_prefixes);
 	  for (auto id = 1; id < opt_end; id <<= 1, ++it) {
 	    if (opt & id) {
 	      prefixes.insert(*it);
 	    }
 	  }
 	  if (prefixes.size() == 1) {
-	    fprintf(out_file, "%s%s", delimeter, prefixes.begin()->c_str());
+	    fprintf(out_file, "%s%s", delimeter, begin(prefixes)->c_str());
 	    delimeter = " | ";
 	  } else {
-	    std::vector<std::string> permutations(prefixes.begin(),
-						  prefixes.end());
+	    std::vector<std::string> permutations(begin(prefixes),
+								 end(prefixes));
 	    do {
 	      fprintf(out_file, "%s", delimeter);
 	      delimeter = " | ";
@@ -1530,8 +1541,7 @@ found in the LICENSE file.
 	        delimeter = ' ';
 	      }
 	      fprintf(out_file, ")");
-	    } while (next_permutation(permutations.begin(),
-				      permutations.end()));
+	    } while (next_permutation(begin(permutations), end(permutations)));
 	  }
 	}
 	if (opt_start) {
@@ -1597,9 +1607,9 @@ found in the LICENSE file.
 	auto c5_ok = (opcodes[0] == "0xc4") &&
 		     ((opcodes[1] == "RXB.01") ||
 		      (opcodes[1] == "RXB.00001")) &&
-		     ((*opcodes[2].begin() == '0') ||
-		      (*opcodes[2].begin() == 'x') ||
-		      (*opcodes[2].begin() == 'X'));
+		     ((*begin(opcodes[2]) == '0') ||
+		      (*begin(opcodes[2]) == 'x') ||
+		      (*begin(opcodes[2]) == 'X'));
 	if (c5_ok) fprintf(out_file, "((");
 	fprintf(out_file, "(%s (VEX_", opcodes[0].c_str());
 	if (!rex.r && !rex.x & !rex.b) {
@@ -1616,12 +1626,12 @@ found in the LICENSE file.
 	static const std::regex third_byte_check(
 		       R"([01xX]\.[01xX][01xX][01xX][01xX]\.[01xX]\.[01][01])");
 	if ((third_byte.length() != 11) ||
-	    !regex_match(third_byte.begin(), third_byte.end(),
+	    !regex_match(begin(third_byte), end(third_byte),
 							    third_byte_check)) {
 #else
 	for (auto symbolic : { "cntl", "dest", "src1", "src" }) {
-	  for (auto it = third_byte.begin(); it != third_byte.end(); ++it) {
-	    if ((third_byte.end() - it) >= strlen(symbolic) &&
+	  for (auto it = begin(third_byte); it != end(third_byte); ++it) {
+	    if ((end(third_byte) - it) >= strlen(symbolic) &&
 	        !strncmp(&*it, symbolic, strlen(symbolic))) {
 	      third_byte.replace(it, it + strlen(symbolic), "XXXX");
 	      break;
@@ -1645,7 +1655,7 @@ found in the LICENSE file.
 							   third_byte.length());
 	if (third_byte_ok) {
 	  for (auto &set : third_byte_check) {
-	    if (set.find(third_byte[&set - third_byte_check]) == set.end()) {
+	    if (set.find(third_byte[&set - third_byte_check]) == end(set)) {
 	      third_byte_ok = false;
 	      break;
 	    }
@@ -1700,7 +1710,7 @@ found in the LICENSE file.
 	    }
 	    fprintf(out_file, "))");
 	  }
-	  for (auto opcode = ++++++opcodes.begin(); opcode != opcodes.end();
+	  for (auto opcode = ++++++begin(opcodes); opcode != end(opcodes);
 								     ++opcode) {
 	
 	    if (opcode->find('/') == opcode->npos) {
@@ -1735,7 +1745,7 @@ found in the LICENSE file.
 	for (auto &operand : operands) {
 	  if (operand.source == 'r') {
 	    fprintf(out_file, " @operand%zd_from_opcode",
-						 &operand - &*operands.begin());
+						  &operand - &*begin(operands));
 	  }
 	}
       }
@@ -1759,10 +1769,14 @@ found in the LICENSE file.
 	  fprintf(out_file, " @not_data16_prefix");
 	  break;
 	}
+      }
+      for (auto &prefix : required_prefixes) {
 	if (prefix == "0xf2") {
 	  fprintf(out_file, " @not_repnz_prefix");
 	  break;
 	}
+      }
+      for (auto &prefix : required_prefixes) {
 	if (prefix == "0xf3") {
 	  fprintf(out_file, " @not_repz_prefix");
 	  break;
@@ -1853,28 +1867,28 @@ found in the LICENSE file.
 	  };
 	  auto it = operand_sizes.find(T {instruction_class,
 					  operand.source, operand.size});
-	  if (it == operand_sizes.end()) {
+	  if (it == end(operand_sizes)) {
 	    it = operand_sizes.find(T {InstructionClass::kUnknown,
 				       operand.source, operand.size});
 	  }
-	  if (it == operand_sizes.end()) {
+	  if (it == end(operand_sizes)) {
 	    it = operand_sizes.find(T {instruction_class,
 				       ' ', operand.size});
 	  }
-	  if (it == operand_sizes.end()) {
+	  if (it == end(operand_sizes)) {
 	    it = operand_sizes.find(T {instruction_class,
 				       operand.source, ""});
 	  }
-	  if (it == operand_sizes.end()) {
+	  if (it == end(operand_sizes)) {
 	    it = operand_sizes.find(T {InstructionClass::kUnknown,
 				       ' ', operand.size});
 	  }
-	  if (it == operand_sizes.end()) {
+	  if (it == end(operand_sizes)) {
 	    fprintf(stderr, _("%s: error - can not determine operand size: %c%s"
 		   ), short_program_name, operand.source, operand.size.c_str());
 	    exit(1);
 	  } else {
-	    fprintf(out_file, " @operand%zd_%s", &operand - &*operands.begin(),
+	    fprintf(out_file, " @operand%zd_%s", &operand - &*begin(operands),
 								    it->second);
 	  }
 	  static std::map<char, const char*> operand_type {
@@ -1894,8 +1908,8 @@ found in the LICENSE file.
 	    { 'Y', "es_rdi"		}
 	  };
 	  auto it2 = operand_type.find(operand.source);
-	  if (it2 != operand_type.end()) {
-	    fprintf(out_file, " @operand%zd_%s", &operand - &*operands.begin(),
+	  if (it2 != end(operand_type)) {
+	    fprintf(out_file, " @operand%zd_%s", &operand - &*begin(operands),
 								   it2->second);
 	  }
 	}
@@ -1905,18 +1919,18 @@ found in the LICENSE file.
 	  if (operand.read) {
 	    if (operand.write) {
 	      fprintf(out_file, " @operand%zd_readwrite",
-						 &operand - &*operands.begin());
+						  &operand - &*begin(operands));
 	    } else {
 	      fprintf(out_file, " @operand%zd_read",
-						 &operand - &*operands.begin());
+						  &operand - &*begin(operands));
 	    }
 	  } else {
 	    if (operand.write) {
 	      fprintf(out_file, " @operand%zd_write",
-						 &operand - &*operands.begin());
+						  &operand - &*begin(operands));
 	    } else {
 	      fprintf(out_file, " @operand%zd_unused",
-						 &operand - &*operands.begin());
+						  &operand - &*begin(operands));
 	    }
 	  }
 	}
@@ -1953,7 +1967,7 @@ found in the LICENSE file.
 	if (operand->source == 'i') {
 	  auto it = immediate_sizes.find({instruction_class,
 					  operand->size});
-	  if (it == immediate_sizes.end()) {
+	  if (it == end(immediate_sizes)) {
 	    fprintf(stderr, _("%s: error - can not determine immediate size: %c"
 	     "%s"), short_program_name, operand->source, operand->size.c_str());
 	    exit(1);
@@ -1963,7 +1977,7 @@ found in the LICENSE file.
 	if (operand->source == 'I') {
 	  auto it = immediate_sizes.find({instruction_class,
 					  operand->size});
-	  if (it == immediate_sizes.end()) {
+	  if (it == end(immediate_sizes)) {
 	    fprintf(stderr, _("%s: error - can not determine immediate size: %c"
 	     "%s"), short_program_name, operand->source, operand->size.c_str());
 	    exit(1);
@@ -1981,7 +1995,7 @@ found in the LICENSE file.
 	};
 	if (operand->source == 'J') {
 	  auto it = jump_sizes.find({instruction_class, operand->size});
-	  if (it == jump_sizes.end()) {
+	  if (it == end(jump_sizes)) {
 	    fprintf(stderr, _("%s: error - can not determine jump size: %c%s"),
 		    short_program_name, operand->source, operand->size.c_str());
 	    exit(1);
@@ -2005,8 +2019,8 @@ found in the LICENSE file.
 	if (prefix == "0xf0") {
 	  for (auto &operand : operands) {
 	    if (operand.source == 'C') {
-	      fprintf(out_file, " @not_lock_prefix%d",
-						 &operand - &*operands.begin());
+	      fprintf(out_file, " @not_lock_prefix%zd",
+						  &operand - &*begin(operands));
 	      break;
 	    }
 	  }
