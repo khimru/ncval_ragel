@@ -341,7 +341,7 @@ namespace {
     }
   }
 
-#if (__GNUC__ >= 5) || (__GNUC_MINOR__ >= 6)
+#if (__GNUC__ >= 4) && (__GNUC_MINOR__ >= 6)
 #define USE_LAMBDA_IN_CHARTEST 1
 #else
 #define USE_LAMBDA_IN_CHARTEST 0
