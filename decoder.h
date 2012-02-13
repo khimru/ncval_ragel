@@ -106,9 +106,13 @@ typedef void (*process_instruction_func) (const uint8_t *begin,
 
 typedef void (*process_error_func) (const uint8_t *ptr, void *userdata);
 
-int DecodeChunk(const uint8_t *data, size_t size,
-                process_instruction_func process_instruction,
-                process_error_func process_error, void *userdata);
+int DecodeChunkAMD64(const uint8_t *data, size_t size, 
+                     process_instruction_func process_instruction,
+                     process_error_func process_error, void *userdata);
+
+int DecodeChunkIA32(const uint8_t *data, size_t size, 
+                    process_instruction_func process_instruction,
+                    process_error_func process_error, void *userdata);
 
 #ifdef __cplusplus
 }

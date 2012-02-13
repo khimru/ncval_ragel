@@ -30,7 +30,7 @@ INST_DEFS = general-purpose-instructions.def \
 FAST_TMP_FOR_TEST=/dev/shm
 
 # Default rule.
-all: outdirs $(OBJD)/decoder-test-x86_64 $(OBJD)/validator-test-x86_64
+all: outdirs $(OBJD)/decoder-test $(OBJD)/validator-test
 
 # Create all prerequisite directories.
 .PHONY: outdirs
@@ -46,21 +46,37 @@ $(OBJD)/%.c: %.rl
 	$(RAGEL) -G2 -I$(OBJD) $< -o $@
 
 # Decoder, validator, etc.
-$(OBJD)/decoder-test-x86_64: \
-    $(OBJD)/decoder-x86_64.o $(OBJD)/decoder-test-x86_64.o
-$(OBJD)/validator-test-x86_64: \
-    $(OBJD)/validator-x86_64.o $(OBJD)/validator-test-x86_64.o
+$(OBJD)/decoder-test: \
+    $(OBJD)/decoder-x86_32.o $(OBJD)/decoder-x86_64.o $(OBJD)/decoder-test.o
+$(OBJD)/validator-test: \
+    $(OBJD)/validator-x86_32.o $(OBJD)/validator-x86_64.o $(OBJD)/validator-test.o
 
 GEN_DECODER=$(OBJD)/gen-decoder
 $(GEN_DECODER): gen-decoder.C
 	$(CXX) $(CXXFLAGS) $< -o $(GEN_DECODER)
+
+$(OBJD)/decoder-x86_32.c: $(OBJD)/decoder-x86_32-instruction-consts.c
+$(OBJD)/decoder-x86_32.c: $(OBJD)/decoder-x86_32-instruction.rl
+$(OBJD)/decoder-x86_32-instruction-consts.c \
+  $(OBJD)/decoder-x86_32-instruction.rl: $(GEN_DECODER) $(INST_DEFS)
+	$(GEN_DECODER) -o $(OBJD)/decoder-x86_32-instruction.rl $(INST_DEFS) \
+	    -d check_access,opcode,parse_operands_states,mark_data_fields
 
 $(OBJD)/decoder-x86_64.c: $(OBJD)/decoder-x86_64-instruction-consts.c
 $(OBJD)/decoder-x86_64.c: $(OBJD)/decoder-x86_64-instruction.rl
 $(OBJD)/decoder-x86_64-instruction-consts.c \
   $(OBJD)/decoder-x86_64-instruction.rl: $(GEN_DECODER) $(INST_DEFS)
 	$(GEN_DECODER) -o $(OBJD)/decoder-x86_64-instruction.rl $(INST_DEFS) \
-	    -d check_access,opcode,parse_operands_states,mark_data_fields
+	    -d check_access,opcode,parse_operands_states,mark_data_fields \
+	    -m amd64
+
+$(OBJD)/validator-x86_32.c: $(OBJD)/validator-x86_32-instruction.rl
+$(OBJD)/validator-x86_32-instruction-consts.c \
+  $(OBJD)/validator-x86_32-instruction.rl: $(GEN_DECODER) $(INST_DEFS)
+	$(GEN_DECODER) -o $(OBJD)/validator-x86_32-instruction.rl $(INST_DEFS) \
+	  -d check_access,opcode,parse_operands,parse_operands_states \
+	  -d instruction_name,mark_data_fields,nacl-forbidden \
+	  -d imm_operand_action,rel_operand_action nops.def
 
 $(OBJD)/validator-x86_64.c: $(OBJD)/validator-x86_64-instruction-consts.c
 $(OBJD)/validator-x86_64.c: $(OBJD)/validator-x86_64-instruction.rl
@@ -68,36 +84,54 @@ $(OBJD)/validator-x86_64-instruction-consts.c \
   $(OBJD)/validator-x86_64-instruction.rl: $(GEN_DECODER) $(INST_DEFS)
 	$(GEN_DECODER) -o $(OBJD)/validator-x86_64-instruction.rl $(INST_DEFS) \
 	  -d opcode,instruction_name,mark_data_fields,rel_operand_action \
-	  -d nacl-forbidden nops.def
+	  -d nacl-forbidden nops.def -m amd64
 
 # Facilities for testing:
 #   one-instruction.dot: the description of the DFA that accepts all instruction
 #     the decoder is able to decode.
 #   decoder-test-x86-64: the decoder that follows the objdump format
-$(OBJD)/one-instruction.dot: one-instruction.rl \
-  $(OBJD)/one-valid-instruction-consts.c $(OBJD)/one-valid-instruction.rl
+$(OBJD)/one-instruction-x86_32.dot: one-instruction-x86_32.rl \
+  $(OBJD)/one-valid-instruction-x86_32-consts.c \
+  $(OBJD)/one-valid-instruction-x86_32.rl
 	$(RAGEL) -V -I$(OBJD) $< -o $@
 
-$(OBJD)/one-valid-instruction-consts.c \
-    $(OBJD)/one-valid-instruction.rl: $(GEN_DECODER) $(INST_DEFS)
-	$(GEN_DECODER) -o $(OBJD)/one-valid-instruction.rl $(INST_DEFS) \
+$(OBJD)/one-instruction-x86_64.dot: one-instruction-x86_64.rl \
+  $(OBJD)/one-valid-instruction-x86_64-consts.c \
+  $(OBJD)/one-valid-instruction-x86_64.rl
+	$(RAGEL) -V -I$(OBJD) $< -o $@
+
+$(OBJD)/one-valid-instruction-x86_32-consts.c \
+    $(OBJD)/one-valid-instruction-x86_32.rl: $(GEN_DECODER) $(INST_DEFS)
+	$(GEN_DECODER) -o $(OBJD)/one-valid-instruction-x86_32.rl $(INST_DEFS) \
 	  -d check_access,rex_prefix,vex_prefix,opcode,parse_operands \
 	  -d parse_operands_states
 
-$(OBJD)/decoder-test-x86_64.o: decoder-test-x86_64.c
+$(OBJD)/one-valid-instruction-x86_64-consts.c \
+    $(OBJD)/one-valid-instruction-x86_64.rl: $(GEN_DECODER) $(INST_DEFS)
+	$(GEN_DECODER) -o $(OBJD)/one-valid-instruction-x86_64.rl $(INST_DEFS) \
+	  -d check_access,rex_prefix,vex_prefix,opcode,parse_operands \
+	  -d parse_operands_states -m amd64
+
+$(OBJD)/decoder-test.o: decoder-test.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJD)/validator-test-x86_64.o: validator-test-x86_64.c
+$(OBJD)/validator-test.o: validator-test.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJD)/validator-x86_64.o: $(OBJD)/validator-x86_64.c
-	if [ -e nacl_irt_x86_64.nexe ]; then \
+	if [ -e nacl_irt_x86_32.nexe ] && [-e nacl_irt_x86_64.nexe ]; then \
 	  $(CC) $(CFLAGS) -I. -I$(OBJD) -fprofile-generate -c $< -o $@-pf && \
-	  $(CC) $(CFLAGS) -fprofile-generate $@-pf validator-test-x86_64.c \
+	  $(CC) $(CFLAGS) -I. -I$(OBJD) -fprofile-generate -c \
+	    $(OBJD)/validator-x86_64.c -o $(OBJD)/validator-x86_64.o-pf && \
+	  $(CC) $(CFLAGS) -fprofile-generate $@-pf \
+	    $(OBJD)/validator-x86_64.o-pf validator-test.c \
 	    -o $(OBJD)/ncval_train && \
+	  $(OBJD)/ncval_train nacl_irt_x86_32.nexe && \
 	  $(OBJD)/ncval_train nacl_irt_x86_64.nexe && \
-	  rm validator-test-x86_64.gcda && \
-	  $(CC) $(CFLAGS) -I. -I$(OBJD) -fprofile-use -c $< -o $@ ; \
+	  rm validator-test.gcda && \
+	  $(CC) $(CFLAGS) -I. -I$(OBJD) -fprofile-use -c $< -o $@ && \
+	  $(CC) $(CFLAGS) -I. -I$(OBJD) -fprofile-use -c \
+	    $(OBJD)/validator-x86_64.c -o $(OBJD)/validator-x86_64.o ; \
 	else \
 	  $(CC) $(CFLAGS) -I. -I$(OBJD) -c $< -o $@ ; \
 	fi
@@ -160,31 +194,46 @@ check: check-irt check-as-alt-validator
 
 # Checks that the IRT is not rejected by the validator.
 .PHONY: check-irt
-check-irt: outdirs $(OBJD)/validator-test-x86_64
-	$(OBJD)/validator-test-x86_64 nacl_irt_x86_64.nexe
+check-irt: outdirs $(OBJD)/validator-test
+	$(OBJD)/validator-test nacl_irt_x86_64.nexe
 
 .PHONY: check-as-alt-validator
-check-as-alt-validator: $(OBJD)/validator-test-x86_64
-	ln -sfn $(OBJD)/validator-test-x86_64 dfa_ncval
+check-as-alt-validator: $(OBJD)/validator-test
+	ln -sfn $(OBJD)/validator-test dfa_ncval
 	$(PYTHON2X) validator_test.py
 	rm -f dfa_ncval
 
 # Checks that all byte sequences accepted by the DFA are decoded identically to
 # the objdump. A long-running test.
 .PHONY: check-decoder
-check-decoder: outdirs $(BINUTILS_STAMP) $(OBJD)/one-instruction.dot \
-    $(OBJD)/decoder-test-x86_64
-	$(PYTHON2X) parse_dfa.py <"$(OBJD)/one-instruction.dot" \
-	    > "$(OUT)/test/test_dfa_transitions.c"
+check-decoder: outdirs $(BINUTILS_STAMP) $(OBJD)/one-instruction-x86_32.dot \
+    $(OBJD)/one-instruction-x86_64.dot $(OBJD)/decoder-test
+	$(PYTHON2X) parse_dfa.py <"$(OBJD)/one-instruction-x86_32.dot" \
+	    > "$(OUT)/test/test_dfa_transitions-x86_32.c"
 	$(CC) $(CFLAGS) -c test_dfa.c -o "$(OUT)/test/test_dfa.o"
-	$(CC) $(CFLAGS) -O0 -I. -c "$(OUT)/test/test_dfa_transitions.c" -o \
-	    "$(OUT)/test/test_dfa_transitions.o"
+	$(CC) $(CFLAGS) -O0 -I. -c "$(OUT)/test/test_dfa_transitions-x86_32.c" \
+	    -o "$(OUT)/test/test_dfa_transitions-x86_32.o"
 	$(CC) $(LDFLAGS) "$(OUT)/test/test_dfa.o" \
-	    "$(OUT)/test/test_dfa_transitions.o" -o $(OUT)/test/test_dfa
+	    "$(OUT)/test/test_dfa_transitions-x86_32.o" \
+	    -o $(OUT)/test/test_dfa-x86_32
 	$(PYTHON2X) run_objdump_test.py \
-	  --gas="$(GAS)" \
+	  --gas="$(GAS) --32" \
 	  --objdump="$(OBJDUMP)" \
-	  --decoder="$(OBJD)/decoder-test-x86_64" \
+	  --decoder="$(OBJD)/decoder-test" \
 	  --tester=./decoder_test_one_file.sh \
 	  --nthreads=`cat /proc/cpuinfo | grep processor | wc -l` -- \
-	  "$(OUT)/test/test_dfa" "$(FAST_TMP_FOR_TEST)"
+	  "$(OUT)/test/test_dfa-x86_32" "$(FAST_TMP_FOR_TEST)"
+	$(PYTHON2X) parse_dfa.py <"$(OBJD)/one-instruction-x86_64.dot" \
+	    > "$(OUT)/test/test_dfa_transitions-x86_64.c"
+	$(CC) $(CFLAGS) -O0 -I. -c "$(OUT)/test/test_dfa_transitions-x86_64.c" \
+	    -o "$(OUT)/test/test_dfa_transitions-x86_64.o"
+	$(CC) $(LDFLAGS) "$(OUT)/test/test_dfa.o" \
+	    "$(OUT)/test/test_dfa_transitions-x86_64.o" \
+	    -o $(OUT)/test/test_dfa-x86_64
+	$(PYTHON2X) run_objdump_test.py \
+	  --gas="$(GAS) --64" \
+	  --objdump="$(OBJDUMP)" \
+	  --decoder="$(OBJD)/decoder-test" \
+	  --tester=./decoder_test_one_file.sh \
+	  --nthreads=`cat /proc/cpuinfo | grep processor | wc -l` -- \
+	  "$(OUT)/test/test_dfa-x86_64" "$(FAST_TMP_FOR_TEST)"

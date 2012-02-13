@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "validator-x86_64.h"
+#include "validator.h"
 
 #undef TRUE
 #define TRUE    1
@@ -277,7 +277,7 @@
     } |
     (0xae		       | # scas   %ds:(%rsi),%al
      (data16|REXW_NONE)? 0xaf  | # scas   %ds:(%rsi),%ax/%eax/%rax
-     (rep? 0xaa)	       | # stos   %al,%es:(%rdi)
+     rep? 0xaa		       | # stos   %al,%es:(%rdi)
      (data16 |
       rep data16 |
       data16 rep) 0xab	       | # stos   %ax,%es:(%rdi)
@@ -388,8 +388,6 @@ enum imm_mode {
   IMM64
 };
 
-static const uint8_t one = 1;
-
 static const int kBitsPerByte = 8;
 
 static inline uint8_t *BitmapAllocate(uint32_t indexes) {
@@ -413,8 +411,8 @@ static inline void BitmapClearBit(uint8_t *bitmap, uint32_t index) {
   bitmap[index / kBitsPerByte] &= ~(1 << (index % kBitsPerByte));
 }
 
-int CheckJumpTargets(uint8_t *valid_targets, uint8_t *jump_dests,
-                     size_t size) {
+static int CheckJumpTargets(uint8_t *valid_targets, uint8_t *jump_dests,
+			    size_t size) {
   size_t i;
   for (i = 0; i < size / 32; i++) {
     uint32_t jump_dest_mask = ((uint32_t *) jump_dests)[i];
@@ -427,8 +425,8 @@ int CheckJumpTargets(uint8_t *valid_targets, uint8_t *jump_dests,
   return 0;
 }
 
-int ValidateChunk(const uint8_t *data, size_t size,
-		  process_error_func process_error, void *userdata) {
+int ValidateChunkAMD64(const uint8_t *data, size_t size,
+		       process_error_func process_error, void *userdata) {
   const size_t bundle_size = 32;
   const size_t bundle_mask = bundle_size - 1;
 

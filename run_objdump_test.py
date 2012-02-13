@@ -119,10 +119,10 @@ class Worker(threading.Thread):
     pid = os.fork()
     if pid == 0:
       os.execl(self.opt.tester, self.opt.tester,
-               'GAS=' + self.opt.gas_path,
-               'OBJDUMP=' + self.opt.objdump_path,
-               'DECODER=' + self.opt.decoder_path,
-               'ASMFILE=' + filename)
+               'GAS="' + self.opt.gas_path + '"',
+               'OBJDUMP="' + self.opt.objdump_path + '"',
+               'DECODER="' + self.opt.decoder_path + '"',
+               'ASMFILE="' + filename + '"')
 
     else:
       (child_pid, retcode) = os.wait()
