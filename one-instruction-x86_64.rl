@@ -32,7 +32,7 @@
   action rel32_operand_begin { }
   action rel32_operand_end { }
 
-  include decode_x86_64 "one-valid-instruction.rl";
+  include decode_x86_64 "one-valid-instruction-x86_64.rl";
 
   main := one_instruction;
 

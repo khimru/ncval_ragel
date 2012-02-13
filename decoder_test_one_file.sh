@@ -15,7 +15,7 @@ set -u
 eval "$@"
 
 # Sanity check arguments.
-if [[ ! -x "$GAS" || ! -x "$OBJDUMP" || ! -x "$DECODER" ]] ; then
+if [[ ! -x "${GAS% *}" || ! -x "${OBJDUMP% *}" || ! -x "${DECODER% *}" ]] ; then
   echo >&2 "error: GAS or OBJDUMP or DECODER incorrect"
   exit 2
 fi
@@ -26,7 +26,7 @@ if [[ ! -f "$ASMFILE" ]] ; then
 fi
 
 # Produce an object file, disassemble it in 2 ways and compare results.
-$GAS --64 "$ASMFILE" -o "$ASMFILE.o"
+$GAS "$ASMFILE" -o "$ASMFILE.o"
 rm -f "$ASMFILE"
 $DECODER "$ASMFILE.o" > "$ASMFILE.decoder"
 # Take objdump output starting at line 8 to skip the unimportant header that

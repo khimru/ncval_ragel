@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "decoder-x86_64.h"
+#include "decoder.h"
 
 #undef TRUE
 #define TRUE    1
@@ -23,9 +23,6 @@
 #pragma GCC diagnostic error "-Wswitch"
 /* This may help with portability but makes code less readable.  */
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
-
-typedef Elf64_Ehdr Elf_Ehdr;
-typedef Elf64_Shdr Elf_Shdr;
 
 static void CheckBounds(unsigned char *data, size_t data_size,
 			void *ptr, size_t inside_size) {
@@ -70,6 +67,7 @@ struct DecodeState {
   uint8_t width;
   const uint8_t *fwait; /* Set to true if fwait is detetected. */
   const uint8_t *offset;
+  int ia32_mode;
 };
 
 void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
@@ -381,7 +379,13 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	  switch (instruction->operands[i].type) {
 	    case OperandSize8bit: show_name_suffix = FALSE; break;
 	    case OperandSize16bit: show_name_suffix = 'w'; break;
-	    case OperandSize32bit: show_name_suffix = 'q'; break;
+	    case OperandSize32bit:
+	      if (((struct DecodeState *)userdata)->ia32_mode) {
+		show_name_suffix = FALSE;
+	      } else {
+		show_name_suffix = 'q';
+	      }
+	      break;
 	    default: assert(FALSE);
 	  }
 	} else {
@@ -451,16 +455,18 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       if ((instruction->operands[i].name >= REG_R8) &&
 	  (instruction->operands[i].name <= REG_R15) &&
 	  (instruction->operands[i].type != OperandMMX)) {
-	++rex_bits;
-	/* HACK: objdump mistakenly allows “lock” with “mov %crX,%rXX” only in
-	   32bit mode.  It's perfectly valid in 64bit mode, too, so instead of
-	   changing the decoder we fix it here.  */
-	if (instruction->operands[i].type == OperandControlRegister) {
-	  if ((*begin == 0xf0) && !(instruction->prefix.lock)) {
-	    print_name("lock ");
-	    if (!(instruction->prefix.rex & 0x04)) {
-	      instruction->operands[i].name -= 8;
-	      --rex_bits;
+	if (!((struct DecodeState *)userdata)->ia32_mode) {
+	  ++rex_bits;
+	  /* HACK: objdump mistakenly allows “lock” with “mov %crX,%rXX” only in
+	     32bit mode.  It's perfectly valid in 64bit mode, too, so instead of
+	     changing the decoder we fix it here.  */
+	  if (instruction->operands[i].type == OperandControlRegister) {
+	    if ((*begin == 0xf0) && !(instruction->prefix.lock)) {
+	      print_name("lock ");
+	      if (!(instruction->prefix.rex & 0x04)) {
+		instruction->operands[i].name -= 8;
+		--rex_bits;
+	      }
 	    }
 	  }
 	}
@@ -595,7 +601,11 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
        objdump always uses suffix “q”. This is supremely strange, but
        we want to match objdump exactly, so... here goes.  */
     } else if (!strcmp(instruction_name, "enter")) {
-      show_name_suffix = 'q';
+      if (((struct DecodeState *)userdata)->ia32_mode) {
+	show_name_suffix = FALSE;
+      } else {
+	show_name_suffix = 'q';
+      }
     }
   }
   if ((show_name_suffix == 'b') || (show_name_suffix == 'l')) {
@@ -604,7 +614,13 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
        sense whatsoever so we'll just hack around here to make sure we
        produce objdump-compatible output.  */
     if (!strcmp(instruction_name, "push")) {
-      show_name_suffix = 'q';
+      if (((struct DecodeState *)userdata)->ia32_mode) {
+	if (instruction->operands[0].name != REG_RM) {
+	  show_name_suffix = FALSE;
+	}
+      } else {
+	show_name_suffix = 'q';
+      }
     }
   }
   if (show_name_suffix == 'w') {
@@ -624,7 +640,11 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       show_name_suffix = FALSE;
     /* “ret” always uses suffix “q” no matter what.  */
     } else if (!strcmp(instruction_name, "ret")) {
-      show_name_suffix = 'q';
+      if (((struct DecodeState *)userdata)->ia32_mode) {
+	show_name_suffix = FALSE;
+      } else {
+	show_name_suffix = 'q';
+      }
     }
   }
   if ((show_name_suffix == 'w') || (show_name_suffix == 'l')) {
@@ -635,8 +655,14 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     }
   }
   if (show_name_suffix == 'l') {
+    /* “calll”/“jmpl” do not exist, only “call” do.  */
+    if (((struct DecodeState *)userdata)->ia32_mode &&
+	(!strcmp(instruction_name, "call") ||
+	 !strcmp(instruction_name, "jmp"))) {
+      show_name_suffix = FALSE;
     /* “popl” does not exist, only “popq” do.  */
-    if (!strcmp(instruction_name, "pop")) {
+    } else if (!((struct DecodeState *)userdata)->ia32_mode &&
+	       !strcmp(instruction_name, "pop")) {
       show_name_suffix = 'q';
     } else if (!strcmp(instruction_name, "ldmxcsr") ||
 	       !strcmp(instruction_name, "stmxcsr") ||
@@ -694,8 +720,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 #undef print_name
   if ((strcmp(instruction_name, "nop") || operands_count != 0) &&
       strcmp(instruction_name, "fwait") &&
+      strcmp(instruction_name, "pop    %fs") &&
+      strcmp(instruction_name, "pop    %gs") &&
       strcmp(instruction_name, "popq   %fs") &&
       strcmp(instruction_name, "popq   %gs") &&
+      strcmp(instruction_name, "push   %fs") &&
+      strcmp(instruction_name, "push   %gs") &&
       strcmp(instruction_name, "pushq  %fs") &&
       strcmp(instruction_name, "pushq  %gs")) {
     while (shown_name < 6) {
@@ -708,14 +738,21 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   }
   for (i=operands_count-1; i>=0; --i) {
     printf("%c", delimeter);
-    if ((!strcmp(instruction_name, "callw")) ||
-	(!strcmp(instruction_name, "callq")) ||
-	(!strcmp(instruction_name, "jmpw")) ||
-	(!strcmp(instruction_name, "jmpq")) ||
-	(!strcmp(instruction_name, "ljmpw")) ||
-	(!strcmp(instruction_name, "ljmpq")) ||
-	(!strcmp(instruction_name, "lcallw")) ||
-	(!strcmp(instruction_name, "lcallq"))) {
+    if ((!strcmp(instruction_name, "call")) ||
+	(!strcmp(instruction_name, "jmp")) ||
+	(!strcmp(instruction_name, "lcall")) ||
+	(!strcmp(instruction_name, "ljmp"))) {
+      if (instruction->operands[i].name != JMP_TO) {
+	printf("*");
+      }
+    } else if ((!strcmp(instruction_name, "callw")) ||
+	       (!strcmp(instruction_name, "callq")) ||
+	       (!strcmp(instruction_name, "jmpw")) ||
+	       (!strcmp(instruction_name, "jmpq")) ||
+	       (!strcmp(instruction_name, "ljmpw")) ||
+	       (!strcmp(instruction_name, "ljmpq")) ||
+	       (!strcmp(instruction_name, "lcallw")) ||
+	       (!strcmp(instruction_name, "lcallq"))) {
       printf("*");
     }
     /* Dirty hack: both AMD manual and Intel manual agree that mov from general
@@ -1032,62 +1069,106 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	if (instruction->rm.offset) {
 	  printf("0x%llx",instruction->rm.offset);
 	}
-	if ((instruction->rm.base != REG_NONE) ||
-	    (instruction->rm.index != REG_RIZ) ||
-	    (instruction->rm.scale != 0)) {
-	  printf("(");
-	}
-	switch (instruction->rm.base) {
-	  case REG_RAX: printf("%%rax"); break;
-	  case REG_RCX: printf("%%rcx"); break;
-	  case REG_RDX: printf("%%rdx"); break;
-	  case REG_RBX: printf("%%rbx"); break;
-	  case REG_RSP: printf("%%rsp"); break;
-	  case REG_RBP: printf("%%rbp"); break;
-	  case REG_RSI: printf("%%rsi"); break;
-	  case REG_RDI: printf("%%rdi"); break;
-	  case REG_R8: printf("%%r8"); break;
-	  case REG_R9: printf("%%r9"); break;
-	  case REG_R10: printf("%%r10"); break;
-	  case REG_R11: printf("%%r11"); break;
-	  case REG_R12: printf("%%r12"); break;
-	  case REG_R13: printf("%%r13"); break;
-	  case REG_R14: printf("%%r14"); break;
-	  case REG_R15: printf("%%r15"); break;
-	  case REG_RIP: printf("%%rip"); print_rip = TRUE; break;
-	  case REG_NONE: break;
-	  default: assert(FALSE);
-	}
-	switch (instruction->rm.index) {
-	  case REG_RAX: printf(",%%rax,%d",1<<instruction->rm.scale); break;
-	  case REG_RCX: printf(",%%rcx,%d",1<<instruction->rm.scale); break;
-	  case REG_RDX: printf(",%%rdx,%d",1<<instruction->rm.scale); break;
-	  case REG_RBX: printf(",%%rbx,%d",1<<instruction->rm.scale); break;
-	  case REG_RSP: printf(",%%rsp,%d",1<<instruction->rm.scale); break;
-	  case REG_RBP: printf(",%%rbp,%d",1<<instruction->rm.scale); break;
-	  case REG_RSI: printf(",%%rsi,%d",1<<instruction->rm.scale); break;
-	  case REG_RDI: printf(",%%rdi,%d",1<<instruction->rm.scale); break;
-	  case REG_R8: printf(",%%r8,%d",1<<instruction->rm.scale); break;
-	  case REG_R9: printf(",%%r9,%d",1<<instruction->rm.scale); break;
-	  case REG_R10: printf(",%%r10,%d",1<<instruction->rm.scale); break;
-	  case REG_R11: printf(",%%r11,%d",1<<instruction->rm.scale); break;
-	  case REG_R12: printf(",%%r12,%d",1<<instruction->rm.scale); break;
-	  case REG_R13: printf(",%%r13,%d",1<<instruction->rm.scale); break;
-	  case REG_R14: printf(",%%r14,%d",1<<instruction->rm.scale); break;
-	  case REG_R15: printf(",%%r15,%d",1<<instruction->rm.scale); break;
-	  case REG_RIZ: if (((instruction->rm.base != REG_NONE) &&
-			     (instruction->rm.base != REG_RSP) &&
-			     (instruction->rm.base != REG_R12)) ||
-			    (instruction->rm.scale != 0))
-	      printf(",%%riz,%d",1<<instruction->rm.scale);
-	    break;
-	  case REG_NONE: break;
-	  default: assert(FALSE);
-	}
-	if ((instruction->rm.base != REG_NONE) ||
-	    (instruction->rm.index != REG_RIZ) ||
-	    (instruction->rm.scale != 0)) {
-	  printf(")");
+	if (((struct DecodeState *)userdata)->ia32_mode) {
+	  if ((instruction->rm.base != REG_NONE) ||
+	      (instruction->rm.index != REG_NONE) ||
+	      (instruction->rm.scale != 0)) {
+	    printf("(");
+	  }
+	  switch (instruction->rm.base) {
+	    case REG_RAX: printf("%%eax"); break;
+	    case REG_RCX: printf("%%ecx"); break;
+	    case REG_RDX: printf("%%edx"); break;
+	    case REG_RBX: printf("%%ebx"); break;
+	    case REG_RSP: printf("%%esp"); break;
+	    case REG_RBP: printf("%%ebp"); break;
+	    case REG_RSI: printf("%%esi"); break;
+	    case REG_RDI: printf("%%edi"); break;
+	    case REG_NONE: break;
+	    default: assert(FALSE);
+	  }
+	  switch (instruction->rm.index) {
+	    case REG_RAX: printf(",%%eax,%d",1<<instruction->rm.scale); break;
+	    case REG_RCX: printf(",%%ecx,%d",1<<instruction->rm.scale); break;
+	    case REG_RDX: printf(",%%edx,%d",1<<instruction->rm.scale); break;
+	    case REG_RBX: printf(",%%ebx,%d",1<<instruction->rm.scale); break;
+	    case REG_RSP: printf(",%%esp,%d",1<<instruction->rm.scale); break;
+	    case REG_RBP: printf(",%%ebp,%d",1<<instruction->rm.scale); break;
+	    case REG_RSI: printf(",%%esi,%d",1<<instruction->rm.scale); break;
+	    case REG_RDI: printf(",%%edi,%d",1<<instruction->rm.scale); break;
+	    case REG_R15: printf(",%%r15d,%d",1<<instruction->rm.scale); break;
+	    case REG_RIZ: if ((/*(instruction->rm.base != REG_NONE) &&*/
+			       (instruction->rm.base != REG_RSP)/* &&
+			         (instruction->rm.base != REG_R12)*/) ||
+			       (instruction->rm.scale != 0))
+	        printf(",%%eiz,%d",1<<instruction->rm.scale);
+	      break;
+	    case REG_NONE: break;
+	    default: assert(FALSE);
+	  }
+	  if ((instruction->rm.base != REG_NONE) ||
+	      (instruction->rm.index != REG_NONE) ||
+	      (instruction->rm.scale != 0)) {
+	    printf(")");
+	  }
+	} else {
+	  if ((instruction->rm.base != REG_NONE) ||
+	      (instruction->rm.index != REG_RIZ) ||
+	      (instruction->rm.scale != 0)) {
+	    printf("(");
+	  }
+	  switch (instruction->rm.base) {
+	    case REG_RAX: printf("%%rax"); break;
+	    case REG_RCX: printf("%%rcx"); break;
+	    case REG_RDX: printf("%%rdx"); break;
+	    case REG_RBX: printf("%%rbx"); break;
+	    case REG_RSP: printf("%%rsp"); break;
+	    case REG_RBP: printf("%%rbp"); break;
+	    case REG_RSI: printf("%%rsi"); break;
+	    case REG_RDI: printf("%%rdi"); break;
+	    case REG_R8: printf("%%r8"); break;
+	    case REG_R9: printf("%%r9"); break;
+	    case REG_R10: printf("%%r10"); break;
+	    case REG_R11: printf("%%r11"); break;
+	    case REG_R12: printf("%%r12"); break;
+	    case REG_R13: printf("%%r13"); break;
+	    case REG_R14: printf("%%r14"); break;
+	    case REG_R15: printf("%%r15"); break;
+	    case REG_RIP: printf("%%rip"); print_rip = TRUE; break;
+	    case REG_NONE: break;
+	    default: assert(FALSE);
+	  }
+	  switch (instruction->rm.index) {
+	    case REG_RAX: printf(",%%rax,%d",1<<instruction->rm.scale); break;
+	    case REG_RCX: printf(",%%rcx,%d",1<<instruction->rm.scale); break;
+	    case REG_RDX: printf(",%%rdx,%d",1<<instruction->rm.scale); break;
+	    case REG_RBX: printf(",%%rbx,%d",1<<instruction->rm.scale); break;
+	    case REG_RSP: printf(",%%rsp,%d",1<<instruction->rm.scale); break;
+	    case REG_RBP: printf(",%%rbp,%d",1<<instruction->rm.scale); break;
+	    case REG_RSI: printf(",%%rsi,%d",1<<instruction->rm.scale); break;
+	    case REG_RDI: printf(",%%rdi,%d",1<<instruction->rm.scale); break;
+	    case REG_R8: printf(",%%r8,%d",1<<instruction->rm.scale); break;
+	    case REG_R9: printf(",%%r9,%d",1<<instruction->rm.scale); break;
+	    case REG_R10: printf(",%%r10,%d",1<<instruction->rm.scale); break;
+	    case REG_R11: printf(",%%r11,%d",1<<instruction->rm.scale); break;
+	    case REG_R12: printf(",%%r12,%d",1<<instruction->rm.scale); break;
+	    case REG_R13: printf(",%%r13,%d",1<<instruction->rm.scale); break;
+	    case REG_R14: printf(",%%r14,%d",1<<instruction->rm.scale); break;
+	    case REG_R15: printf(",%%r15,%d",1<<instruction->rm.scale); break;
+	    case REG_RIZ: if (((instruction->rm.base != REG_NONE) &&
+			       (instruction->rm.base != REG_RSP) &&
+			       (instruction->rm.base != REG_R12)) ||
+			       (instruction->rm.scale != 0))
+	        printf(",%%riz,%d",1<<instruction->rm.scale);
+	      break;
+	    case REG_NONE: break;
+	    default: assert(FALSE);
+	  }
+	  if ((instruction->rm.base != REG_NONE) ||
+	      (instruction->rm.index != REG_RIZ) ||
+	      (instruction->rm.scale != 0)) {
+	    printf(")");
+	  }
 	}
       }
       break;
@@ -1100,9 +1181,24 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	break;
       }
       case REG_PORT_DX: printf("(%%dx)"); break;
-      case REG_DS_RBX: printf("%%ds:(%%rbx)"); break;
-      case REG_ES_RDI: printf("%%es:(%%rdi)"); break;
-      case REG_DS_RSI: printf("%%ds:(%%rsi)"); break;
+      case REG_DS_RBX: if (((struct DecodeState *)userdata)->ia32_mode) {
+	  printf("%%ds:(%%ebx)");
+	} else {
+	  printf("%%ds:(%%rbx)");
+	}
+	break;
+      case REG_ES_RDI: if (((struct DecodeState *)userdata)->ia32_mode) {
+	  printf("%%es:(%%edi)");
+	} else {
+	  printf("%%es:(%%rdi)");
+	}
+	break;
+      case REG_DS_RSI: if (((struct DecodeState *)userdata)->ia32_mode) {
+	  printf("%%ds:(%%esi)");
+	} else {
+	  printf("%%ds:(%%rsi)");
+	}
+	break;
       case JMP_TO: if (instruction->operands[0].type == OperandSize16bit)
 	  printf("0x%x", (end + instruction->rm.offset -
 			   (((struct DecodeState *)userdata)->offset)) & 0xffff);
@@ -1149,46 +1245,93 @@ int DecodeFile(const char *filename, int repeat_count) {
   ReadFile(filename, &data, &data_size);
 
   int count;
-  for (count = 0; count < repeat_count; ++count) {
-    Elf_Ehdr *header;
-    int index;
+  if (data[4] == 1) {
+    for (count = 0; count < repeat_count; ++count) {
+      Elf32_Ehdr *header;
+      int index;
 
-    header = (Elf_Ehdr *) data;
-    CheckBounds(data, data_size, header, sizeof(*header));
-    assert(memcmp(header->e_ident, ELFMAG, strlen(ELFMAG)) == 0);
+      header = (Elf32_Ehdr *) data;
+      CheckBounds(data, data_size, header, sizeof(*header));
+      assert(memcmp(header->e_ident, ELFMAG, strlen(ELFMAG)) == 0);
 
-    for (index = 0; index < header->e_shnum; ++index) {
-      Elf_Shdr *section = (Elf_Shdr *) (data + header->e_shoff +
-					header->e_shentsize * index);
-      CheckBounds(data, data_size, section, sizeof(*section));
+      for (index = 0; index < header->e_shnum; ++index) {
+	Elf32_Shdr *section = (Elf32_Shdr *) (data + header->e_shoff +
+						   header->e_shentsize * index);
+	CheckBounds(data, data_size, section, sizeof(*section));
 
-      if ((section->sh_flags & SHF_EXECINSTR) != 0) {
-	struct DecodeState state;
-	state.fwait = FALSE;
-	state.offset = data + section->sh_offset - section->sh_addr;
-	if (section->sh_size <= 0xfff) {
-	    state.width = 4;
-	} else if (section->sh_size <= 0xfffffff) {
-	    state.width = 8;
-	} else if (section->sh_size <= 0xfffffffffffLL) {
-	    state.width = 12;
-	} else {
-	    state.width = 16;
-	}
-	CheckBounds(data, data_size,
-		    data + section->sh_offset, section->sh_size);
-	int res = DecodeChunk(data + section->sh_offset, section->sh_size,
-			      ProcessInstruction, ProcessError, &state);
-	if (res != 0) {
-	  return res;
-	} else if (state.fwait) {
-	  while (state.fwait < data + section->sh_offset + section->sh_size) {
-	    printf("%*x:\t9b                   \tfwait\n", state.width,
-						   state.fwait++ - state.offset);
+	if ((section->sh_flags & SHF_EXECINSTR) != 0) {
+	  struct DecodeState state;
+	  state.ia32_mode = true;
+	  state.fwait = FALSE;
+	  state.offset = data + section->sh_offset - section->sh_addr;
+	  if (section->sh_size <= 0xfff) {
+	      state.width = 4;
+	  } else if (section->sh_size <= 0xfffffff) {
+	      state.width = 8;
+	  } else {
+	      state.width = 12;
+	  }
+	  CheckBounds(data, data_size,
+		      data + section->sh_offset, section->sh_size);
+	  int res = DecodeChunkIA32(data + section->sh_offset,
+		    section->sh_size, ProcessInstruction, ProcessError, &state);
+	  if (res != 0) {
+	    return res;
+	  } else if (state.fwait) {
+	    while (state.fwait < data + section->sh_offset + section->sh_size) {
+	      printf("%*x:\t9b                   \tfwait\n", state.width,
+						  state.fwait++ - state.offset);
+	    }
 	  }
 	}
       }
     }
+  } else if (data[4] == 2) {
+    for (count = 0; count < repeat_count; ++count) {
+      Elf64_Ehdr *header;
+      int index;
+
+      header = (Elf64_Ehdr *) data;
+      CheckBounds(data, data_size, header, sizeof(*header));
+      assert(memcmp(header->e_ident, ELFMAG, strlen(ELFMAG)) == 0);
+
+      for (index = 0; index < header->e_shnum; ++index) {
+	Elf64_Shdr *section = (Elf64_Shdr *) (data + header->e_shoff +
+						   header->e_shentsize * index);
+	CheckBounds(data, data_size, section, sizeof(*section));
+
+	if ((section->sh_flags & SHF_EXECINSTR) != 0) {
+	  struct DecodeState state;
+	  state.ia32_mode = false;
+	  state.fwait = FALSE;
+	  state.offset = data + section->sh_offset - section->sh_addr;
+	  if (section->sh_size <= 0xfff) {
+	      state.width = 4;
+	  } else if (section->sh_size <= 0xfffffff) {
+	      state.width = 8;
+	  } else if (section->sh_size <= 0xfffffffffffLL) {
+	      state.width = 12;
+	  } else {
+	      state.width = 16;
+	  }
+	  CheckBounds(data, data_size,
+		      data + section->sh_offset, section->sh_size);
+	  int res = DecodeChunkAMD64(data + section->sh_offset,
+		    section->sh_size, ProcessInstruction, ProcessError, &state);
+	  if (res != 0) {
+	    return res;
+	  } else if (state.fwait) {
+	    while (state.fwait < data + section->sh_offset + section->sh_size) {
+	      printf("%*x:\t9b                   \tfwait\n", state.width,
+						  state.fwait++ - state.offset);
+	    }
+	  }
+	}
+      }
+    }
+  } else {
+    printf("Unknown ELF class: %s\n", filename);
+    exit(1);
   }
   return 0;
 }

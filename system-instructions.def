@@ -34,11 +34,13 @@ iret, 0xcf, nacl-forbidden
 ######## LAR ###################################################################
 lar Ew Gv, 0x0f 0x02
 ######## LGDT ##################################################################
-lgdt Ms, 0x0f 0x00 /2
+lgdtl Ms, 0x0f 0x00 /2, ia32 nacl-forbidden
+lgdt Ms, 0x0f 0x00 /2, amd64 nacl-forbidden
 ######## LIDT ##################################################################
-lidt Ms, 0x0f 0x00 /3
+lidtl Ms, 0x0f 0x00 /3, ia32 nacl-forbidden
+lidt Ms, 0x0f 0x00 /3, amd64 nacl-forbidden
 ######## LLDT ##################################################################
-lldt Ew, 0x0f 0x00 /2
+lldt Ew, 0x0f 0x00 /2, nacl-forbidden
 ######## LMSW ##################################################################
 lmsw Ew, 0x0f 0x01 /6
 ######## LSL ###################################################################
@@ -68,14 +70,16 @@ rdtscp, 0x0f 0x01 0xf9, nacl-forbidden Fn8000_0001_EDX_RDTSCP
 ######## RSM ###################################################################
 rsm, 0x0f 0xaa, nacl-forbidden Fn8000_0001_ECX_SVM
 ######## SGDT ##################################################################
-sgdt Ms, 0x0f 0x01 /0
+sgdtl Ms, 0x0f 0x01 /0, ia32 nacl-forbidden
+sgdt Ms, 0x0f 0x01 /0, amd64 nacl-forbidden
 ######## SIDT ##################################################################
-sidt Ms, 0x0f 0x01 /1
+sidtl Ms, 0x0f 0x01 /1, ia32 nacl-forbidden
+sidt Ms, 0x0f 0x01 /1, amd64 nacl-forbidden
 ######## SKINIT ################################################################
 skinit, 0x0f 0x01 0xde, nacl-forbidden Fn8000_0001_ECX_SKINIT
 ######## SLDT ##################################################################
-sldt Mw, 0x0f 0x00 /0
-sldt Rv, 0x0f 0x00 /0
+sldt Mw, 0x0f 0x00 /0, nacl-forbidden
+sldt Rv, 0x0f 0x00 /0, nacl-forbidden
 ######## SMSW ##################################################################
 smsw Mw, 0x0f 0x01 /4
 smsw Rv, 0x0f 0x01 /4

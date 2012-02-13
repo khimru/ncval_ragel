@@ -24,23 +24,39 @@ INST_DEFS = general-purpose-instructions.def \
 
 FAST_TMP_FOR_TEST=/dev/shm
 
-all: $(OUT_DIRS) decoder-test-x86_64 validator-test-x86_64
+all: $(OUT_DIRS) decoder-test validator-test
 
 $(OUT_DIRS):
 	install -m 755 -d $@
 
-.INTERMEDIATE: decoder-test-x86_64.o decoder-x86_64.o
-decoder-test-x86_64: decoder-x86_64.o decoder-test-x86_64.o
-.INTERMEDIATE: validator-test-x86_64.o validator-x86_64.o
-validator-test-x86_64: validator-x86_64.o validator-test-x86_64.o
-.INTERMEDIATE: gen-decoder decoder-x86_64.c validator-x86_64.c
+.INTERMEDIATE: decoder-test.o decoder-x86_32.o decoder-x86_64.o
+decoder-test: decoder-x86_32.o decoder-x86_64.o decoder-test.o
+.INTERMEDIATE: validator-test.o validator-x86_32.o validator-x86_64.o
+validator-test: validator-x86_32.o validator-x86_64.o validator-test.o
+.INTERMEDIATE: gen-decoder decoder-x86_32.c decoder-x86_64.c
+.INTERMEDIATE: validator-x86_32.c validator-x86_64.c
+decoder-x86_32.c: decoder-x86_32-instruction-consts.c
+decoder-x86_32.c: decoder-x86_32-instruction.rl
+.INTERMEDIATE: decoder-x86_32-instruction.rl decoder-x86_32-instruction-consts.c
+decoder-x86_32-instruction-consts.c decoder-x86_32-instruction.rl: \
+							gen-decoder $(INST_DEFS)
+	./gen-decoder -o decoder-x86_32-instruction.rl $(INST_DEFS) \
+	  -d check_access,opcode,parse_operands_states,mark_data_fields
 decoder-x86_64.c: decoder-x86_64-instruction-consts.c
 decoder-x86_64.c: decoder-x86_64-instruction.rl
 .INTERMEDIATE: decoder-x86_64-instruction.rl decoder-x86_64-instruction-consts.c
 decoder-x86_64-instruction-consts.c decoder-x86_64-instruction.rl: \
 							gen-decoder $(INST_DEFS)
 	./gen-decoder -o decoder-x86_64-instruction.rl $(INST_DEFS) \
-	  -d check_access,opcode,parse_operands_states,mark_data_fields
+	  -d check_access,opcode,parse_operands_states,mark_data_fields \
+	  -m amd64
+validator-x86_32.c: validator-x86_32-instruction.rl
+.INTERMEDIATE: validator-x86_32-instruction.rl
+validator-x86_32-instruction.rl: gen-decoder $(INST_DEFS)
+	./gen-decoder -o validator-x86_32-instruction.rl $(INST_DEFS) \
+	  -d check_access,opcode,parse_operands,parse_operands_states \
+	  -d instruction_name,mark_data_fields,nacl-forbidden \
+	  -d imm_operand_action,rel_operand_action nops.def
 validator-x86_64.c: validator-x86_64-instruction-consts.c
 validator-x86_64.c: validator-x86_64-instruction.rl
 .INTERMEDIATE: validator-x86_64-instruction.rl
@@ -49,16 +65,27 @@ validator-x86_64-instruction-consts.c validator-x86_64-instruction.rl: \
 							gen-decoder $(INST_DEFS)
 	./gen-decoder -o validator-x86_64-instruction.rl $(INST_DEFS) \
 	  -d opcode,instruction_name,mark_data_fields,rel_operand_action \
-	  -d nacl-forbidden nops.def
-one-instruction.rl: one-valid-instruction-consts.c
-one-instruction.rl: one-valid-instruction.rl
-.INTERMEDIATE: one-valid-instruction.rl one-valid-instruction-consts.c
-one-valid-instruction-consts.c one-valid-instruction.rl: \
+	  -d nacl-forbidden nops.def -m amd64
+one-instruction-x86_32.rl: one-valid-instruction-x86_32-consts.c
+one-instruction-x86_32.rl: one-valid-instruction-x86_32.rl
+.INTERMEDIATE: one-valid-instruction-x86_32.rl
+.INTERMEDIATE: one-valid-instruction-x86_32-consts.c
+one-valid-instruction-x86_32-consts.c one-valid-instruction-x86_32.rl: \
 							gen-decoder $(INST_DEFS)
-	./gen-decoder -o one-valid-instruction.rl $(INST_DEFS) \
+	./gen-decoder -o one-valid-instruction-x86_32.rl $(INST_DEFS) \
 	  -d check_access,rex_prefix,vex_prefix,opcode,parse_operands \
 	  -d parse_operands_states
-.INTERMEDIATE: one-instruction.dot one-instruction.xml
+one-instruction-x86_64.rl: one-valid-instruction-x86_64-consts.c
+one-instruction-x86_64.rl: one-valid-instruction-x86_64.rl
+.INTERMEDIATE: one-valid-instruction-x86_64.rl
+.INTERMEDIATE: one-valid-instruction-x86_64-consts.c
+one-valid-instruction-x86_64-consts.c one-valid-instruction-x86_64.rl: \
+							gen-decoder $(INST_DEFS)
+	./gen-decoder -o one-valid-instruction-x86_64.rl $(INST_DEFS) \
+	  -d check_access,rex_prefix,vex_prefix,opcode,parse_operands \
+	  -d parse_operands_states -m amd64
+.INTERMEDIATE: one-instruction-x86_32.dot one-instruction-x86_32.xml
+.INTERMEDIATE: one-instruction-x86_64.dot one-instruction-x86_64.xml
 
 %.c: %.rl
 	ragel -G2 $<
@@ -113,18 +140,34 @@ clean-tests:
 	rm -rf "$(OUT)"/test "$(FAST_TMP_FOR_TEST)"/_test_dfa_insts*
 
 .PHONY: check
-check: $(BINUTILS_STAMP) one-instruction.dot decoder-test-x86_64 | $(OUT)/test
-	$(PYTHON2X) parse_dfa.py <one-instruction.dot \
-	    > "$(OUT)/test/test_dfa_transitions.c"
+check: $(BINUTILS_STAMP) one-instruction-x86_32.dot one-instruction-x86_64.dot \
+						      decoder-test | $(OUT)/test
+	$(PYTHON2X) parse_dfa.py <one-instruction-x86_32.dot \
+	    > "$(OUT)/test/test_dfa_transitions-x86_32.c"
 	$(CC) $(CFLAGS) -c test_dfa.c -o "$(OUT)/test/test_dfa.o"
-	$(CC) $(CFLAGS) -O0 -I. -c "$(OUT)/test/test_dfa_transitions.c" -o \
-	    "$(OUT)/test/test_dfa_transitions.o"
-	$(CC) $(LDFLAGS) "$(OUT)/test/test_dfa.o" "$(OUT)/test/test_dfa_transitions.o" \
-	    -o $(OUT)/test/test_dfa
+	$(CC) $(CFLAGS) -O0 -I. -c "$(OUT)/test/test_dfa_transitions-x86_32.c" -o \
+	    "$(OUT)/test/test_dfa_transitions-x86_32.o"
+	$(CC) $(LDFLAGS) "$(OUT)/test/test_dfa.o" \
+	    "$(OUT)/test/test_dfa_transitions-x86_32.o" \
+	    -o $(OUT)/test/test_dfa-x86_32
 	$(PYTHON2X) run_objdump_test.py \
-	  --gas="$(GAS)" \
+	  --gas="$(GAS) --32" \
 	  --objdump="$(OBJDUMP)" \
-	  --decoder=./decoder-test-x86_64 \
+	  --decoder=./decoder-test \
 	  --tester=./decoder_test_one_file.sh \
 	  --nthreads=`cat /proc/cpuinfo | grep processor | wc -l` -- \
-	  "$(OUT)/test/test_dfa" "$(FAST_TMP_FOR_TEST)"
+	  "$(OUT)/test/test_dfa-x86_32" "$(FAST_TMP_FOR_TEST)"
+	$(PYTHON2X) parse_dfa.py <one-instruction-x86_64.dot \
+	    > "$(OUT)/test/test_dfa_transitions-x86_64.c"
+	$(CC) $(CFLAGS) -O0 -I. -c "$(OUT)/test/test_dfa_transitions-x86_64.c" -o \
+	    "$(OUT)/test/test_dfa_transitions-x86_64.o"
+	$(CC) $(LDFLAGS) "$(OUT)/test/test_dfa.o" \
+	    "$(OUT)/test/test_dfa_transitions-x86_64.o" \
+	    -o $(OUT)/test/test_dfa-x86_64
+	$(PYTHON2X) run_objdump_test.py \
+	  --gas="$(GAS) --64" \
+	  --objdump="$(OBJDUMP)" \
+	  --decoder=./decoder-test \
+	  --tester=./decoder_test_one_file.sh \
+	  --nthreads=`cat /proc/cpuinfo | grep processor | wc -l` -- \
+	  "$(OUT)/test/test_dfa-x86_64" "$(FAST_TMP_FOR_TEST)"

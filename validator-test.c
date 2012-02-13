@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "validator-x86_64.h"
+#include "validator.h"
 
 #undef TRUE
 #define TRUE    1
@@ -20,9 +20,6 @@
 
 /* This may help with portability but makes code less readable.  */
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
-
-typedef Elf64_Ehdr Elf_Ehdr;
-typedef Elf64_Shdr Elf_Shdr;
 
 static void CheckBounds(unsigned char *data, size_t data_size,
 			void *ptr, size_t inside_size) {
@@ -78,40 +75,79 @@ int ValidateFile(const char *filename, int repeat_count) {
   ReadFile(filename, &data, &data_size);
 
   int count;
-  for (count = 0; count < repeat_count; count++) {
-    Elf_Ehdr *header;
-    int index;
+  if (data[4] == 1) {
+    for (count = 0; count < repeat_count; ++count) {
+      Elf32_Ehdr *header;
+      int index;
 
-    header = (Elf_Ehdr *) data;
-    CheckBounds(data, data_size, header, sizeof(*header));
-    assert(memcmp(header->e_ident, ELFMAG, strlen(ELFMAG)) == 0);
+      header = (Elf32_Ehdr *) data;
+      CheckBounds(data, data_size, header, sizeof(*header));
+      assert(memcmp(header->e_ident, ELFMAG, strlen(ELFMAG)) == 0);
 
-    for (index = 0; index < header->e_shnum; index++) {
-      Elf_Shdr *section = (Elf_Shdr *) (data + header->e_shoff +
-					header->e_shentsize * index);
-      CheckBounds(data, data_size, section, sizeof(*section));
+      for (index = 0; index < header->e_shnum; ++index) {
+	Elf32_Shdr *section = (Elf32_Shdr *) (data + header->e_shoff +
+						   header->e_shentsize * index);
+	CheckBounds(data, data_size, section, sizeof(*section));
 
-      if ((section->sh_flags & SHF_EXECINSTR) != 0) {
-	struct ValidateState state;
-	state.offset = data + section->sh_offset - section->sh_addr;
-	if (section->sh_size <= 0xfff) {
+	if ((section->sh_flags & SHF_EXECINSTR) != 0) {
+	  struct ValidateState state;
+	  state.offset = data + section->sh_offset - section->sh_addr;
+	  if (section->sh_size <= 0xfff) {
 	    state.width = 4;
-	} else if (section->sh_size <= 0xfffffff) {
+	  } else if (section->sh_size <= 0xfffffff) {
 	    state.width = 8;
-	} else if (section->sh_size <= 0xfffffffffffLL) {
+	  } else {
 	    state.width = 12;
-	} else {
-	    state.width = 16;
-	}
-	CheckBounds(data, data_size,
-		    data + section->sh_offset, section->sh_size);
-	int res = ValidateChunk(data + section->sh_offset, section->sh_size,
-				ProcessError, &state);
-	if (res != 0) {
-	  return res;
+	  }
+	  CheckBounds(data, data_size,
+		      data + section->sh_offset, section->sh_size);
+	  int res = ValidateChunkIA32(data + section->sh_offset,
+					section->sh_size, ProcessError, &state);
+	  if (res != 0) {
+	    return res;
+	  }
 	}
       }
     }
+  } else if (data[4] == 2) {
+    for (count = 0; count < repeat_count; ++count) {
+      Elf64_Ehdr *header;
+      int index;
+
+      header = (Elf64_Ehdr *) data;
+      CheckBounds(data, data_size, header, sizeof(*header));
+      assert(memcmp(header->e_ident, ELFMAG, strlen(ELFMAG)) == 0);
+
+      for (index = 0; index < header->e_shnum; ++index) {
+	Elf64_Shdr *section = (Elf64_Shdr *) (data + header->e_shoff +
+						   header->e_shentsize * index);
+	CheckBounds(data, data_size, section, sizeof(*section));
+
+	if ((section->sh_flags & SHF_EXECINSTR) != 0) {
+	  struct ValidateState state;
+	  state.offset = data + section->sh_offset - section->sh_addr;
+	  if (section->sh_size <= 0xfff) {
+	    state.width = 4;
+	  } else if (section->sh_size <= 0xfffffff) {
+	    state.width = 8;
+	  } else if (section->sh_size <= 0xfffffffffffLL) {
+	    state.width = 12;
+	  } else {
+	    state.width = 16;
+	  }
+	  CheckBounds(data, data_size,
+		      data + section->sh_offset, section->sh_size);
+	  int res = ValidateChunkAMD64(data + section->sh_offset,
+					section->sh_size, ProcessError, &state);
+	  if (res != 0) {
+	    return res;
+	  }
+	}
+      }
+    }
+  } else {
+    printf("Unknown ELF class: %s\n", filename);
+    exit(1);
   }
   return 0;
 }
@@ -124,7 +160,7 @@ int main(int argc, char **argv) {
   if (!strcmp(argv[1],"--repeat"))
     repeat_count = atoi(argv[2]),
     initial_index += 2;
-  for (index = initial_index; index < argc; index++) {
+  for (index = initial_index; index < argc; ++index) {
     const char *filename = argv[index];
     int rc = ValidateFile(filename, repeat_count);
     if (rc != 0) {

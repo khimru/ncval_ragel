@@ -88,8 +88,11 @@ enum register_name {
 
 typedef void (*process_error_func) (const uint8_t *ptr, void *userdata);
 
-int ValidateChunk(const uint8_t *data, size_t size,
-		  process_error_func process_error, void *userdata);
+int ValidateChunkAMD64(const uint8_t *data, size_t size,
+		       process_error_func process_error, void *userdata);
+
+int ValidateChunkIA32(const uint8_t *data, size_t size,
+		      process_error_func process_error, void *userdata);
 
 #ifdef __cplusplus
 }

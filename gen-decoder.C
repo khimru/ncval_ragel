@@ -90,6 +90,9 @@ where they are insered:
    check_access        this will check memory access (actions is not generated
                          by %1$s, you need to define it in your program)
 
+   imm_operand_action  generate imm_operand action references, but not actions
+                         themselves - in you need non-standard definition
+
    rel_operand_action  generate rel_operand action references, but not actions
                          themselves - in you need non-standard definition
 
@@ -111,6 +114,7 @@ found in the LICENSE file.
     kParseOperandsStates,
     kMarkDataFields,
     kCheckAccess,
+    kImmOperandAction,
     kRelOperandAction,
     kNaClForbidden
   };
@@ -123,6 +127,7 @@ found in the LICENSE file.
     "parse_operands_states",
     "mark_data_fields",
     "check_access",
+    "imm_operand_action",
     "rel_operand_action",
     "nacl-forbidden"
   };
@@ -158,8 +163,9 @@ found in the LICENSE file.
 
   FILE *out_file = stdout;
   FILE *const_file = stdout;
+  char *out_file_name = nullptr;
 
-  auto amd64_mode = true;
+  auto ia32_mode = true;
 
   std::string read_file(const char *filename) {
     std::string file_content;
@@ -289,22 +295,22 @@ found in the LICENSE file.
 		#include "gen-decoder-flags.C"
 		#undef INSTRUCTION_FLAG
 		if (flag == "ia32") {
-		  if (amd64_mode) {
+		  if (!ia32_mode) {
 		    enabled_instruction = false;
 		    break;
 		  }
 		} else if (flag == "amd64") {
-		  if (!amd64_mode) {
+		  if (ia32_mode) {
 		    enabled_instruction = false;
 		    break;
 		  }
 		} else if (flag == "nacl-ia32-forbidden") {
-		  if (!amd64_mode && !enabled(Actions::kNaClForbidden)) {
+		  if (ia32_mode && !enabled(Actions::kNaClForbidden)) {
 		    enabled_instruction = false;
 		    break;
 		  }
 		} else if (flag == "nacl-amd64-forbidden") {
-		  if (amd64_mode && !enabled(Actions::kNaClForbidden)) {
+		  if (!ia32_mode && !enabled(Actions::kNaClForbidden)) {
 		    enabled_instruction = false;
 		    break;
 		  }
@@ -501,7 +507,9 @@ found in the LICENSE file.
     disp_type = DISP64;
     disp = p - 7;
   }
-  action imm2_operand {
+)END");
+    if (enabled(Actions::kImmOperandAction)) {
+      fprintf(out_file, R"END(  action imm2_operand {
     imm_operand = IMM2;
     imm = p;
   }
@@ -538,27 +546,58 @@ found in the LICENSE file.
     imm2 = p - 7;
   }
 )END");
+    }
     if (enabled(Actions::kParseOperands)) {
-      fprintf(out_file, R"END(  action modrm_only_base {
+      if (ia32_mode) {
+	fprintf(out_file, R"END(  action modrm_only_base {
+    disp_type = DISPNONE;
+    index = REG_NONE;
+    base = (*p) & 0x07;
+    scale = 0;
+  }
+  action modrm_base_disp {
+    index = REG_NONE;
+    base = (*p) & 0x07;
+    scale = 0;
+  }
+  action modrm_pure_disp {
+    base = REG_NONE;
+    index = REG_NONE;
+    scale = 0;
+  }
+  action modrm_pure_index {
+    disp_type = DISPNONE;
+    base = REG_NONE;
+    index = index_registers[((*p) & 0x38) >> 3];
+    scale = ((*p) & 0xc0) >> 6;
+  }
+  action modrm_parse_sib {
+    disp_type = DISPNONE;
+    base = (*p) & 0x7;
+    index = index_registers[((*p) & 0x38) >> 3];
+    scale = ((*p) & 0xc0) >> 6;
+  }
+)END");
+      } else {
+	fprintf(out_file, R"END(  action modrm_only_base {
     disp_type = DISPNONE;
     index = REG_NONE;
     base = ((*p) & 0x07) |
 	   ((rex_prefix & 0x01) << 3) |
 	   (((~vex_prefix2) & 0x20) >> 2);
+    scale = 0;
   }
   action modrm_base_disp {
     index = REG_NONE;
     base = ((*p) & 0x07) |
 	   ((rex_prefix & 0x01) << 3) |
 	   (((~vex_prefix2) & 0x20) >> 2);
+    scale = 0;
   }
   action modrm_rip {
     index = REG_NONE;
     base = REG_RIP;
-  }
-  action modrm_pure_disp {
-    base = REG_NONE;
-    index = REG_NONE;
+    scale = 0;
   }
   action modrm_pure_index {
     disp_type = DISPNONE;
@@ -579,6 +618,7 @@ found in the LICENSE file.
     scale = ((*p) & 0xc0) >> 6;
   }
 )END");
+      }
     }
     fprintf(out_file, R"END(
   # Relative jumps and calls.
@@ -605,7 +645,7 @@ found in the LICENSE file.
     fprintf(out_file, R"END(
   # Immediates.
   imm2 = %s @imm2_operand;
-)END", chartest((c & 0x0c) == 0x00));
+)END", ia32_mode ? chartest((c & 0x8c) == 0x00) : chartest((c & 0x0c) == 0x00));
     fprintf(out_file, R"END(  imm8 = any %s;
   imm16 = any{2} %s;
   imm32 = any{4} %s;
@@ -652,7 +692,8 @@ found in the LICENSE file.
     fprintf(out_file, "  # It's pure disp32 in IA32 case, "
 	    R"END(but offset(%%rip) in x86-64 case.
   operand_rip = %2$s%1$s . disp32;
-)END", enabled(Actions::kParseOperands) ? " @modrm_rip" : "",
+)END", enabled(Actions::kParseOperands) ?
+			   ia32_mode ? " @modrm_pure_disp" : " @modrm_rip" : "",
        chartest((c & 0xC0) == 0   && (c & 0x07) == 0x05));
     fprintf(out_file, R"END(  single_register_memory = %2$s%1$s;
 )END", enabled(Actions::kParseOperands) ? " @modrm_only_base" : "",
@@ -771,22 +812,36 @@ found in the LICENSE file.
        chartest((c & 0xfc) == 0x48),
        chartest((c & 0xf8) == 0x48));
     if (enabled(Actions::kVexPrefix)) {
-      fprintf(out_file, R"END(
-  # VEX/XOP prefix.
-  action vex_prefix2 {
-    vex_prefix2 = *p;
-  }
-  # VEX/XOP prefix2.
+      if (ia32_mode) {
+	fprintf(out_file, R"END(
+  # VEX/XOP prefix - byte 3.
   action vex_prefix3 {
     vex_prefix3 = *p;
   }
   # VEX/XOP short prefix
   action vex_prefix_short {
-    /* This emulates two prefixes case. */
+    /* VEX.R is not used in ia32 mode.  */
+    vex_prefix3 = p[0] & 0x7f;
+  }
+)END");
+      } else {
+	fprintf(out_file, R"END(
+  # VEX/XOP prefix - byte 2.
+  action vex_prefix2 {
+    vex_prefix2 = *p;
+  }
+  # VEX/XOP prefix -  byte 3.
+  action vex_prefix3 {
+    vex_prefix3 = *p;
+  }
+  # VEX/XOP short prefix
+  action vex_prefix_short {
+    /* This emulates two prefixes case.  */
     vex_prefix2 = (p[0] & 0x80) | 0x61;
     vex_prefix3 = p[0] & 0x7f;
   }
 )END");
+      }
     }
     typedef std::pair<const char *, int> T;
     for (auto vex : {
@@ -800,7 +855,7 @@ found in the LICENSE file.
       T { "RXB",	0x00 }
     } ) {
       fprintf(out_file, R"END(  VEX_%2$s = %3$s%1$s;
-)END", enabled(Actions::kVexPrefix) ? " @vex_prefix2" : "",
+)END", enabled(Actions::kVexPrefix) && !ia32_mode ? " @vex_prefix2" : "",
        vex.first, chartest((c & vex.second) == vex.second));
     }
     for (auto vex : {
@@ -851,6 +906,8 @@ found in the LICENSE file.
 	  T { "float32bit",		"FloatSize32bit"		},
 	  T { "float64bit",		"FloatSize64bit"		},
 	  T { "float80bit",		"FloatSize80bit"		},
+	  T { "regsize",		ia32_mode ? "Size32bit" :
+						    "Size64bit"		},
 	  T { "x87_16bit",		"X87Size16bit"			},
 	  T { "x87_32bit",		"X87Size32bit"			},
 	  T { "x87_64bit",		"X87Size64bit"			},
@@ -873,7 +930,31 @@ found in the LICENSE file.
   }
 )END", i, size.first, size.second);
 	}
-	fprintf(out_file, R"END(  action operand%1$d_absolute_disp {
+	if (ia32_mode) {
+	  fprintf(out_file, R"END(  action operand%1$d_absolute_disp {
+    operand%1$d = REG_RM;
+    base = REG_NONE;
+    index = REG_NONE;
+    scale = 0;
+  }
+  action operand%1$d_from_opcode {
+    operand%1$d = (*p) & 0x7;
+  }
+  action operand%1$d_from_is4 {
+    operand%1$d = p[0] >> 4;
+  }
+  action operand%1$d_from_modrm_rm {
+    operand%1$d = (*p) & 0x07;
+  }
+  action operand%1$d_from_modrm_reg {
+    operand%1$d = ((*p) & 0x38) >> 3;
+  }
+  action operand%1$d_from_vex {
+    operand%1$d = ((~vex_prefix3) & 0x38) >> 3;
+  }
+)END", i);
+	} else {
+	  fprintf(out_file, R"END(  action operand%1$d_absolute_disp {
     operand%1$d = REG_RM;
     base = REG_NONE;
     index = REG_RIZ;
@@ -901,6 +982,7 @@ found in the LICENSE file.
     operand%1$d = ((~vex_prefix3) & 0x78) >> 3;
   }
 )END", i);
+	}
 	for (auto type : {
 	  T { "ds_rbx",			"REG_DS_RBX"	},
 	  T { "ds_rsi",			"REG_DS_RSI"	},
@@ -1287,6 +1369,10 @@ found in the LICENSE file.
     }
 
     void print_one_size_definition(void) {
+      /* 64bit commands are not supported in ia32 mode.  */
+      if (ia32_mode && rex.w) {
+        return;
+      }
       bool modrm_memory = false;
       bool modrm_register = false;
       char operand_source;
@@ -1553,6 +1639,10 @@ found in the LICENSE file.
     }
 
     void print_rex_prefix(void) {
+      /* Prefix REX is not used in ia32 mode.  */
+      if (ia32_mode) {
+	return;
+      }
       /* VEX/XOP instructions integrate REX bits and opcode bits.  They will
          be printed in print_opcode_nomodrm.  */
       if ((opcodes.size() >= 3) &&
@@ -1612,7 +1702,7 @@ found in the LICENSE file.
 		      (*begin(opcodes[2]) == 'X'));
 	if (c5_ok) fprintf(out_file, "((");
 	fprintf(out_file, "(%s (VEX_", opcodes[0].c_str());
-	if (!rex.r && !rex.x & !rex.b) {
+	if (ia32_mode || (!rex.r && !rex.x & !rex.b)) {
 	  fprintf(out_file, "NONE");
 	} else {
 	  if (rex.r) fprintf(out_file, "R");
@@ -1663,6 +1753,9 @@ found in the LICENSE file.
 	}
 	if (third_byte_ok) {
 #endif
+	  if (ia32_mode && third_byte[2] == 'X') {
+	    third_byte[2] = '1';
+	  }
 	  third_byte.erase(1, 1);
 	  third_byte.erase(5, 1);
 	  third_byte.erase(6, 1);
@@ -1699,7 +1792,7 @@ found in the LICENSE file.
 	  }
 	  if (c5_ok) {
 	    fprintf(out_file, ") | (0xc5 ");
-	    if (rex.r) {
+	    if (!ia32_mode && rex.r) {
 	      third_byte[0] = 'X';
 	    } else {
 	      third_byte[0] = '1';
@@ -1831,7 +1924,7 @@ found in the LICENSE file.
 	    { T { InstructionClass::kUnknown, 'U', "q"	  },	"xmm"	      },
 	    { T { InstructionClass::kUnknown, 'V', "q"	  },	"xmm"	      },
 	    { T { InstructionClass::kUnknown, 'W', "q"	  },	"xmm"	      },
-	    { T { InstructionClass::kUnknown, ' ', "r"	  },	"64bit"	      },
+	    { T { InstructionClass::kUnknown, ' ', "r"	  },	"regsize"     },
 	    { T { InstructionClass::kUnknown, 'C', "r"	  },	"creg"	      },
 	    { T { InstructionClass::kUnknown, 'D', "r"	  },	"dreg"	      },
 	    { T { InstructionClass::kUnknown, ' ', "s"	  },	"selector"    },
@@ -1860,7 +1953,6 @@ found in the LICENSE file.
 	    { T { InstructionClass::kData16,  ' ', "y"	  },	"32bit"	      },
 	    { T { InstructionClass::kDefault, ' ', "y"	  },	"32bit"	      },
 	    { T { InstructionClass::kRexW,    ' ', "y"	  },	"64bit"	      },
-	    { T { InstructionClass::kRexW,    'U', "y"	  },	"xmm"	      },
 	    { T { InstructionClass::kData16,  ' ', "z"	  },	"16bit"	      },
 	    { T { InstructionClass::kDefault, ' ', "z"	  },	"32bit"	      },
 	    { T { InstructionClass::kRexW,    ' ', "z"	  },	"32bit"	      }
@@ -2004,7 +2096,11 @@ found in the LICENSE file.
 	}
 	if (operand->source == 'L') {
 	  if (operands.size() == 4) {
-	    fprintf(out_file, " %s", chartest((c & 0x0f) == 0x00));
+	    if (ia32_mode) {
+	      fprintf(out_file, " %s", chartest((c & 0x8f) == 0x00));
+	    } else {
+	      fprintf(out_file, " %s", chartest((c & 0x0f) == 0x00));
+	    }
 	  }
 	  if (enabled(Actions::kParseOperands)) {
 	    fprintf(out_file, " @operand%zd_from_is4",
@@ -2012,7 +2108,11 @@ found in the LICENSE file.
 	  }
 	}
 	if (operand->source == 'O') {
-	  fprintf(out_file, " disp64");
+	  if (ia32_mode) {
+	    fprintf(out_file, " disp32");
+	  } else {
+	    fprintf(out_file, " disp64");
+	  }
 	}
       }
       for (auto &prefix : required_prefixes) {
@@ -2065,7 +2165,7 @@ int main(int argc, char *argv[]) {
   for (;;) {
     int option_index;
 
-    int option = getopt_long(argc, argv, "d:ho:v",
+    int option = getopt_long(argc, argv, "d:hm:o:v",
 			     kProgramOptions, &option_index);
 
     if (option == -1) {
@@ -2100,10 +2200,10 @@ int main(int argc, char *argv[]) {
 	break;
       }
       case 'm': {
-	if (optarg == "ia32") {
-	  amd64_mode = false;
-	} else if (optarg == "amd64") {
-	  amd64_mode = true;
+	if (!strcmp(optarg, "ia32")) {
+	  ia32_mode = true;
+	} else if (!strcmp(optarg, "amd64")) {
+	  ia32_mode = false;
 	} else {
 	  fprintf(stderr, _("%s: mode “%s” is unknown\n"),
 	    short_program_name, optarg);
@@ -2112,25 +2212,8 @@ int main(int argc, char *argv[]) {
 	break;
       }
       case 'o':
-	if (!(out_file = fopen(optarg, "w"))) {
-	  fprintf(stderr, _("%s: can not open “%s” file (%s)\n"),
-	    short_program_name, optarg, strerror(errno));
-	  return 1;
-	} else {
-	  auto const_name = static_cast<char *>(malloc(strlen(optarg) + 10));
-	  strcpy(const_name, optarg);
-	  auto dot_position = strrchr(const_name, '.');
-	  if (!dot_position) {
-	    dot_position = strrchr(const_name, '\0');
-	  }
-	  strcpy(dot_position, "-consts.c");
-	  if (!(const_file = fopen(const_name, "w"))) {
-	    fprintf(stderr, _("%s: can not open “%s” file (%s)\n"),
-	      short_program_name, const_name, strerror(errno));
-	    return 1;
-	  }
-	  break;
-	}
+	out_file_name = optarg;
+	break;
       case 'h':
 	printf(gettext(kProgramHelp), short_program_name);
 	break;
@@ -2149,19 +2232,50 @@ int main(int argc, char *argv[]) {
     load_instructions(argv[i]);
   }
 
-  print_consts();
-
-  if (out_file == const_file) {
-    for (auto i = 0; i < 80; ++i) {
-      fputc('#', out_file);
+  if (!(out_file = fopen(out_file_name, "w"))) {
+    fprintf(stderr, _("%s: can not open “%s” file (%s)\n"),
+			    short_program_name, out_file_name, strerror(errno));
+    return 1;
+  } else if (enabled(Actions::kInstructionName) ||
+	     enabled(Actions::kParseOperands)) {
+    auto const_name = static_cast<char *>(malloc(strlen(out_file_name) + 10));
+    strcpy(const_name, out_file_name);
+    auto dot_position = strrchr(const_name, '.');
+    if (!dot_position) {
+      dot_position = strrchr(const_name, '\0');
     }
-    fputc('\n', out_file);
+    strcpy(dot_position, "-consts.c");
+    if (!(const_file = fopen(const_name, "w"))) {
+      fprintf(stderr, _("%s: can not open “%s” file (%s)\n"),
+			       short_program_name, const_name, strerror(errno));
+       return 1;
+    }
+    free(const_name);
   }
 
-  fprintf(out_file, R"END(%%%%{
+  if (enabled(Actions::kInstructionName) ||
+      enabled(Actions::kParseOperands)) {
+    print_consts();
+
+    if (out_file == const_file) {
+      for (auto i = 0; i < 80; ++i) {
+	fputc('#', out_file);
+      }
+      fputc('\n', out_file);
+    }
+  }
+
+  if (ia32_mode) {
+    fprintf(out_file, R"END(%%%%{
+  machine decode_x86_32;
+  alphtype unsigned char;
+)END");
+  } else {
+    fprintf(out_file, R"END(%%%%{
   machine decode_x86_64;
   alphtype unsigned char;
 )END");
+  }
 
   print_common_decoding();
 
