@@ -13,14 +13,6 @@
 #include <string.h>
 #include "validator.h"
 
-#undef TRUE
-#define TRUE    1
-
-#undef FALSE
-#define FALSE   0
-
-#include "validator-x86_64-instruction-consts.c"
-
 #define check_jump_dest \
     if ((jump_dest & bundle_mask) != bundle_mask) { \
       if (jump_dest >= size) { \
@@ -33,7 +25,7 @@
     } \
     operand0 = JMP_TO; \
     base = REG_RIP; \
-    index = REG_NONE;
+    index = NO_REG;
 
 %%{
   machine x86_64_decoder;
@@ -47,7 +39,7 @@
 	  ((index == REG_RDI) &&
 	   (restricted_register == kSandboxedRsiRestrictedRdi))) {
 	BitmapClearBit(valid_targets, begin - data);
-      } else if ((index != REG_NONE) && (index != REG_RIZ)) {
+      } else if ((index != NO_REG) && (index != REG_RIZ)) {
 	fprintf(stderr,"Improper sandboxing in instruction %x", begin - data);
 	exit(1);
       }
@@ -58,7 +50,7 @@
 	  ((base == REG_RDI) &&
 	   (restricted_register == kSandboxedRsiRestrictedRdi))) {
 	BitmapClearBit(valid_targets, begin - data);
-      } else if ((base != REG_NONE) && (base != REG_RIZ)) {
+      } else if ((base != NO_REG) && (base != REG_RIZ)) {
 	fprintf(stderr,"Improper sandboxing in instruction @%x", begin - data);
 	exit(1);
       }
@@ -171,6 +163,9 @@
     (0x49 0x8d 0x3c 0x3f)	   # lea (%r15,%rdi,1),%rdi
   )) @process_normal_instruction;
 
+  data16condrep = (data16 | condrep data16 | data16 condrep);
+  data16rep = (data16 | rep data16 | data16 rep);
+
   special_instruction =
     (0x48 0x89 0xe5)			   | # mov %rsp,%rbp
     (0x48 0x81 0xe4 any{3} (0x80 .. 0xff)) | # and $XXX,%rsp
@@ -265,8 +260,9 @@
          restricted_register = kNoRestrictedReg;
        }
     } |
-    (0xac		       | # lods   %ds:(%rsi),%al
-     (data16|REXW_NONE)? 0xad)	 # lods   %ds:(%rsi),%ax/%eax/%rax
+    (rep? 0xac		       | # lods   %ds:(%rsi),%al
+     data16rep 0xad	       | # lods   %ds:(%rsi),%ax
+     rep? REXW_NONE? 0xad)       # lods   %ds:(%rsi),%eax/%rax
     @{ if (restricted_register != kSandboxedRsi) {
 	 printf("Incorrectly sandboxed %%rdi at the %x\n", p - data);
 	 exit(1);
@@ -275,12 +271,12 @@
        BitmapClearBit(valid_targets, (begin - data));
        BitmapClearBit(valid_targets, (sandboxed_rdi - data));
     } |
-    (0xae		       | # scas   %ds:(%rsi),%al
-     (data16|REXW_NONE)? 0xaf  | # scas   %ds:(%rsi),%ax/%eax/%rax
+    (condrep? 0xae	       | # scas   %es:(%rdi),%al
+     data16condrep 0xaf	       | # scas   %es:(%rdi),%ax
+     condrep? REXW_NONE? 0xaf  | # scas   %es:(%rdi),%eax/%rax
+
      rep? 0xaa		       | # stos   %al,%es:(%rdi)
-     (data16 |
-      rep data16 |
-      data16 rep) 0xab	       | # stos   %ax,%es:(%rdi)
+     data16rep 0xab	       | # stos   %ax,%es:(%rdi)
      rep? REXW_NONE? 0xab)	 # stos   %eax/%rax,%es:(%rdi)
     @{ if (restricted_register != kSandboxedRdi &&
 	   restricted_register != kSandboxedRsiSandboxedRdi) {
@@ -292,14 +288,11 @@
        BitmapClearBit(valid_targets, (sandboxed_rdi - data));
     } |
     (condrep? 0xa6	      | # cmpsb	   %es:(%rdi),%ds:(%rsi)
-     (data16 |
-      condrep data16 |
-      data16 condrep) 0xa7    | # cmpsw	   %es:(%rdi),%ds:(%rsi)
+     data16condrep 0xa7	      | # cmpsw	   %es:(%rdi),%ds:(%rsi)
      condrep? REXW_NONE? 0xa7 | # cmps[lq] %es:(%rdi),%ds:(%rsi)
+
      rep? 0xa4		      | # movsb	   %es:(%rdi),%ds:(%rsi)
-     (data16 |
-      rep data16 |
-      data16 rep) 0xa5	      | # movsw	   %es:(%rdi),%ds:(%rsi)
+     data16rep 0xa5	      | # movsw	   %es:(%rdi),%ds:(%rsi)
      rep? REXW_NONE? 0xa5)	# movs[lq] %es:(%rdi),%ds:(%rsi)
     @{ if (restricted_register != kSandboxedRsiSandboxedRdi) {
 	 printf("Incorrectly sandboxed %%rsi or %%rdi at the %x\n", p - data);
@@ -313,16 +306,15 @@
     };
 
   main := ((normal_instruction | special_instruction) >{
-	begin = p;
 	BitmapSetBit(valid_targets, p - data);
 	rex_prefix = FALSE;
 	vex_prefix2 = 0xe0;
 	vex_prefix3 = 0x00;
      })*
-    $!{ process_error(p, userdata);
-	result = 1;
-	goto error_detected;
-    };
+     $err{ process_error(begin, userdata);
+       result = 1;
+       goto error_detected;
+     };
 
 }%%
 
@@ -390,8 +382,8 @@ enum imm_mode {
 
 static const int kBitsPerByte = 8;
 
-static inline uint8_t *BitmapAllocate(uint32_t indexes) {
-  uint32_t byte_count = (indexes + kBitsPerByte - 1) / kBitsPerByte;
+static inline uint8_t *BitmapAllocate(size_t indexes) {
+  size_t byte_count = (indexes + kBitsPerByte - 1) / kBitsPerByte;
   uint8_t *bitmap = malloc(byte_count);
   if (bitmap != NULL) {
     memset(bitmap, 0, byte_count);
@@ -399,15 +391,15 @@ static inline uint8_t *BitmapAllocate(uint32_t indexes) {
   return bitmap;
 }
 
-static inline int BitmapIsBitSet(uint8_t *bitmap, uint32_t index) {
+static inline int BitmapIsBitSet(uint8_t *bitmap, size_t index) {
   return (bitmap[index / kBitsPerByte] & (1 << (index % kBitsPerByte))) != 0;
 }
 
-static inline void BitmapSetBit(uint8_t *bitmap, uint32_t index) {
+static inline void BitmapSetBit(uint8_t *bitmap, size_t index) {
   bitmap[index / kBitsPerByte] |= 1 << (index % kBitsPerByte);
 }
 
-static inline void BitmapClearBit(uint8_t *bitmap, uint32_t index) {
+static inline void BitmapClearBit(uint8_t *bitmap, size_t index) {
   bitmap[index / kBitsPerByte] &= ~(1 << (index % kBitsPerByte));
 }
 
@@ -434,9 +426,11 @@ int ValidateChunkAMD64(const uint8_t *data, size_t size,
   uint8_t *jump_dests = BitmapAllocate(size);
 
   const uint8_t *p = data;
-  const uint8_t *begin;
+  const uint8_t *begin = p;
 
-  uint8_t rex_prefix, vex_prefix2, vex_prefix3;
+  uint8_t rex_prefix = 0;
+  uint8_t vex_prefix2 = 0xe0;
+  uint8_t vex_prefix3 = 0x00;
   struct Operand {
     unsigned int name	:5;
     unsigned int type	:2;

@@ -17,8 +17,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <algorithm>
+#include <iterator>
 #include <map>
 #include <set>
 #include <string>
@@ -36,12 +38,13 @@ namespace {
   const char* short_program_name;
 
   const struct option kProgramOptions[] = {
-    {"mode",	required_argument,	nullptr,	'm'},
-    {"disable",	required_argument,	nullptr,	'd'},
-    {"output",	required_argument,	nullptr,	'o'},
-    {"help",	no_argument,		nullptr,	'h'},
-    {"version",	no_argument,		nullptr,	'v'},
-    {nullptr,	0,			nullptr,	0}
+    {"mode",		required_argument,	nullptr,	'm'	},
+    {"disable",		required_argument,	nullptr,	'd'	},
+    {"output",		required_argument,	nullptr,	'o'	},
+    {"const_file",	required_argument,	nullptr,	'c'	},
+    {"help",		no_argument,		nullptr,	'h'	},
+    {"version",		no_argument,		nullptr,	'v'	},
+    {nullptr,		0,			nullptr,	0	}
   };
 
   const char kVersion[] = "0.0";
@@ -56,6 +59,7 @@ Options list:
   -m, --mode=mode            CPU mode: ia32 for IA32, amd64 for x86-64
   -d, --disable=action_list  disable actions from the comma-separated list
   -o, --output=FILE          write result to FILE instead of standard output
+  -c, --const_file=FILE      write result of FILE instead of standard output
   -h, --help                 display this help and exit
   -v, --version              output version information and exit
 
@@ -149,14 +153,14 @@ found in the LICENSE file.
     };
     std::vector<Operand> operands;
     std::vector<std::string> opcodes;
-#if 0
+#if (__GNUC__ > 4) || (__GNUC_MINOR__ > 6)
     /* We need GCC 4.7 for the following */
-    #define INSTRUCTION_FLAG(x) bool x :1 = false;
+    #define INSTRUCTION_FLAG(x) bool x = false;
 #else
     /* Use this and “Instruction instruction { }”…  */
-    #define INSTRUCTION_FLAG(x) bool x :1;
+    #define INSTRUCTION_FLAG(x) bool x;
 #endif
-    #include "gen-decoder-flags.C"
+    #include "gen-dfa-flags.C"
     #undef INSTRUCTION_FLAG
   };
   std::vector<Instruction> instructions;
@@ -164,6 +168,7 @@ found in the LICENSE file.
   FILE *out_file = stdout;
   FILE *const_file = stdout;
   char *out_file_name = nullptr;
+  char *const_file_name = nullptr;
 
   auto ia32_mode = true;
 
@@ -203,41 +208,38 @@ found in the LICENSE file.
   void load_instructions(const char *filename) {
     const auto file_content = read_file(filename);
     auto it = begin(file_content);
-    auto eol = [](decltype(*it) c) {
+    auto is_eol = [](decltype(*it) c) {
       return c == '\n';
     };
-    auto whitespace = [](decltype(*it) c) {
+    auto is_whitespace = [](decltype(*it) c) {
       return c == ' ' || c == '\t';
     };
-    auto right_parenthesis = [](decltype(*it) c) {
-      return c == ')';
+    auto is_quotation_mark = [](decltype(*it) c) {
+      return c == '\"';
     };
     while (it != end(file_content)) {
-      it = std::find_if_not(it, end(file_content), eol);
+      it = std::find_if_not(it, end(file_content), is_eol);
       if (it == end(file_content)) {
 	return;
       }
       /* If line starts with “#” then it's a comment. */
       if (*it == '#') {
-	it = std::find_if(it, end(file_content), eol);
+	it = std::find_if(it, end(file_content), is_eol);
       } else {
-	auto line_end = std::find_if(it, end(file_content), eol);
-	auto get_strings = [=, &it](void) {
+	auto line_end = std::find_if(it, end(file_content), is_eol);
+	auto split_till_comma = [=, &it](void) {
 	  std::vector<std::string> strings;
 	  std::string string;
-	  while ((it = std::find_if_not(it, line_end, whitespace)) < line_end &&
-								   *it != ',') {
-	    for (; it < line_end && *it != ',' && !whitespace(*it); ++it) {
-	      if (*it != '\\') {
+	  while ((it = std::find_if_not(it, line_end, is_whitespace)) < line_end
+								&& *it != ',') {
+	    for (; it < line_end && *it != ',' && !is_whitespace(*it); ++it) {
+	      if (*it != '\"') {
 		string.push_back(*it);
 	      } else {
-		if (*++it == '(') {
-		  auto parenthesis = std::find_if(it, line_end, right_parenthesis);
-		  string.insert(end(string), it, ++parenthesis);
-		  it = --parenthesis;
-		} else {
-		  string.push_back(*it);
-		}
+		auto quotation_mark = std::find_if(++it, line_end,
+							     is_quotation_mark);
+		string.insert(end(string), it, quotation_mark);
+		it = quotation_mark;
 	      }
 	    }
 	    strings.push_back(string);
@@ -247,7 +249,7 @@ found in the LICENSE file.
 	};
 	/* Note: initialization list makes sure flags are toggled to zero.  */
 	Instruction instruction { };
-	auto operation = get_strings();
+	auto operation = split_till_comma();
 	/* Line with just a whitespaces is ignored.  */
 	if (operation.size() != 0) {
 	  instruction_names[instruction.name = operation[0]] = 0;
@@ -286,13 +288,13 @@ found in the LICENSE file.
 	  auto enabled_instruction = true;
 	  if (*it == ',') {
 	    ++it;
-	    instruction.opcodes = get_strings();
+	    instruction.opcodes = split_till_comma();
 	    if (*it == ',') {
 	      ++it;
-	      for (auto &flag : get_strings()) {
+	      for (auto &flag : split_till_comma()) {
 		#define INSTRUCTION_FLAG(x) \
 		  if (flag == #x) {instruction.x = true;} else
-		#include "gen-decoder-flags.C"
+		#include "gen-dfa-flags.C"
 		#undef INSTRUCTION_FLAG
 		if (flag == "ia32") {
 		  if (!ia32_mode) {
@@ -331,7 +333,7 @@ found in the LICENSE file.
 	    instructions.push_back(instruction);
 	  }
 	}
-	it = std::find_if(it, file_content.end(), eol);
+	it = std::find_if(it, file_content.end(), is_eol);
       }
     }
   }
@@ -339,13 +341,13 @@ found in the LICENSE file.
   template<typename func>
   std::string chartest(func f) {
     std::string result;
-    auto delimeter = "( ";
+    auto delimiter = "( ";
     for (int c = 0x00; c <= 0xff; ++c) {
       if (f(c)) {
         char buf[10];
-        sprintf(buf, "%s0x%02x", delimeter, c);
+        sprintf(buf, "%s0x%02x", delimiter, c);
         result += buf;
-        delimeter = " | ";
+        delimiter = " | ";
       }
     }
     return result + " )";
@@ -390,17 +392,17 @@ found in the LICENSE file.
 	}
       }
       offset = 0;
-      auto delimeter = "static const char instruction_names[] = {\n  ";
+      auto delimiter = "static const char instruction_names[] = {\n  ";
       for (auto &pair : instruction_names) {
 	if (pair.second == offset) {
-	  fprintf(const_file, "%s", delimeter);
+	  fprintf(const_file, "%s", delimiter);
 	  for (auto &c : pair.first) {
 	    fprintf(const_file, "0x%02x, ", static_cast<int>(c));
 	  }
 	  fprintf(const_file, "\'\\0\',  /* ");
 	  fprintf(const_file, "%s", pair.first.c_str());
 	  offset += pair.first.length() + 1;
-	  delimeter = " */\n  ";
+	  delimiter = " */\n  ";
 	}
       }
       fprintf(const_file, " */\n};\n");
@@ -434,7 +436,7 @@ found in the LICENSE file.
       fprintf(out_file, R"END(  action rel8_operand {
     operand0 = JMP_TO;
     base = REG_RIP;
-    index = REG_NONE;
+    index = NO_REG;
     scale = 0;
     disp_type = DISP8;
     disp = p;
@@ -442,7 +444,7 @@ found in the LICENSE file.
   action rel16_operand {
     operand0 = JMP_TO;
     base = REG_RIP;
-    index = REG_NONE;
+    index = NO_REG;
     scale = 0;
     disp_type = DISP16;
     disp = p - 1;
@@ -450,7 +452,7 @@ found in the LICENSE file.
   action rel32_operand {
     operand0 = JMP_TO;
     base = REG_RIP;
-    index = REG_NONE;
+    index = NO_REG;
     scale = 0;
     disp_type = DISP32;
     disp = p - 3;
@@ -458,7 +460,7 @@ found in the LICENSE file.
 )END");
     }
     fprintf(out_file, R"END(  action branch_not_taken {
-    branch_taken = TRUE;
+    branch_not_taken = TRUE;
   }
   action branch_taken {
     branch_taken = TRUE;
@@ -551,23 +553,23 @@ found in the LICENSE file.
       if (ia32_mode) {
 	fprintf(out_file, R"END(  action modrm_only_base {
     disp_type = DISPNONE;
-    index = REG_NONE;
+    index = NO_REG;
     base = (*p) & 0x07;
     scale = 0;
   }
   action modrm_base_disp {
-    index = REG_NONE;
+    index = NO_REG;
     base = (*p) & 0x07;
     scale = 0;
   }
   action modrm_pure_disp {
-    base = REG_NONE;
-    index = REG_NONE;
+    base = NO_REG;
+    index = NO_REG;
     scale = 0;
   }
   action modrm_pure_index {
     disp_type = DISPNONE;
-    base = REG_NONE;
+    base = NO_REG;
     index = index_registers[((*p) & 0x38) >> 3];
     scale = ((*p) & 0xc0) >> 6;
   }
@@ -581,27 +583,27 @@ found in the LICENSE file.
       } else {
 	fprintf(out_file, R"END(  action modrm_only_base {
     disp_type = DISPNONE;
-    index = REG_NONE;
+    index = NO_REG;
     base = ((*p) & 0x07) |
 	   ((rex_prefix & 0x01) << 3) |
 	   (((~vex_prefix2) & 0x20) >> 2);
     scale = 0;
   }
   action modrm_base_disp {
-    index = REG_NONE;
+    index = NO_REG;
     base = ((*p) & 0x07) |
 	   ((rex_prefix & 0x01) << 3) |
 	   (((~vex_prefix2) & 0x20) >> 2);
     scale = 0;
   }
   action modrm_rip {
-    index = REG_NONE;
+    index = NO_REG;
     base = REG_RIP;
     scale = 0;
   }
   action modrm_pure_index {
     disp_type = DISPNONE;
-    base = REG_NONE;
+    base = NO_REG;
     index = index_registers[(((*p) & 0x38) >> 3) |
 			    ((rex_prefix & 0x02) << 2) |
 			    (((~vex_prefix2) & 0x40) >> 3)];
@@ -732,7 +734,7 @@ found in the LICENSE file.
     fprintf(out_file, R"END(
   # Prefixes.
   data16 = 0x66 @data16_prefix;
-  branch = 0x2e @branch_not_taken | 0x3e @branch_taken;
+  branch_hint = 0x2e @branch_not_taken | 0x3e @branch_taken;
   condrep = 0xf2 @repnz_prefix | 0xf3 @repz_prefix;
   lock = 0xf0 @lock_prefix;
   rep = 0xf3 @rep_prefix;
@@ -933,8 +935,8 @@ found in the LICENSE file.
 	if (ia32_mode) {
 	  fprintf(out_file, R"END(  action operand%1$d_absolute_disp {
     operand%1$d = REG_RM;
-    base = REG_NONE;
-    index = REG_NONE;
+    base = NO_REG;
+    index = NO_REG;
     scale = 0;
   }
   action operand%1$d_from_opcode {
@@ -949,6 +951,9 @@ found in the LICENSE file.
   action operand%1$d_from_modrm_reg {
     operand%1$d = ((*p) & 0x38) >> 3;
   }
+  action operand%1$d_from_modrm_reg_norex {
+    operand%1$d = ((*p) & 0x38) >> 3;
+  }
   action operand%1$d_from_vex {
     operand%1$d = ((~vex_prefix3) & 0x38) >> 3;
   }
@@ -956,7 +961,7 @@ found in the LICENSE file.
 	} else {
 	  fprintf(out_file, R"END(  action operand%1$d_absolute_disp {
     operand%1$d = REG_RM;
-    base = REG_NONE;
+    base = NO_REG;
     index = REG_RIZ;
     scale = 0;
   }
@@ -977,6 +982,9 @@ found in the LICENSE file.
     operand%1$d = (((*p) & 0x38) >> 3) |
 	       ((rex_prefix & 0x04) << 1) |
 	       (((~vex_prefix2) & 0x80) >> 4);
+  }
+  action operand%1$d_from_modrm_reg_norex {
+    operand%1$d = ((*p) & 0x38) >> 3;
   }
   action operand%1$d_from_vex {
     operand%1$d = ((~vex_prefix3) & 0x78) >> 3;
@@ -1006,20 +1014,20 @@ found in the LICENSE file.
     if (enabled(Actions::kParseOperandsStates)) {
       for (auto i = 0 ; i < 5; ++i) {
 	fprintf(out_file, R"END(  action operand%1$d_unused {
-    operand%1$d_read = false;
-    operand%1$d_write = false;
+    operand%1$d_read = FALSE;
+    operand%1$d_write = FALSE;
   }
   action operand%1$d_read {
-    operand%1$d_read = true;
-    operand%1$d_write = false;
+    operand%1$d_read = TRUE;
+    operand%1$d_write = FALSE;
   }
   action operand%1$d_write {
-    operand%1$d_read = false;
-    operand%1$d_write = true;
+    operand%1$d_read = FALSE;
+    operand%1$d_write = TRUE;
   }
   action operand%1$d_readwrite {
-    operand%1$d_read = true;
-    operand%1$d_write = true;
+    operand%1$d_read = TRUE;
+    operand%1$d_write = TRUE;
   }
 )END", i);
       }
@@ -1039,7 +1047,10 @@ found in the LICENSE file.
     MarkedInstruction(Instruction instruction_) :
 	Instruction(instruction_),
 	instruction_class(get_instruction_class(instruction_)),
-	opcode_in_modrm(false), opcode_in_imm(false), rex { } {
+	rex { }, opcode_in_modrm(false), opcode_in_imm(false) {
+      if (branch_hint) {
+	optional_prefixes.insert("branch_hint");
+      }
       if (condrep) {
 	optional_prefixes.insert("condrep");
       }
@@ -1121,7 +1132,8 @@ found in the LICENSE file.
 	    rex.w = true;
 	  } else {
 	    fprintf(stderr, _("%s: error - can not enforce “%drexw” prefix in "
-			 "instruction “%s”"), short_program_name, instruction_class, name.c_str());
+		"instruction “%s”"),
+			   short_program_name, instruction_class, name.c_str());
 	    exit(1);
 	  }
 	} else {
@@ -1375,7 +1387,7 @@ found in the LICENSE file.
       }
       bool modrm_memory = false;
       bool modrm_register = false;
-      char operand_source;
+      char operand_source = ' ';
       for (auto &operand : operands) {
 	static std::map<char, std::pair<bool, bool> > operand_map {
 	  { 'E', { true,  true  } },
@@ -1422,7 +1434,7 @@ found in the LICENSE file.
     }
 
     void print_one_size_definition_nomodrm(void) {
-      print_operator_delimeter();
+      print_operator_delimiter();
       print_legacy_prefixes();
       print_rex_prefix();
       print_opcode_nomodrm();
@@ -1436,7 +1448,7 @@ found in the LICENSE file.
     }
 
     void print_one_size_definition_modrm_register(void) {
-      print_operator_delimeter();
+      print_operator_delimiter();
       if (mod_reg_is_used()) {
 	rex.r = true;
       }
@@ -1455,17 +1467,17 @@ found in the LICENSE file.
 	  static const std::map<char, const char*> operand_type {
 	    { 'C', "reg"	},
 	    { 'D', "reg"	},
-	    { 'E', "rm"	},
+	    { 'E', "rm"		},
 	    { 'G', "reg"	},
-	    { 'M', "rm"	},
-	    { 'N', "rm"	},
+	    { 'M', "rm"		},
+	    { 'N', "rm"		},
 	    { 'P', "reg"	},
-	    { 'Q', "rm"	},
-	    { 'R', "rm"	},
-	    { 'S', "reg"	},
-	    { 'U', "rm"	},
+	    { 'Q', "rm"		},
+	    { 'R', "rm"		},
+	    { 'S', "reg_norex"	},
+	    { 'U', "rm"		},
 	    { 'V', "reg"	},
-	    { 'W', "rm"	}
+	    { 'W', "rm"		}
 	  };
 	  auto it = operand_type.find(operand.source);
 	  if (it != end(operand_type)) {
@@ -1494,7 +1506,7 @@ found in the LICENSE file.
         T { " operand_sib_pure_index",	true,	false	},
         T { " operand_sib_base_index",	true,	true	}
       }) {
-	print_operator_delimeter();
+	print_operator_delimiter();
 	if (mod_reg_is_used()) {
 	  rex.r = true;
 	}
@@ -1516,19 +1528,19 @@ found in the LICENSE file.
 	if (enabled(Actions::kParseOperands)) {
 	  for (auto &operand : operands) {
 	    static const std::map<char, const char*> operand_type {
-	      { 'C', "from_modrm_reg"	},
-	      { 'D', "from_modrm_reg"	},
-	      { 'E', "rm"		},
-	      { 'G', "from_modrm_reg"	},
-	      { 'M', "rm"		},
-	      { 'N', "rm"		},
-	      { 'P', "from_modrm_reg"	},
-	      { 'Q', "rm"		},
-	      { 'R', "rm"		},
-	      { 'S', "from_modrm_reg"	},
-	      { 'U', "rm"		},
-	      { 'V', "from_modrm_reg"	},
-	      { 'W', "rm"		}
+	      { 'C', "from_modrm_reg"		},
+	      { 'D', "from_modrm_reg"		},
+	      { 'E', "rm"			},
+	      { 'G', "from_modrm_reg"		},
+	      { 'M', "rm"			},
+	      { 'N', "rm"			},
+	      { 'P', "from_modrm_reg"		},
+	      { 'Q', "rm"			},
+	      { 'R', "rm"			},
+	      { 'S', "from_modrm_reg_norex"	},
+	      { 'U', "rm"			},
+	      { 'V', "from_modrm_reg"		},
+	      { 'W', "rm"			}
             };
 	    auto it = operand_type.find(operand.source);
 	    if (it != end(operand_type)) {
@@ -1551,19 +1563,14 @@ found in the LICENSE file.
       }
     }
 
-#if 0
-  /* We need GCC 4.7 to use the following.  */
-  static auto first_delimeter = true;
-#else
-  static bool first_delimeter;
-#endif
-    void print_operator_delimeter(void) {
-      if (first_delimeter) {
+    static bool first_delimiter;
+    void print_operator_delimiter(void) {
+      if (first_delimiter) {
 	fprintf(out_file, "\n    (");
       } else {
 	fprintf(out_file, ") |\n    (");
       }
-      first_delimeter = false;
+      first_delimiter = false;
     }
 
     bool mod_reg_is_used() {
@@ -1601,7 +1608,7 @@ found in the LICENSE file.
 	fprintf(out_file, "%s? ", begin(optional_prefixes)->c_str());
       } else if ((optional_prefixes.size() > 0) ||
 		 (required_prefixes.size() > 0)) {
-	auto delimeter = "(";
+	auto delimiter = "(";
 	auto opt_start = required_prefixes.size() ? 0 : 1;
 	auto opt_end = 1 << optional_prefixes.size();
 	for (auto opt = opt_start; opt < opt_end; ++opt) {
@@ -1613,18 +1620,18 @@ found in the LICENSE file.
 	    }
 	  }
 	  if (prefixes.size() == 1) {
-	    fprintf(out_file, "%s%s", delimeter, begin(prefixes)->c_str());
-	    delimeter = " | ";
+	    fprintf(out_file, "%s%s", delimiter, begin(prefixes)->c_str());
+	    delimiter = " | ";
 	  } else {
 	    std::vector<std::string> permutations(begin(prefixes),
 								 end(prefixes));
 	    do {
-	      fprintf(out_file, "%s", delimeter);
-	      delimeter = " | ";
-	      auto delimeter = '(';
+	      fprintf(out_file, "%s", delimiter);
+	      delimiter = " | ";
+	      auto delimiter = '(';
 	      for (auto &prefix : permutations) {
-	        fprintf(out_file, "%c%s", delimeter, prefix.c_str());
-	        delimeter = ' ';
+	        fprintf(out_file, "%c%s", delimiter, prefix.c_str());
+	        delimiter = ' ';
 	      }
 	      fprintf(out_file, ")");
 	    } while (next_permutation(begin(permutations), end(permutations)));
@@ -1650,6 +1657,21 @@ found in the LICENSE file.
 	   ((opcodes[0] == "0x8f") && (opcodes[1] != "/0")))) {
 	return;
       }
+#if 1
+      /* Allow any bits in rex prefix for the compatibility. See
+	 http://code.google.com/p/nativeclient/issues/detail?id=2517 */
+      if (rex.w || rex.r || rex.x || rex.b) {
+	if (!rex.r && !rex.x && ! rex.b) {
+	  fprintf(out_file, "REXW_NONE ");
+	} else {
+	  if (rex.w) {
+	    fprintf(out_file, "REXW_RXB ");
+	  } else {
+	    fprintf(out_file, "REX_RXB? ");
+	  }
+	}
+      }
+#else
       if (rex.w || rex.r || rex.x || rex.b) {
 	if (!rex.r && !rex.x && ! rex.b) {
 	  fprintf(out_file, "REXW_NONE ");
@@ -1676,6 +1698,7 @@ found in the LICENSE file.
 	  }
 	}
       }
+#endif
     }
 
     void print_opcode_nomodrm(void) {
@@ -1778,10 +1801,10 @@ found in the LICENSE file.
 		  }
 	        }
 	      }
-	      auto delimeter = "(";
+	      auto delimiter = "(";
 	      for (auto &byte : bytes) {
-	        fprintf(out_file, "%s0x%02x", delimeter, byte);
-	        delimeter = " | ";
+	        fprintf(out_file, "%s0x%02x", delimiter, byte);
+	        delimiter = " | ";
 	      }
 	      fprintf(out_file, ")");
 	    }
@@ -1803,7 +1826,7 @@ found in the LICENSE file.
 	    }
 	    fprintf(out_file, "))");
 	  }
-	  for (auto opcode = ++++++begin(opcodes); opcode != end(opcodes);
+	  for (auto opcode = begin(opcodes) + 3; opcode != end(opcodes);
 								     ++opcode) {
 	
 	    if (opcode->find('/') == opcode->npos) {
@@ -1820,11 +1843,11 @@ found in the LICENSE file.
 	  exit(1);
 	}
       } else {
-	auto delimeter = '(';
+	auto delimiter = '(';
 	for (auto &opcode : opcodes) {
 	  if (opcode.find('/') == opcode.npos) {
-	    fprintf(out_file, "%c%s", delimeter, opcode.c_str());
-	    delimeter = ' ';
+	    fprintf(out_file, "%c%s", delimiter, opcode.c_str());
+	    delimiter = ' ';
 	  } else {
 	    break;
 	  }
@@ -2146,10 +2169,7 @@ found in the LICENSE file.
       MarkedInstruction(instruction).print_definition();
     }
   }
-#if 1
-  /* We need GCC 4.7 to remove the following */
-  bool MarkedInstruction::first_delimeter = true;
-#endif
+  bool MarkedInstruction::first_delimiter = true;
 }
 
 int main(int argc, char *argv[]) {
@@ -2165,7 +2185,7 @@ int main(int argc, char *argv[]) {
   for (;;) {
     int option_index;
 
-    int option = getopt_long(argc, argv, "d:hm:o:v",
+    int option = getopt_long(argc, argv, "c:d:hm:o:v",
 			     kProgramOptions, &option_index);
 
     if (option == -1) {
@@ -2173,14 +2193,10 @@ int main(int argc, char *argv[]) {
     }
 
     switch (option) {
-#if 0
-      case 0:
-	printf("option %s", kProgramOptions[option_index].name);
-	if (optarg)
-	  printf(" with arg %s", optarg);
-	printf("\n");
-	break;
-#endif
+      case 'c': {
+        const_file_name = optarg;
+        break;
+      }
       case 'd': {
 	for (auto action_to_disable = strtok(optarg, ",");
 	     action_to_disable;
@@ -2232,25 +2248,33 @@ int main(int argc, char *argv[]) {
     load_instructions(argv[i]);
   }
 
-  if (!(out_file = fopen(out_file_name, "w"))) {
+  if (out_file_name && !(out_file = fopen(out_file_name, "w"))) {
     fprintf(stderr, _("%s: can not open “%s” file (%s)\n"),
 			    short_program_name, out_file_name, strerror(errno));
     return 1;
-  } else if (enabled(Actions::kInstructionName) ||
-	     enabled(Actions::kParseOperands)) {
-    auto const_name = static_cast<char *>(malloc(strlen(out_file_name) + 10));
-    strcpy(const_name, out_file_name);
-    auto dot_position = strrchr(const_name, '.');
-    if (!dot_position) {
-      dot_position = strrchr(const_name, '\0');
+  } else if ((out_file_name || const_file_name) &&
+	     (enabled(Actions::kInstructionName) ||
+	      enabled(Actions::kParseOperands))) {
+    size_t const_name_len = 0;
+    if (out_file_name && !const_file_name) {
+      const_name_len = strlen(out_file_name) + 10;
+      const_file_name = static_cast<char *>(malloc(const_name_len));
+      strcpy(const_file_name, out_file_name);
+      auto dot_position = strrchr(const_file_name, '.');
+      if (!dot_position) {
+        dot_position = strrchr(const_file_name, '\0');
+      }
+      strcpy(dot_position, "-consts.c");
     }
-    strcpy(dot_position, "-consts.c");
-    if (!(const_file = fopen(const_name, "w"))) {
+    if (!(const_file = fopen(const_file_name, "w"))) {
       fprintf(stderr, _("%s: can not open “%s” file (%s)\n"),
-			       short_program_name, const_name, strerror(errno));
+			  short_program_name, const_file_name, strerror(errno));
        return 1;
     }
-    free(const_name);
+    if (const_name_len) {
+      free(const_file_name);
+      const_file_name = NULL;
+    }
   }
 
   if (enabled(Actions::kInstructionName) ||

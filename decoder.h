@@ -70,10 +70,20 @@ enum register_name {
   REG_ES_RDI,	/* For string instructions: %es:(%rsi).			      */
   REG_DS_RSI,	/* For string instructions: %ds:(%rdi).			      */
   REG_PORT_DX,	/* 16-bit DX: for in/out instructions.			      */
-  REG_NONE,	/* For modrm: both index and base can be absent.	      */
+  NO_REG,	/* For modrm: both index and base can be absent.	      */
   REG_ST,	/* For x87 instructions: implicit %st.			      */
   JMP_TO	/* Operand is jump target address: usually %rip+offset.	      */
 };
+
+#ifdef TRUE
+#undef TRUE
+#endif
+#define TRUE    (1)
+
+#ifdef FALSE
+#undef FALSE
+#endif
+#define FALSE   (!TRUE)
 
 struct instruction {
   const char *name;

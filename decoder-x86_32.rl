@@ -13,12 +13,6 @@
 #include <string.h>
 #include "decoder.h"
 
-#undef TRUE
-#define TRUE    1
-
-#undef FALSE
-#define FALSE   0
-
 #include "decoder-x86_32-instruction-consts.c"
 
 %%{

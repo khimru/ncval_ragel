@@ -13,12 +13,6 @@
 #include <string.h>
 #include "validator.h"
 
-#undef TRUE
-#define TRUE    1
-
-#undef FALSE
-#define FALSE   0
-
 #define check_jump_dest \
     if ((jump_dest & bundle_mask) != bundle_mask) { \
       if (jump_dest >= size) { \
@@ -78,10 +72,16 @@
   main := ((one_instruction | special_instruction) >{
 	BitmapSetBit(valid_targets, p - data);
      })*
-    $!{ process_error(p, userdata);
+     @{
+       /* On successful match the instruction start must point to the next byte
+        * to be able to report the new offset as the start of instruction
+        * causing error.  */
+       begin = p + 1;
+     }
+     $err{ process_error(begin, userdata);
 	result = 1;
 	goto error_detected;
-    };
+     };
 
 }%%
 
@@ -107,8 +107,8 @@ enum disp_mode {
 
 static const int kBitsPerByte = 8;
 
-static inline uint8_t *BitmapAllocate(uint32_t indexes) {
-  uint32_t byte_count = (indexes + kBitsPerByte - 1) / kBitsPerByte;
+static inline uint8_t *BitmapAllocate(size_t indexes) {
+  size_t byte_count = (indexes + kBitsPerByte - 1) / kBitsPerByte;
   uint8_t *bitmap = malloc(byte_count);
   if (bitmap != NULL) {
     memset(bitmap, 0, byte_count);
@@ -116,15 +116,15 @@ static inline uint8_t *BitmapAllocate(uint32_t indexes) {
   return bitmap;
 }
 
-static inline int BitmapIsBitSet(uint8_t *bitmap, uint32_t index) {
+static inline int BitmapIsBitSet(uint8_t *bitmap, size_t index) {
   return (bitmap[index / kBitsPerByte] & (1 << (index % kBitsPerByte))) != 0;
 }
 
-static inline void BitmapSetBit(uint8_t *bitmap, uint32_t index) {
+static inline void BitmapSetBit(uint8_t *bitmap, size_t index) {
   bitmap[index / kBitsPerByte] |= 1 << (index % kBitsPerByte);
 }
 
-static inline void BitmapClearBit(uint8_t *bitmap, uint32_t index) {
+static inline void BitmapClearBit(uint8_t *bitmap, size_t index) {
   bitmap[index / kBitsPerByte] &= ~(1 << (index % kBitsPerByte));
 }
 
@@ -151,7 +151,7 @@ int ValidateChunkIA32(const uint8_t *data, size_t size,
   uint8_t *jump_dests = BitmapAllocate(size);
 
   const uint8_t *p = data;
-/*  const uint8_t *begin;*/
+  const uint8_t *begin = p;
 
   int result = 0;
 
@@ -172,5 +172,7 @@ int ValidateChunkIA32(const uint8_t *data, size_t size,
   }
 
 error_detected:
+  free(jump_dests);
+  free(valid_targets);
   return result;
 }

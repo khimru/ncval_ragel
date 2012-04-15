@@ -80,6 +80,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
   int rex_bits = 0;
   int maybe_rex_bits = 0;
   int show_name_suffix = FALSE;
+  int empty_rex_prefix_ok = FALSE;
 #define print_name(x) (printf((x)), shown_name += strlen((x)))
   int shown_name = 0;
   int i, operand_type;
@@ -425,6 +426,12 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	  }
 	}
       } else {
+	/* “Empty” rex prefix (0x40) is used to select “sil”/“dil”/“spl”/“bpl”.
+	 */
+	if (instruction->operands[i].type == OperandSize8bit &&
+	    instruction->operands[i].name <= REG_R15) {
+	  empty_rex_prefix_ok = TRUE;
+	}
 	/* First argument of “rcl”/“rcr”/“rol”/“ror”/“sar/”“shl”/“shr”
 	   can not be used to determine size of command.  */
 	if (((i != 1) || (strcmp(instruction_name, "rcl") &&
@@ -474,7 +481,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	if ((instruction->rm.base >= REG_R8) &&
 	    (instruction->rm.base <= REG_R15)) {
 	  ++rex_bits;
-	} else if ((instruction->rm.base == REG_NONE) ||
+	} else if ((instruction->rm.base == NO_REG) ||
 		   (instruction->rm.base == REG_RIP)) {
 	  ++maybe_rex_bits;
 	}
@@ -521,8 +528,10 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     print_name("repnz ");
   }
   if (instruction->prefix.repz) {
-    /* This prefix is “rep” for “ins”, “movs”, and “outs”, “repz” otherwise.  */
+    /* This prefix is “rep” for “ins”, “lods”, “movs”, “outs”, and “stos”.
+       For other instructions print “repz”.  */
     if ((!strcmp(instruction_name, "ins")) ||
+	(!strcmp(instruction_name, "lods")) ||
 	(!strcmp(instruction_name, "movs")) ||
 	(!strcmp(instruction_name, "outs")) ||
 	(!strcmp(instruction_name, "stos"))) {
@@ -532,17 +541,16 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
     }
   }
   if (instruction->prefix.rex == 0x40) {
-    /* First argument of “crc32”/“rcl”/“rcr”/“rol”/“ror”/“sar”/“shl”/“shr”
+    /* First argument of “rcl”/“rcr”/“rol”/“ror”/“sar”/“shl”/“shr”
        confuses objdump: it does not show it in this case.  */
-    if ((show_name_suffix ||
+    if ((!empty_rex_prefix_ok ||
 	 !strcmp(instruction_name, "movsbl") ||
 	 !strcmp(instruction_name, "movsbw") ||
 	 !strcmp(instruction_name, "movzbl") ||
 	 !strcmp(instruction_name, "movzbw") ||
 	 !strcmp(instruction_name, "pextrb") ||
 	 !strcmp(instruction_name, "pinsrb")) &&
-	((strcmp(instruction_name, "crc32") &&
-	  strcmp(instruction_name, "movsbl") &&
+	((strcmp(instruction_name, "movsbl") &&
 	  strcmp(instruction_name, "movsbw") &&
 	  strcmp(instruction_name, "movzbl") &&
 	  strcmp(instruction_name, "movzbw") &&
@@ -717,9 +725,38 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
       print_name("abs");
     }
   }
+  {
+    size_t i;
+    /* Print branch hint suffixes for conditional jump instructions (Jcc).  */
+    const char* jcc_jumps[] = {
+      "ja", "jae", "jbe", "jb", "je", "jg", "jge", "jle",
+      "jl", "jne", "jno", "jnp", "jns", "jo", "jp", "js", NULL};
+    for (i = 0; jcc_jumps[i] != NULL; ++i) {
+      if (!strcmp(instruction_name, jcc_jumps[i])) {
+        if (instruction->prefix.branch_not_taken) {
+          print_name(",pn");
+        } else if (instruction->prefix.branch_taken) {
+          print_name(",pt");
+        }
+        break;
+      }
+    }
+  }
 #undef print_name
   if ((strcmp(instruction_name, "nop") || operands_count != 0) &&
       strcmp(instruction_name, "fwait") &&
+      strcmp(instruction_name, "nopw   %cs:0x0(%eax,%eax,1)") &&
+      strcmp(instruction_name, "nopw   %cs:0x0(%rax,%rax,1)") &&
+      strcmp(instruction_name, "data32 nopw %cs:0x0(%eax,%eax,1)") &&
+      strcmp(instruction_name, "data32 nopw %cs:0x0(%rax,%rax,1)") &&
+      strcmp(instruction_name, "data32 data32 nopw %cs:0x0(%eax,%eax,1)") &&
+      strcmp(instruction_name, "data32 data32 nopw %cs:0x0(%rax,%rax,1)") &&
+      strcmp(instruction_name, "data32 data32 data32 nopw %cs:0x0(%eax,%eax,1)") &&
+      strcmp(instruction_name, "data32 data32 data32 nopw %cs:0x0(%rax,%rax,1)") &&
+      strcmp(instruction_name, "data32 data32 data32 data32 nopw %cs:0x0(%eax,%eax,1)") &&
+      strcmp(instruction_name, "data32 data32 data32 data32 nopw %cs:0x0(%rax,%rax,1)") &&
+      strcmp(instruction_name, "data32 data32 data32 data32 data32 nopw %cs:0x0(%eax,%eax,1)") &&
+      strcmp(instruction_name, "data32 data32 data32 data32 data32 nopw %cs:0x0(%rax,%rax,1)") &&
       strcmp(instruction_name, "pop    %fs") &&
       strcmp(instruction_name, "pop    %gs") &&
       strcmp(instruction_name, "popq   %fs") &&
@@ -946,6 +983,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize256bit:
 	case OperandYMM: printf("%%ymm8"); break;
 	case OperandControlRegister: printf("%%cr8"); break;
+	case OperandDebugRegister: printf("%%db8"); break;
 	default: assert(FALSE);
       }
       break;
@@ -962,6 +1000,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize256bit:
 	case OperandYMM: printf("%%ymm9"); break;
 	case OperandControlRegister: printf("%%cr9"); break;
+	case OperandDebugRegister: printf("%%db9"); break;
 	default: assert(FALSE);
       }
       break;
@@ -978,6 +1017,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize256bit:
 	case OperandYMM: printf("%%ymm10"); break;
 	case OperandControlRegister: printf("%%cr10"); break;
+	case OperandDebugRegister: printf("%%db10"); break;
 	default: assert(FALSE);
       }
       break;
@@ -994,6 +1034,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize256bit:
 	case OperandYMM: printf("%%ymm11"); break;
 	case OperandControlRegister: printf("%%cr11"); break;
+	case OperandDebugRegister: printf("%%db11"); break;
 	default: assert(FALSE);
       }
       break;
@@ -1010,6 +1051,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize256bit:
 	case OperandYMM: printf("%%ymm12"); break;
 	case OperandControlRegister: printf("%%cr12"); break;
+	case OperandDebugRegister: printf("%%db12"); break;
 	default: assert(FALSE);
       }
       break;
@@ -1026,6 +1068,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize256bit:
 	case OperandYMM: printf("%%ymm13"); break;
 	case OperandControlRegister: printf("%%cr13"); break;
+	case OperandDebugRegister: printf("%%db13"); break;
 	default: assert(FALSE);
       }
       break;
@@ -1042,6 +1085,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize256bit:
 	case OperandYMM: printf("%%ymm14"); break;
 	case OperandControlRegister: printf("%%cr14"); break;
+	case OperandDebugRegister: printf("%%db14"); break;
 	default: assert(FALSE);
       }
       break;
@@ -1058,6 +1102,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	case OperandSize256bit:
 	case OperandYMM: printf("%%ymm15"); break;
 	case OperandControlRegister: printf("%%cr15"); break;
+	case OperandDebugRegister: printf("%%db15"); break;
 	default: assert(FALSE);
       }
       break;
@@ -1070,8 +1115,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	  printf("0x%llx",instruction->rm.offset);
 	}
 	if (((struct DecodeState *)userdata)->ia32_mode) {
-	  if ((instruction->rm.base != REG_NONE) ||
-	      (instruction->rm.index != REG_NONE) ||
+	  if ((instruction->rm.base != NO_REG) ||
+	      (instruction->rm.index != NO_REG) ||
 	      (instruction->rm.scale != 0)) {
 	    printf("(");
 	  }
@@ -1084,7 +1129,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case REG_RBP: printf("%%ebp"); break;
 	    case REG_RSI: printf("%%esi"); break;
 	    case REG_RDI: printf("%%edi"); break;
-	    case REG_NONE: break;
+	    case NO_REG: break;
 	    default: assert(FALSE);
 	  }
 	  switch (instruction->rm.index) {
@@ -1097,22 +1142,22 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case REG_RSI: printf(",%%esi,%d",1<<instruction->rm.scale); break;
 	    case REG_RDI: printf(",%%edi,%d",1<<instruction->rm.scale); break;
 	    case REG_R15: printf(",%%r15d,%d",1<<instruction->rm.scale); break;
-	    case REG_RIZ: if ((/*(instruction->rm.base != REG_NONE) &&*/
+	    case REG_RIZ: if ((/*(instruction->rm.base != NO_REG) &&*/
 			       (instruction->rm.base != REG_RSP)/* &&
 			         (instruction->rm.base != REG_R12)*/) ||
 			       (instruction->rm.scale != 0))
 	        printf(",%%eiz,%d",1<<instruction->rm.scale);
 	      break;
-	    case REG_NONE: break;
+	    case NO_REG: break;
 	    default: assert(FALSE);
 	  }
-	  if ((instruction->rm.base != REG_NONE) ||
-	      (instruction->rm.index != REG_NONE) ||
+	  if ((instruction->rm.base != NO_REG) ||
+	      (instruction->rm.index != NO_REG) ||
 	      (instruction->rm.scale != 0)) {
 	    printf(")");
 	  }
 	} else {
-	  if ((instruction->rm.base != REG_NONE) ||
+	  if ((instruction->rm.base != NO_REG) ||
 	      (instruction->rm.index != REG_RIZ) ||
 	      (instruction->rm.scale != 0)) {
 	    printf("(");
@@ -1135,7 +1180,7 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case REG_R14: printf("%%r14"); break;
 	    case REG_R15: printf("%%r15"); break;
 	    case REG_RIP: printf("%%rip"); print_rip = TRUE; break;
-	    case REG_NONE: break;
+	    case NO_REG: break;
 	    default: assert(FALSE);
 	  }
 	  switch (instruction->rm.index) {
@@ -1155,16 +1200,16 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	    case REG_R13: printf(",%%r13,%d",1<<instruction->rm.scale); break;
 	    case REG_R14: printf(",%%r14,%d",1<<instruction->rm.scale); break;
 	    case REG_R15: printf(",%%r15,%d",1<<instruction->rm.scale); break;
-	    case REG_RIZ: if (((instruction->rm.base != REG_NONE) &&
+	    case REG_RIZ: if (((instruction->rm.base != NO_REG) &&
 			       (instruction->rm.base != REG_RSP) &&
 			       (instruction->rm.base != REG_R12)) ||
 			       (instruction->rm.scale != 0))
 	        printf(",%%riz,%d",1<<instruction->rm.scale);
 	      break;
-	    case REG_NONE: break;
+	    case NO_REG: break;
 	    default: assert(FALSE);
 	  }
-	  if ((instruction->rm.base != REG_NONE) ||
+	  if ((instruction->rm.base != NO_REG) ||
 	      (instruction->rm.index != REG_RIZ) ||
 	      (instruction->rm.scale != 0)) {
 	    printf(")");
@@ -1200,10 +1245,10 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	}
 	break;
       case JMP_TO: if (instruction->operands[0].type == OperandSize16bit)
-	  printf("0x%x", (end + instruction->rm.offset -
+	  printf("0x%zx", (end + instruction->rm.offset -
 			   (((struct DecodeState *)userdata)->offset)) & 0xffff);
 	else
-	  printf("0x%x", end + instruction->rm.offset -
+	  printf("0x%zx", end + instruction->rm.offset -
 				     (((struct DecodeState *)userdata)->offset));
 	break;
       default: assert(FALSE);
@@ -1227,8 +1272,8 @@ void ProcessInstruction(const uint8_t *begin, const uint8_t *end,
 	printf("%02x ", *p);
       }
     }
+    printf("\n");
     if (p >= end) {
-      printf("\n");
       return;
     }
     begin += 7;

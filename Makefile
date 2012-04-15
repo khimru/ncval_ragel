@@ -20,7 +20,8 @@ INST_DEFS = general-purpose-instructions.def \
 	    system-instructions.def \
 	    x87-instructions.def \
 	    mmx-instructions.def \
-	    xmm-instructions.def
+	    xmm-instructions.def \
+	    nops.def
 
 FAST_TMP_FOR_TEST=/dev/shm
 
@@ -33,46 +34,46 @@ $(OUT_DIRS):
 decoder-test: decoder-x86_32.o decoder-x86_64.o decoder-test.o
 .INTERMEDIATE: validator-test.o validator-x86_32.o validator-x86_64.o
 validator-test: validator-x86_32.o validator-x86_64.o validator-test.o
-.INTERMEDIATE: gen-decoder decoder-x86_32.c decoder-x86_64.c
+.INTERMEDIATE: gen-dfa decoder-x86_32.c decoder-x86_64.c
 .INTERMEDIATE: validator-x86_32.c validator-x86_64.c
 decoder-x86_32.c: decoder-x86_32-instruction-consts.c
 decoder-x86_32.c: decoder-x86_32-instruction.rl
 .INTERMEDIATE: decoder-x86_32-instruction.rl decoder-x86_32-instruction-consts.c
 decoder-x86_32-instruction-consts.c decoder-x86_32-instruction.rl: \
-							gen-decoder $(INST_DEFS)
-	./gen-decoder -o decoder-x86_32-instruction.rl $(INST_DEFS) \
+							gen-dfa $(INST_DEFS)
+	./gen-dfa -o decoder-x86_32-instruction.rl $(INST_DEFS) \
 	  -d check_access,opcode,parse_operands_states,mark_data_fields
 decoder-x86_64.c: decoder-x86_64-instruction-consts.c
 decoder-x86_64.c: decoder-x86_64-instruction.rl
 .INTERMEDIATE: decoder-x86_64-instruction.rl decoder-x86_64-instruction-consts.c
 decoder-x86_64-instruction-consts.c decoder-x86_64-instruction.rl: \
-							gen-decoder $(INST_DEFS)
-	./gen-decoder -o decoder-x86_64-instruction.rl $(INST_DEFS) \
+							gen-dfa $(INST_DEFS)
+	./gen-dfa -o decoder-x86_64-instruction.rl $(INST_DEFS) \
 	  -d check_access,opcode,parse_operands_states,mark_data_fields \
 	  -m amd64
 validator-x86_32.c: validator-x86_32-instruction.rl
 .INTERMEDIATE: validator-x86_32-instruction.rl
-validator-x86_32-instruction.rl: gen-decoder $(INST_DEFS)
-	./gen-decoder -o validator-x86_32-instruction.rl $(INST_DEFS) \
+validator-x86_32-instruction.rl: gen-dfa $(INST_DEFS)
+	./gen-dfa -o validator-x86_32-instruction.rl $(INST_DEFS) \
 	  -d check_access,opcode,parse_operands,parse_operands_states \
 	  -d instruction_name,mark_data_fields,nacl-forbidden \
-	  -d imm_operand_action,rel_operand_action nops.def
+	  -d imm_operand_action,rel_operand_action
 validator-x86_64.c: validator-x86_64-instruction-consts.c
 validator-x86_64.c: validator-x86_64-instruction.rl
 .INTERMEDIATE: validator-x86_64-instruction.rl
 .INTERMEDIATE: validator-x86_64-instruction-consts.c
 validator-x86_64-instruction-consts.c validator-x86_64-instruction.rl: \
-							gen-decoder $(INST_DEFS)
-	./gen-decoder -o validator-x86_64-instruction.rl $(INST_DEFS) \
+							gen-dfa $(INST_DEFS)
+	./gen-dfa -o validator-x86_64-instruction.rl $(INST_DEFS) \
 	  -d opcode,instruction_name,mark_data_fields,rel_operand_action \
-	  -d nacl-forbidden nops.def -m amd64
+	  -d nacl-forbidden -m amd64
 one-instruction-x86_32.rl: one-valid-instruction-x86_32-consts.c
 one-instruction-x86_32.rl: one-valid-instruction-x86_32.rl
 .INTERMEDIATE: one-valid-instruction-x86_32.rl
 .INTERMEDIATE: one-valid-instruction-x86_32-consts.c
 one-valid-instruction-x86_32-consts.c one-valid-instruction-x86_32.rl: \
-							gen-decoder $(INST_DEFS)
-	./gen-decoder -o one-valid-instruction-x86_32.rl $(INST_DEFS) \
+							gen-dfa $(INST_DEFS)
+	./gen-dfa -o one-valid-instruction-x86_32.rl $(INST_DEFS) \
 	  -d check_access,rex_prefix,vex_prefix,opcode,parse_operands \
 	  -d parse_operands_states
 one-instruction-x86_64.rl: one-valid-instruction-x86_64-consts.c
@@ -80,8 +81,8 @@ one-instruction-x86_64.rl: one-valid-instruction-x86_64.rl
 .INTERMEDIATE: one-valid-instruction-x86_64.rl
 .INTERMEDIATE: one-valid-instruction-x86_64-consts.c
 one-valid-instruction-x86_64-consts.c one-valid-instruction-x86_64.rl: \
-							gen-decoder $(INST_DEFS)
-	./gen-decoder -o one-valid-instruction-x86_64.rl $(INST_DEFS) \
+							gen-dfa $(INST_DEFS)
+	./gen-dfa -o one-valid-instruction-x86_64.rl $(INST_DEFS) \
 	  -d check_access,rex_prefix,vex_prefix,opcode,parse_operands \
 	  -d parse_operands_states -m amd64
 .INTERMEDIATE: one-instruction-x86_32.dot one-instruction-x86_32.xml
