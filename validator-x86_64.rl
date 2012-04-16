@@ -305,8 +305,12 @@
        BitmapClearBit(valid_targets, (sandboxed_rdi - data));
     };
 
-  main := ((normal_instruction | special_instruction) >{
-	BitmapSetBit(valid_targets, p - data);
+  main := ((normal_instruction | special_instruction) @{
+       /* On successful match the instruction start must point to the next byte
+        * to be able to report the new offset as the start of instruction
+        * causing error.  */
+       BitmapSetBit(valid_targets, p + 1 - data);
+       begin = p + 1;
 	rex_prefix = FALSE;
 	vex_prefix2 = 0xe0;
 	vex_prefix3 = 0x00;

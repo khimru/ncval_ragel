@@ -141,7 +141,14 @@ found in the LICENSE file.
     return !disabled_actions[static_cast<int>(action)];
   }
 
+  /* instruction_names maps strings with instruction_names to offsets in
+     the instruction_names array.  These offsets are set to zero prior to
+     print_consts call.  */
   std::map<std::string, size_t> instruction_names;
+
+  /* instructions contain all the instructions defined in all the .def files.
+     We need to collect them all first to generate instruction_names map.
+     Later they are processed induvidually to produce DFA.  */
   struct Instruction {
     std::string name;
     struct Operand {
@@ -165,13 +172,20 @@ found in the LICENSE file.
   };
   std::vector<Instruction> instructions;
 
+  /* Here we have couple of file descriptors and couple of filenames which are
+     used to print out the result.  We are generating two files because our
+     .rl file can not include C language constants.  */
   FILE *out_file = stdout;
   FILE *const_file = stdout;
   char *out_file_name = nullptr;
   char *const_file_name = nullptr;
 
+  /* Generator has two different modes: ia32 one (old 32bit mode) and amd64 (new
+     64bit one). They are slightly different WRT REX/VEX handling, etc.  */
   auto ia32_mode = true;
 
+  /* read_file reads the filename and returns it's contents.  We don't try to
+     save memory by using line-by-line processing.  */
   std::string read_file(const char *filename) {
     std::string file_content;
     auto file = open(filename, O_RDONLY);
@@ -185,11 +199,11 @@ found in the LICENSE file.
     }
     while ((count = read(file, buf, sizeof(buf))) > 0) {
       for (auto it = buf; it < buf + count ; ++it) {
-        if (*it != '\r') {
-          file_content.push_back(*it);
-        } else {
-          file_content.push_back('\n');
-        }
+	if (*it != '\r') {
+	  file_content.push_back(*it);
+	} else {
+	  file_content.push_back('\n');
+	}
       }
     }
     if (count == -1) {
@@ -205,6 +219,10 @@ found in the LICENSE file.
     return file_content;
   }
 
+  /* load_instructions parses the given file and adds instruction definitions
+     to the instructions vector and their names to instruction_names map.
+
+     Note: it only accets flags listed in gen-dfa-flags.C  */
   void load_instructions(const char *filename) {
     const auto file_content = read_file(filename);
     auto it = begin(file_content);
@@ -252,7 +270,6 @@ found in the LICENSE file.
 	auto operation = split_till_comma();
 	/* Line with just a whitespaces is ignored.  */
 	if (operation.size() != 0) {
-	  instruction_names[instruction.name = operation[0]] = 0;
 	  for_each(operation.rbegin(), operation.rend() - 1,
 	    [&instruction, &operation](std::string &str) {
 	      Instruction::Operand operand;
@@ -330,6 +347,7 @@ found in the LICENSE file.
 	    }
 	  }
 	  if (enabled_instruction) {
+	    instruction_names[instruction.name = operation[0]] = 0;
 	    instructions.push_back(instruction);
 	  }
 	}
@@ -338,22 +356,28 @@ found in the LICENSE file.
     }
   }
 
+  /* chartest prints all the chacters for which the given expression is true.
+     For example chartest(c < 3) will return "( 0x00 | 0x01 | 0x02 )".  */
   template<typename func>
   std::string chartest(func f) {
     std::string result;
     auto delimiter = "( ";
     for (int c = 0x00; c <= 0xff; ++c) {
       if (f(c)) {
-        char buf[10];
-        sprintf(buf, "%s0x%02x", delimiter, c);
-        result += buf;
-        delimiter = " | ";
+	char buf[10];
+	sprintf(buf, "%s0x%02x", delimiter, c);
+	result += buf;
+	delimiter = " | ";
       }
     }
     return result + " )";
   }
   #define chartest(x) (chartest([=](int c) { return x; }).c_str())
 
+  /* print_consts does three things:
+       • prints instruction_names array in -consts.c (if needed).
+       • adjusts offsets in instruction_names map.
+       • prints index_registers array in -consts.c (if needed).  */
   void print_consts(void)  {
     if (enabled(Actions::kInstructionName)) {
       std::vector<std::string> names;
@@ -361,7 +385,7 @@ found in the LICENSE file.
 	std::back_inserter(names),
 	[](decltype(*begin(instruction_names)) pair) { return pair.first; });
       std::sort(begin(names), end(names), [](std::string x, std::string y) {
-        return (x.size() > y.size()) || ((x.size() == y.size()) && x < y);
+	return (x.size() > y.size()) || ((x.size() == y.size()) && x < y);
       });
       for (auto &name : names) {
 	if (instruction_names[name] == 0) {
@@ -418,19 +442,10 @@ found in the LICENSE file.
     }
   }
 
-  std::string c_identifier(std::string text) {
-    std::string name;
-    for (auto c : text) {
-      if (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') ||
-	  ('0' <= c && c <= '9')) {
-	name.push_back(c);
-      } else {
-	name.push_back('_');
-      }
-    }
-    return name;
-  }
-
+  /* print_common_decoding prints common actions uses later by instruction
+     recognizing DFA.  We try to reduce number of actions, but this is has
+     mostly cosmetic effect since ragel does not include unreferenced actions
+     in the generated .c file.  */
   void print_common_decoding(void) {
     if (enabled(Actions::kRelOperandAction)) {
       fprintf(out_file, R"END(  action rel8_operand {
@@ -1034,6 +1049,25 @@ found in the LICENSE file.
     }
   }
 
+  /* c_identifier replaces all characters except letters and numbers
+     with underscores.  This may lead to the collisions, but these will
+     be detected by ragel thus they can not real to runtime errors.  */
+  std::string c_identifier(std::string text) {
+    std::string name;
+    for (auto c : text) {
+      if (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') ||
+	  ('0' <= c && c <= '9')) {
+	name.push_back(c);
+      } else {
+	name.push_back('_');
+      }
+    }
+    return name;
+  }
+
+  /* print_name_actions prints set of actions which save name of the instruction
+     in instruction_name variable.  It uses instruction_names array generated by
+     print_consts function.  */
   void print_name_actions(void) {
     for (auto &pair : instruction_names) {
       fprintf(out_file, "  action instruction_%s"
@@ -1044,6 +1078,39 @@ found in the LICENSE file.
 
   struct MarkedInstruction : Instruction {
     /* Additional marks are created in the process of parsing. */
+    /* MarkedInstruction is Instruction with additional fields used to keep
+       track of the data processing.
+
+       In addition to what Instruction class contains it includes the following:
+	 • instruction_class - used to generate different sizes from a single
+	   instruction definition in a .def file (see get_instruction_class for
+	   details).
+	 • required_prefixes - prefixes which MUST be present in a given
+	   instruction form.
+	 • optional_prefixes - prefixes which MAY be present in a given
+	   instruction form.
+	   Note: prefixes which may be present but will be ignored are NOT
+	   included and will be rejected by generated DFA!
+	 • rex - defines REX/VEX prefix
+	   ◦ rex.b - “B” bit MAY be present in the instruction variant.
+	   ◦ rex.x - “X” bit MAY be present in the instruction variant.
+	   ◦ rex.r - “R” bit MAY be present in the instruction variant.
+	   ◦ rex.w - “W” bit MUST be present in the instruction variant.
+	   Note: “W” is quite different from “B”/“X”/“R” bits in that it changes
+	   the instruction and some instructions may be valid only with “W” bit
+	   set or, alternative, only when “W” bit is not set.  Thus we create
+	   two separate lines in case where “W” can be both set and unset.
+	   Other bits only extend fields in “base”, “index”, and “reg” fields in
+	   “ModR/M” and “SIB” bytes and thus are always allowed - but sometimes
+	   they don't make sense (if you don't have a field then how can you
+	   extend it?).  Worse: VEX/XOP instructions can not be decoded if they
+	   use these bits!
+	 • opcode_in_modrm - true IFF “reg” field of “ModR/M” byte is used as
+	   opcode extension.
+	 • opcode_in_imm - true UFF “imm” part is used as opcode extension.
+       Note: these marks can be changed by induvidual functions in
+       MarkedInstruction class, but they are saved and then restored thus they
+       are unchanged after call.  */
     MarkedInstruction(Instruction instruction_) :
 	Instruction(instruction_),
 	instruction_class(get_instruction_class(instruction_)),
@@ -1083,9 +1150,6 @@ found in the LICENSE file.
 		    opcode->append(saved_opcode);
 		  }
 		  opcode->push_back(')');
-		  if (saved_opcode == "0x97") {
-		    opcode->erase(1, 5);
-		  }
 		  break;
 		case '8':
 		  (*opcode) = "(";
@@ -1172,15 +1236,23 @@ found in the LICENSE file.
     bool opcode_in_modrm : 1;
     bool opcode_in_imm : 1;
 
+    /* One source line from .def file can generate few lines in .rl file.
+       This happens when size-altering and/or operand altering prefixes are
+       involved.  This also includes “byte/word” bit in opcode.
+       The prefixes in question:
+	 “size8” - opcode's last bit is zero, all operands are 8bit in size.
+	 “data16” - operands which normally are 32bit are turned to 16bit.
+	 “REX.W” - bit “W” in REX/VEX prefix turns 32bit operands in 64bit ones.
+	 "L bit” - bit “L” VEX prefix turns 128bit operands to 256bit ones.
+
+       get_instruction_class function looks on the list of arguments for the
+       instruction and determines if said prefixes can be meaningfully used
+       with such instruction.  */
     static InstructionClass get_instruction_class(
 					       const Instruction &instruction) {
       InstructionClass instruction_class = InstructionClass::kUnknown;
       for (auto &operand : instruction.operands) {
 	static const std::map<std::string, InstructionClass> classes_map {
-	  /* “size8” is special “prefix” not included in AMD manual:  w bit in
-	     opcode switches between 8bit and 16/32/64 bit versions.  M is just
-	     an address in memory: it means register-only encodings are invalid,
-	     but other operands decide everything else.  */
 	  { "",		InstructionClass::kSize8Data16DefaultRexW	},
 	  { "2",	InstructionClass::kUnknown			}, 
 	  { "7",	InstructionClass::kUnknown			}, 
@@ -1272,9 +1344,25 @@ found in the LICENSE file.
       }
     }
 
+    /* One source line from .def file can generate few lines in .rl file.
+       This happens when size-altering and/or operand altering prefixes are
+       involved.  This also includes “byte/word” bit in opcode.
+       The prefixes in question:
+	 “size8” - opcode's last bit is zero, all operands are 8bit in size.
+	 “data16” - operands which normally are 32bit are turned to 16bit.
+	 “REX.W” - bit “W” in REX/VEX prefix turns 32bit operands in 64bit ones.
+	 "L bit” - bit “L” VEX prefix turns 128bit operands to 256bit ones.
+
+       print_definition function calls print_one_size_definition one to four
+       times to handle all these cases.  “L bit” and “size8” are never used
+       together thus we have at most four cases.
+
+       This means that other functions never encounter “L bit” in opcode written
+       as “.L.” (it's either “.0.” or “.1.” there) and may rely on the correct
+       content of rex.w variable.  */
     void print_definition(void) {
       auto print_one_size_definition_data16 = [this] (void) {
-        auto saved_prefixes = required_prefixes;
+	auto saved_prefixes = required_prefixes;
 	required_prefixes.insert("data16");
 	print_one_size_definition();
 	required_prefixes = saved_prefixes;
@@ -1380,10 +1468,19 @@ found in the LICENSE file.
       }
     }
 
+    /* print_one_size_definition prints definition for one single operands size.
+
+       Note: this may include up to three blocks if “lock” prefix is involved:
+	 • “ModR/M byte” specifies reg-to-reg operands.
+	 • “ModR/M byte” specifies reg-to-mem operands without “lock” prefix.
+	 • “ModR/M byte” specifies reg-to-mem operands with “lock” prefix.
+
+       Note that 64bit operands are illegal in ia32 mode (duh).  This function does
+       not print anything in this case.  */
     void print_one_size_definition(void) {
       /* 64bit commands are not supported in ia32 mode.  */
       if (ia32_mode && rex.w) {
-        return;
+	return;
       }
       bool modrm_memory = false;
       bool modrm_register = false;
@@ -1429,12 +1526,23 @@ found in the LICENSE file.
 	  print_one_size_definition_modrm_register();
 	}
       } else {
-        print_one_size_definition_nomodrm();
+	print_one_size_definition_nomodrm();
       }
     }
 
+    /* print_one_size_definition_nomodrm prints full definition of one single
+       instruction which does not include “ModR/M byte”.
+
+       The only twist here is the 0x90 opcode: it requires special handling
+       because all combinations except straight “0x90” and “0x48 0x90” are
+       handled as normal “xchg” instruction, but “0x90” and “0x48 0x90” are
+       treated specially to make sure there are one-byte “nop” in the
+       instruction set.  */
     void print_one_size_definition_nomodrm(void) {
       print_operator_delimiter();
+      if (opcodes[0] == "(0x90|0x91|0x92|0x93|0x94|0x95|0x96|0x97)") {
+	fprintf(out_file, "(");
+      }
       print_legacy_prefixes();
       print_rex_prefix();
       print_opcode_nomodrm();
@@ -1445,9 +1553,20 @@ found in the LICENSE file.
 	print_opcode_recognition();
 	print_immediate_arguments();
       }
+      if (opcodes[0] == "(0x90|0x91|0x92|0x93|0x94|0x95|0x96|0x97)") {
+	fprintf(out_file, ") - (0x90|0x48 0x90)");
+      }
     }
 
+    /* print_one_size_definition_modrm_register prints full definition of one
+       single which does include “ModR/M byte” but which is not used to access
+       memory.
+
+       This function should handle two corner cases: when field “reg” in
+       “ModR/M byte” is used to extend opcode and when “imm” field is used to
+       extend opcode.  These two cases are never combined.  */
     void print_one_size_definition_modrm_register(void) {
+      auto saved_rex = rex;
       print_operator_delimiter();
       if (mod_reg_is_used()) {
 	rex.r = true;
@@ -1459,11 +1578,11 @@ found in the LICENSE file.
       print_rex_prefix();
       print_opcode_nomodrm();
       if (!opcode_in_imm) {
-        print_opcode_recognition();
+	print_opcode_recognition();
       }
       fprintf(out_file, " modrm_registers");
       if (enabled(Actions::kParseOperands)) {
-        for (auto &operand : operands) {
+	for (auto &operand : operands) {
 	  static const std::map<char, const char*> operand_type {
 	    { 'C', "reg"	},
 	    { 'D', "reg"	},
@@ -1495,16 +1614,29 @@ found in the LICENSE file.
       } else {
 	print_immediate_arguments();
       }
+      rex = saved_rex;
     }
 
+    /* print_one_size_definition_modrm_memory prints full definition of one
+       single which does include “ModR/M byte” which is ussed to access memory.
+
+       This is is the most complicated and expensive variant to parse because
+       there are so many variants: with and without base, without and without
+       index and, accordingly, with zero, one, or two bits used from REX/VEX
+       byte.
+
+       Additionally function should handle two corner cases: when field “reg” in
+       “ModR/M byte” is used to extend opcode and when “imm” field is used to
+       extend opcode.  These two cases are never combined.  */
     void print_one_size_definition_modrm_memory(void) {
+      auto saved_rex = rex;
       typedef std::tuple<const char *, bool, bool> T;
       for (auto mode : {
-        T { " operand_disp",		false,	true	},
-        T { " operand_rip",		false,	false	},
-        T { " single_register_memory",	false,	true	},
-        T { " operand_sib_pure_index",	true,	false	},
-        T { " operand_sib_base_index",	true,	true	}
+	T { " operand_disp",		false,	true	},
+	T { " operand_rip",		false,	false	},
+	T { " single_register_memory",	false,	true	},
+	T { " operand_sib_pure_index",	true,	false	},
+	T { " operand_sib_base_index",	true,	true	}
       }) {
 	print_operator_delimiter();
 	if (mod_reg_is_used()) {
@@ -1541,7 +1673,7 @@ found in the LICENSE file.
 	      { 'U', "rm"			},
 	      { 'V', "from_modrm_reg"		},
 	      { 'W', "rm"			}
-            };
+	    };
 	    auto it = operand_type.find(operand.source);
 	    if (it != end(operand_type)) {
 	      fprintf(out_file, " @operand%zd_%s",
@@ -1561,8 +1693,13 @@ found in the LICENSE file.
 	  print_immediate_arguments();
 	}
       }
+      rex = saved_rex;
     }
 
+    /* print_operator_delimiter is simple function: it's called to start a line.
+
+       When it's called for a first time it just starts a line, in all other
+       cases it first finishes the previous line with “(” first.  */
     static bool first_delimiter;
     void print_operator_delimiter(void) {
       if (first_delimiter) {
@@ -1573,6 +1710,9 @@ found in the LICENSE file.
       first_delimiter = false;
     }
 
+    /* mod_reg_is_used returns true if the instruction includes operands which
+       is encoded in field “reg” in “ModR/M byte” and must be extended by “R”
+       bit in REX/VEX prefix.  */
     bool mod_reg_is_used() {
       for (auto &operand : operands) {
 	if (operand.source == 'C' &&
@@ -1588,6 +1728,9 @@ found in the LICENSE file.
       return false;
     }
 
+    /* mod_reg_is_used returns true if the instruction includes operands which
+       is encoded in field “reg” in “ModR/M byte” and must be extended by “X”
+       and/or “B” bits in REX/VEX prefix.  */
     bool mod_rm_is_used() {
       for (auto &operand : operands) {
 	for (auto c : { 'E', 'M', 'N', 'Q', 'R', 'U', 'W' }) {
@@ -1599,6 +1742,15 @@ found in the LICENSE file.
       return false;
     }
 
+    /* print_legacy_prefixes prints all possible combinations of legacy prefixes
+       from required_prefixes and optional_prefixes sets.
+
+       Right now we print all possible permutations of required_prefixes with
+       all optional_prefixes in all positions but without repetitions.
+
+       Later we may decide to implement other cases (such as: duplicated
+       prefixes for decoder and/or prefixes in a single “preferred order”
+       for strict validator).  */
     void print_legacy_prefixes(void) {
       if ((required_prefixes.size() == 1) &&
 	  (optional_prefixes.size() == 0)) {
@@ -1630,8 +1782,8 @@ found in the LICENSE file.
 	      delimiter = " | ";
 	      auto delimiter = '(';
 	      for (auto &prefix : permutations) {
-	        fprintf(out_file, "%c%s", delimiter, prefix.c_str());
-	        delimiter = ' ';
+		fprintf(out_file, "%c%s", delimiter, prefix.c_str());
+		delimiter = ' ';
 	      }
 	      fprintf(out_file, ")");
 	    } while (next_permutation(begin(permutations), end(permutations)));
@@ -1645,13 +1797,18 @@ found in the LICENSE file.
       }
     }
 
+    /* print_rex_prefix prints REX prefix.
+
+       There are two complications:
+	 • ia32 mode does not support REX prefix.
+	 • REX prefix is incompatible with VEX/XOP prefixes.  */
     void print_rex_prefix(void) {
       /* Prefix REX is not used in ia32 mode.  */
       if (ia32_mode) {
 	return;
       }
       /* VEX/XOP instructions integrate REX bits and opcode bits.  They will
-         be printed in print_opcode_nomodrm.  */
+	 be printed in print_opcode_nomodrm.  */
       if ((opcodes.size() >= 3) &&
 	  ((opcodes[0] == "0xc4") ||
 	   ((opcodes[0] == "0x8f") && (opcodes[1] != "/0")))) {
@@ -1701,18 +1858,20 @@ found in the LICENSE file.
 #endif
     }
 
+    /* print_opcode_nomodrm prints the main opcode of the instruction.
+
+       There are quite a few twists here:
+	 • opcode may include register (e.g. “push” and “pop” instructions)
+	 • VEX/XOP mix together opcode and prefix - both are printed here.
+	 • opcode can be embedded in “ModR/M byte” and “imm” parts of the
+	   instruction.  These are NOT printed here.  */
     void print_opcode_nomodrm(void) {
       if ((opcodes.size() == 1) ||
 	  ((opcodes.size() == 2) &&
 	   (opcodes[1].find('/') != opcodes[1].npos))) {
 	if (opcodes[0].find('/') == opcodes[0].npos) {
-	  if ((instruction_class == InstructionClass::kData16) &&
-	      (opcodes[0] == "(0x91|0x92|0x93|0x94|0x95|0x96|0x97)")) {
-	    fprintf(out_file, "(0x90|0x91|0x92|0x93|0x94|0x95|0x96|0x97)");
-	  } else {
-	    fprintf(out_file, "%s", opcodes[0].c_str());
-	  }
-        }
+	  fprintf(out_file, "%s", opcodes[0].c_str());
+	}
       } else if ((opcodes.size() >= 3) &&
 		 ((opcodes[0] == "0xc4") ||
 		  ((opcodes[0] == "0x8f") && (opcodes[1] != "/0"))) &&
@@ -1745,7 +1904,7 @@ found in the LICENSE file.
 	for (auto symbolic : { "cntl", "dest", "src1", "src" }) {
 	  for (auto it = begin(third_byte); it != end(third_byte); ++it) {
 	    if ((end(third_byte) - it) >= strlen(symbolic) &&
-	        !strncmp(&*it, symbolic, strlen(symbolic))) {
+		!strncmp(&*it, symbolic, strlen(symbolic))) {
 	      third_byte.replace(it, it + strlen(symbolic), "XXXX");
 	      break;
 	    }
@@ -1799,12 +1958,12 @@ found in the LICENSE file.
 		  for (auto &byte : bytes) {
 		    bytes.insert(byte & ~p);
 		  }
-	        }
+		}
 	      }
 	      auto delimiter = "(";
 	      for (auto &byte : bytes) {
-	        fprintf(out_file, "%s0x%02x", delimiter, byte);
-	        delimiter = " | ";
+		fprintf(out_file, "%s0x%02x", delimiter, byte);
+		delimiter = " | ";
 	      }
 	      fprintf(out_file, ")");
 	    }
@@ -1867,6 +2026,19 @@ found in the LICENSE file.
       }
     }
 
+    /* print_opcode_recognition prints appropriate actions for the case where
+       opcode is recognized.
+
+       This may happen in three positions:
+	 • after “official opcode bytes” - normal case.
+	 • after “ModR/M byte”.
+	 • after “imm byte”.
+
+       In all cases we need to store information about the detected instruction:
+	 • name of the instruction.
+	 • number of operands.
+	 • sizes of the operands.
+	 • recognition of implied operands (e.g. %rax or %ds:(%rsi).  */
     void print_opcode_recognition(void) {
       if (opcode_in_modrm) {
 	fprintf(out_file, " (");
@@ -1903,9 +2075,9 @@ found in the LICENSE file.
       }
       if (enabled(Actions::kParseOperands)) {
 	fprintf(out_file, " @operands_count_is_%zd", operands.size());
-        for (auto &operand : operands) {
-          typedef std::tuple<InstructionClass, char, std::string> T;
-          static const std::map<T, const char*> operand_sizes {
+	for (auto &operand : operands) {
+	  typedef std::tuple<InstructionClass, char, std::string> T;
+	  static const std::map<T, const char*> operand_sizes {
 	    { T { InstructionClass::kDefault, ' ', ""	  },	"32bit"	      },
 	    { T { InstructionClass::kSize8,   ' ', ""	  },	"8bit"	      },
 	    { T { InstructionClass::kData16,  ' ', ""	  },	"16bit"	      },
@@ -2055,6 +2227,10 @@ found in the LICENSE file.
       }
     }
 
+    /* print_immediate_arguments prints immediate recognitions.
+
+       This includes “normal immediates”, “relative immediates” (for call/j*),
+       and “32bit/64bit offset” (e.g. in “movabs” instruction).  */
     void print_immediate_arguments(void) {
       for (auto operand = operands.rbegin(); operand != operands.rend();
 								    ++operand) {
@@ -2152,6 +2328,10 @@ found in the LICENSE file.
       }
     }
 
+    /* print_immediate_opcode is only used when opcode is embedded in “imm”
+       field.
+
+       Pulls the last part of opcode and prints it.  */
     void print_immediate_opcode(void) {
       auto print_opcode = false;
       for (auto &opcode : opcodes) {
@@ -2164,11 +2344,17 @@ found in the LICENSE file.
     }
   };
 
+  /* print_one_instruction_definition prints definition for the instruction.
+
+     It creates MarkedInstruction from a given instruction which is used to
+     pass information between pletora of functions which are supposed to
+     create ragel definition for a given function.  */
   void print_one_instruction_definition(void) {
     for (auto &instruction : instructions) {
       MarkedInstruction(instruction).print_definition();
     }
   }
+
   bool MarkedInstruction::first_delimiter = true;
 }
 
@@ -2194,8 +2380,8 @@ int main(int argc, char *argv[]) {
 
     switch (option) {
       case 'c': {
-        const_file_name = optarg;
-        break;
+	const_file_name = optarg;
+	break;
       }
       case 'd': {
 	for (auto action_to_disable = strtok(optarg, ",");
@@ -2262,7 +2448,7 @@ int main(int argc, char *argv[]) {
       strcpy(const_file_name, out_file_name);
       auto dot_position = strrchr(const_file_name, '.');
       if (!dot_position) {
-        dot_position = strrchr(const_file_name, '\0');
+	dot_position = strrchr(const_file_name, '\0');
       }
       strcpy(dot_position, "-consts.c");
     }

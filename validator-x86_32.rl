@@ -69,15 +69,13 @@
     @{ BitmapClearBit(valid_targets, (p - data) - 1);
     };
 
-  main := ((one_instruction | special_instruction) >{
-	BitmapSetBit(valid_targets, p - data);
-     })*
-     @{
+  main := ((one_instruction | special_instruction) @{
        /* On successful match the instruction start must point to the next byte
         * to be able to report the new offset as the start of instruction
         * causing error.  */
+       BitmapSetBit(valid_targets, p + 1 - data);
        begin = p + 1;
-     }
+     })*
      $err{ process_error(begin, userdata);
 	result = 1;
 	goto error_detected;
